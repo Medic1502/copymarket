@@ -1,0 +1,178 @@
+require('dotenv').config();
+const bcrypt = require('bcrypt');
+const { ethers } = require('ethers');
+const { pool, query } = require('./client');
+const crypto = require('crypto');
+
+const SALT_ROUNDS = 12;
+const ALGORITHM = 'aes-256-gcm';
+
+function encryptPrivateKey(privateKey) {
+  const key = process.env.WALLET_ENCRYPTION_KEY;
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(key, 'hex'), iv);
+  const encrypted = Buffer.concat([cipher.update(privateKey, 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return [iv.toString('hex'), authTag.toString('hex'), encrypted.toString('hex')].join(':');
+}
+
+function decryptPrivateKey(encryptedStr) {
+  const key = process.env.WALLET_ENCRYPTION_KEY;
+  const [ivHex, authTagHex, encryptedHex] = encryptedStr.split(':');
+  const decipher = crypto.createDecipheriv(ALGORITHM, Buffer.from(key, 'hex'), Buffer.from(ivHex, 'hex'));
+  decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
+  const decrypted = Buffer.concat([decipher.update(Buffer.from(encryptedHex, 'hex')), decipher.final()]);
+  return decrypted.toString('utf8');
+}
+
+// USERS
+async function createUser(email, password) {
+  const existing = await query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
+  if (existing.rows.length > 0) throw new Error('EMAIL_TAKEN');
+  const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+  const res = await query(
+    'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email, created_at',
+    [email.toLowerCase(), passwordHash]
+  );
+  return res.rows[0];
+}
+
+async function getUserByEmail(email) {
+  const res = await query('SELECT * FROM users WHERE email = $1 AND is_active = TRUE', [email.toLowerCase()]);
+  return res.rows[0] ?? null;
+}
+
+async function getUserById(id) {
+  const res = await query('SELECT id, email, created_at, is_active FROM users WHERE id = $1', [id]);
+  return res.rows[0] ?? null;
+}
+
+async function verifyPassword(user, password) {
+  return bcrypt.compare(password, user.password_hash);
+}
+
+// WALLETS
+async function createWalletForUser(userId) {
+  const wallet = ethers.Wallet.createRandom();
+  const encryptedKey = encryptPrivateKey(wallet.privateKey);
+  const res = await query(
+    'INSERT INTO wallets (user_id, address, encrypted_private_key) VALUES ($1, $2, $3) RETURNING id, address, created_at',
+    [userId, wallet.address, encryptedKey]
+  );
+  return res.rows[0];
+}
+
+async function getWalletByUserId(userId) {
+  const res = await query('SELECT * FROM wallets WHERE user_id = $1', [userId]);
+  return res.rows[0] ?? null;
+}
+
+async function getUSDCBalance(address) {
+  const USDC = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
+  const provider = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
+  const abi = ['function balanceOf(address) view returns (uint256)'];
+  const contract = new ethers.Contract(USDC, abi, provider);
+  const raw = await contract.balanceOf(address);
+  return parseFloat(ethers.formatUnits(raw, 6));
+}
+
+// COPY CONFIGS
+async function saveCopyConfig(userId, { targetWallet, budget, maxPerTrade, dailyLossLimit }) {
+  const res = await query(
+    `INSERT INTO copy_configs (user_id, target_wallet, budget, max_per_trade, daily_loss_limit)
+     VALUES ($1, $2, $3, $4, $5)
+     
+     RETURNING *`,
+    [userId, targetWallet, budget, maxPerTrade, dailyLossLimit]
+  );
+  return res.rows[0];
+}
+
+async function getCopyConfig(userId) {
+  const res = await query('SELECT * FROM copy_configs WHERE user_id = $1', [userId]);
+  return res.rows ?? [];
+}
+
+async function setActive(userId, isActive, pausedReason = null) {
+  await query(
+    'UPDATE copy_configs SET is_active = $2, paused_reason = $3, updated_at = NOW() WHERE user_id = $1',
+    [userId, isActive, pausedReason]
+  );
+}
+
+async function getAllActiveConfigs() {
+  const res = await query(`
+    SELECT cc.*, w.address AS wallet_address, w.encrypted_private_key
+    FROM copy_configs cc
+    JOIN wallets w ON w.user_id = cc.user_id
+    WHERE cc.is_active = TRUE
+  `);
+  return res.rows;
+}
+
+// TRADES
+async function saveTrade(userId, trade) {
+  const { conditionId, marketName, outcome, side, size, price, orderId, filledSize, status, skipReason, pnl } = trade;
+  const res = await query(
+    `INSERT INTO trades (user_id, condition_id, market_name, outcome, side, size, price, order_id, filled_size, status, skip_reason, pnl)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    [userId, conditionId, marketName, outcome, side, size, price, orderId, filledSize, status, skipReason, pnl]
+  );
+  if (pnl != null) await upsertDailyPnl(userId, pnl);
+  return res.rows[0];
+}
+
+async function upsertDailyPnl(userId, pnlDelta) {
+  await query(
+    `INSERT INTO daily_pnl (user_id, date, pnl, trades) VALUES ($1, CURRENT_DATE, $2, 1)
+     ON CONFLICT (user_id, date) DO UPDATE SET pnl = daily_pnl.pnl + EXCLUDED.pnl, trades = daily_pnl.trades + 1`,
+    [userId, pnlDelta]
+  );
+}
+
+async function getRecentTrades(userId, limit = 20) {
+  const res = await query('SELECT * FROM trades WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2', [userId, limit]);
+  return res.rows;
+}
+
+async function getDashboardStats(userId) {
+  const client = await pool.connect();
+  try {
+    const [totalRes, pnlRes, todayRes, winRes] = await Promise.all([
+      client.query("SELECT COUNT(*) AS total_trades, SUM(size) AS total_invested FROM trades WHERE user_id=$1 AND status='FILLED'", [userId]),
+      client.query('SELECT COALESCE(SUM(pnl),0) AS total_pnl FROM trades WHERE user_id=$1', [userId]),
+      client.query('SELECT COALESCE(SUM(pnl),0) AS today_pnl FROM daily_pnl WHERE user_id=$1 AND date=CURRENT_DATE', [userId]),
+      client.query("SELECT COUNT(*) FILTER (WHERE pnl > 0) AS wins, COUNT(*) FILTER (WHERE pnl < 0) AS losses FROM trades WHERE user_id=$1 AND pnl IS NOT NULL", [userId]),
+    ]);
+    const wins = parseInt(winRes.rows[0].wins) || 0;
+    const losses = parseInt(winRes.rows[0].losses) || 0;
+    const winRate = wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : null;
+    return {
+      totalTrades:   parseInt(totalRes.rows[0].total_trades) || 0,
+      totalInvested: parseFloat(totalRes.rows[0].total_invested) || 0,
+      totalPnl:      parseFloat(pnlRes.rows[0].total_pnl),
+      todayPnl:      parseFloat(todayRes.rows[0].today_pnl),
+      winRate,
+    };
+  } finally {
+    client.release();
+  }
+}
+
+async function deleteCopyConfig(id, userId) {
+  await query('DELETE FROM copy_configs WHERE id = $1 AND user_id = $2', [id, userId]);
+}
+
+async function getTodayLoss(userId) {
+  const res = await query('SELECT COALESCE(SUM(pnl), 0) AS pnl FROM daily_pnl WHERE user_id = $1 AND date = CURRENT_DATE', [userId]);
+  const pnl = parseFloat(res.rows[0].pnl);
+  return pnl < 0 ? Math.abs(pnl) : 0;
+}
+
+module.exports = {
+  createUser, getUserByEmail, getUserById, verifyPassword,
+  createWalletForUser, getWalletByUserId, getUSDCBalance,
+  saveCopyConfig, getCopyConfig, setActive, getAllActiveConfigs, deleteCopyConfig,
+  saveTrade, getRecentTrades, getDashboardStats, getTodayLoss,
+  encryptPrivateKey, decryptPrivateKey,
+};

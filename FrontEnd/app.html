@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CopyMarket — App</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0f;--bg2:#111118;--bg3:#1a1a24;
+  --border:#ffffff12;--border2:#ffffff22;
+  --text:#f0f0f5;--text2:#9090a8;--text3:#5a5a70;
+  --green:#22c97a;--green-dim:#22c97a20;
+  --red:#f75a5a;--red-dim:#f75a5a20;
+  --blue:#4f8ef7;--blue-dim:#4f8ef718;
+  --yellow:#f59e0b;--yellow-dim:#f59e0b18;
+  --radius:12px;--radius-sm:8px;
+}
+html,body{min-height:100%;overflow-x:hidden}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.6}
+.screen{display:none}.screen.active{display:block}
+.page{max-width:500px;margin:0 auto;padding:40px 20px}
+.page-wide{max-width:1000px;margin:0 auto;padding:28px 24px}
+.topnav{background:var(--bg2);border-bottom:0.5px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.logo{display:flex;align-items:center;gap:8px;font-size:16px;font-weight:600}
+.logo-dot{width:24px;height:24px;background:var(--green);border-radius:6px;display:flex;align-items:center;justify-content:center}
+.logo-dot svg{width:13px;height:13px;fill:none;stroke:#000;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem}
+.card+.card{margin-top:12px}
+label{display:block;font-size:13px;color:var(--text2);margin-bottom:6px}
+input[type=text],input[type=email],input[type=password]{width:100%;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius-sm);padding:10px 14px;color:var(--text);font-size:14px;outline:none;transition:border .2s}
+input:focus{border-color:var(--blue)}
+input::placeholder{color:var(--text3)}
+input[type=range]{width:100%;accent-color:var(--green)}
+.field{margin-bottom:16px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 20px;border-radius:var(--radius-sm);font-size:14px;font-weight:500;cursor:pointer;transition:all .18s;border:0.5px solid var(--border2);background:transparent;color:var(--text);width:100%}
+.btn:hover{background:var(--bg3)}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn-green{background:var(--green);color:#000;border-color:transparent}
+.btn-green:hover{background:#1db36a}
+.btn-red{color:var(--red);border-color:rgba(247,90,90,.3)}
+.btn-red:hover{background:var(--red-dim)}
+.btn-blue{color:var(--blue);border-color:rgba(79,142,247,.3)}
+.btn-blue:hover{background:var(--blue-dim)}
+.btn-sm{padding:6px 14px;font-size:13px;width:auto}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px}
+.badge-green{background:var(--green-dim);color:var(--green)}
+.badge-red{background:var(--red-dim);color:var(--red)}
+.badge-yellow{background:var(--yellow-dim);color:var(--yellow)}
+.badge-blue{background:var(--blue-dim);color:var(--blue)}
+.badge-gray{background:var(--bg3);color:var(--text2)}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.dot-green{background:var(--green);animation:pulse 2s infinite}
+.dot-gray{background:var(--text3)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.alert{border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;margin-top:10px;display:flex;gap:8px;align-items:flex-start}
+.alert-error{background:var(--red-dim);border:0.5px solid rgba(247,90,90,.25);color:#ff8080}
+.alert-success{background:var(--green-dim);border:0.5px solid rgba(34,201,122,.25);color:var(--green)}
+.alert-info{background:var(--blue-dim);border:0.5px solid rgba(79,142,247,.2);color:#7aabff}
+.alert-close{margin-left:auto;cursor:pointer;opacity:.6;background:none;border:none;color:inherit;font-size:16px;line-height:1;flex-shrink:0}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px}
+.stat-box{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:16px}
+.stat-label{font-size:11px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.stat-val{font-size:22px;font-weight:600;letter-spacing:-.5px}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.tabs{display:flex;gap:4px;border-bottom:0.5px solid var(--border);margin-bottom:20px}
+.tab{padding:8px 16px;font-size:13px;color:var(--text2);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;white-space:nowrap}
+.tab.active{color:var(--green);border-bottom-color:var(--green)}
+.trade-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:0.5px solid var(--border)}
+.trade-row:last-child{border-bottom:none}
+.trade-name{flex:1;font-size:13px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trade-meta{font-size:11px;color:var(--text3);margin-top:1px}
+.slider-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.slider-val{font-size:14px;font-weight:500;min-width:48px;text-align:right}
+.addr-box{display:flex;align-items:center;gap:8px;background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px}
+.addr-text{flex:1;font-family:monospace;font-size:12px;color:var(--text2);word-break:break-all}
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.2);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.auth-logo{text-align:center;margin-bottom:32px}
+.auth-logo .logo{justify-content:center;font-size:20px}
+.auth-logo p{font-size:13px;color:var(--text2);margin-top:6px}
+.auth-switch{text-align:center;font-size:13px;color:var(--text2);margin-top:20px}
+.auth-switch button{background:none;border:none;color:var(--blue);cursor:pointer;font-size:13px;text-decoration:underline}
+.divider{display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--text3);font-size:12px}
+.divider::before,.divider::after{content:'';flex:1;height:0.5px;background:var(--border)}
+.trader-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
+.trader-avatar{width:40px;height:40px;border-radius:50%;background:var(--blue-dim);border:0.5px solid rgba(79,142,247,.3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--blue);flex-shrink:0;font-family:monospace}
+.trader-info{flex:1;min-width:0}
+.trader-stats{display:flex;gap:12px;margin-top:4px;flex-wrap:wrap}
+.trader-stat{font-size:11px;color:var(--text3)}
+.trader-stat span{color:var(--text);font-weight:500}
+.trader-actions{display:flex;gap:6px;flex-shrink:0}
+.profile-header{display:flex;align-items:center;gap:16px;margin-bottom:24px}
+.profile-avatar{width:56px;height:56px;border-radius:50%;background:var(--green-dim);border:0.5px solid rgba(34,201,122,.3);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--green)}
+.profile-name{font-size:18px;font-weight:600}
+.profile-sub{font-size:13px;color:var(--text2);margin-top:2px}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.info-row:last-child{border-bottom:none}
+.info-label{font-size:13px;color:var(--text2)}
+.info-val{font-size:13px;font-weight:500}
+.add-trader-form{background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;display:none}
+.add-trader-form.open{display:block}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="screen-login" class="screen active">
+<div class="page">
+  <div class="auth-logo">
+    <div class="logo"><div class="logo-dot"><svg viewBox="0 0 16 16"><polyline points="2,12 6,7 9,10 14,4"/></svg></div>CopyMarket</div>
+    <p>Welcome back</p>
+  </div>
+  <div class="card">
+    <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="you@email.com"></div>
+    <div class="field"><label>Password</label><input type="password" id="login-pass" placeholder="Your password"></div>
+    <div id="login-alert"></div>
+    <button class="btn btn-green" id="login-btn" onclick="doLogin()" style="margin-top:8px">Sign in</button>
+  </div>
+  <div class="auth-switch">Don't have an account? <button onclick="showScreen('screen-register')">Sign up</button></div>
+</div>
+</div>
+
+<!-- REGISTER -->
+<div id="screen-register" class="screen">
+<div class="page">
+  <div class="auth-logo">
+    <div class="logo"><div class="logo-dot"><svg viewBox="0 0 16 16"><polyline points="2,12 6,7 9,10 14,4"/></svg></div>CopyMarket</div>
+    <p>Copy top Polymarket traders automatically</p>
+  </div>
+  <div class="card">
+    <div class="field"><label>Username</label><input type="text" id="reg-username" placeholder="Your display name"></div>
+    <div class="field"><label>Email</label><input type="email" id="reg-email" placeholder="you@email.com"></div>
+    <div class="field"><label>Password</label><input type="password" id="reg-pass" placeholder="At least 8 characters"></div>
+    <div class="field"><label>Confirm password</label><input type="password" id="reg-pass2" placeholder="Repeat password"></div>
+    <div id="reg-alert"></div>
+    <button class="btn btn-green" id="reg-btn" onclick="doRegister()" style="margin-top:8px">Create account</button>
+  </div>
+  <div class="alert alert-info" style="margin-top:12px">A Polygon wallet is automatically created for you. No MetaMask needed.</div>
+  <div class="auth-switch">Already have an account? <button onclick="showScreen('screen-login')">Sign in</button></div>
+</div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="screen-dashboard" class="screen">
+  <div class="topnav">
+    <div class="logo"><div class="logo-dot"><svg viewBox="0 0 16 16"><polyline points="2,12 6,7 9,10 14,4"/></svg></div>CopyMarket</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="badge badge-green" id="status-badge"><span class="dot dot-green"></span> Live</span>
+      <button class="btn btn-sm" onclick="doLogout()">Log out</button>
+    </div>
+  </div>
+  <div class="page-wide">
+    <div id="dash-alert" style="margin-bottom:16px"></div>
+    <div class="stats-grid">
+      <div class="stat-box"><div class="stat-label">Balance</div><div class="stat-val" id="stat-balance">—</div><div class="stat-sub">USDC</div></div>
+      <div class="stat-box"><div class="stat-label">Total P&L</div><div class="stat-val" id="stat-pnl">—</div><div class="stat-sub">all time</div></div>
+      <div class="stat-box"><div class="stat-label">Today</div><div class="stat-val" id="stat-today">—</div><div class="stat-sub">P&L today</div></div>
+      <div class="stat-box"><div class="stat-label">Win rate</div><div class="stat-val" id="stat-winrate">—</div><div class="stat-sub" id="stat-trades-sub">0 trades</div></div>
+      <div class="stat-box"><div class="stat-label">Copying</div><div class="stat-val" id="stat-traders">0</div><div class="stat-sub">active traders</div></div>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab(this,'tab-traders')">My Traders</button>
+      <button class="tab" onclick="switchTab(this,'tab-trades')">Trade History</button>
+      <button class="tab" onclick="switchTab(this,'tab-wallet')">Wallet</button>
+      <button class="tab" onclick="switchTab(this,'tab-profile')">Profile</button>
+    </div>
+
+    <!-- MY TRADERS -->
+    <div id="tab-traders">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <p style="font-size:14px;font-weight:500">Traders you're copying</p>
+        <button class="btn btn-sm btn-blue" onclick="toggleAddForm()">+ Add trader</button>
+      </div>
+      <div class="add-trader-form" id="add-trader-form">
+        <div class="field"><label>Trader wallet address</label><input type="text" id="new-trader-wallet" placeholder="0x... Polymarket trader address"></div>
+        <div class="slider-row"><label style="margin:0">Budget</label><span class="slider-val" id="lbl-budget">$100</span></div>
+        <input type="range" min="10" max="1000" step="10" value="100" id="sl-budget" oninput="document.getElementById('lbl-budget').textContent='$'+this.value" style="margin-bottom:14px">
+        <div class="slider-row"><label style="margin:0">Max per trade</label><span class="slider-val" id="lbl-max">$20</span></div>
+        <input type="range" min="1" max="200" step="1" value="20" id="sl-max" oninput="document.getElementById('lbl-max').textContent='$'+this.value" style="margin-bottom:14px">
+        <div class="slider-row"><label style="margin:0">Daily loss limit</label><span class="slider-val" id="lbl-loss">$30</span></div>
+        <input type="range" min="5" max="500" step="5" value="30" id="sl-loss" oninput="document.getElementById('lbl-loss').textContent='$'+this.value" style="margin-bottom:14px">
+        <div id="add-trader-alert"></div>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button class="btn btn-green" id="add-trader-btn" onclick="addTrader()" style="flex:1">Start copying</button>
+          <button class="btn btn-sm" onclick="toggleAddForm()" style="width:auto;padding:10px 16px">Cancel</button>
+        </div>
+      </div>
+      <div id="traders-list"><div style="color:var(--text3);font-size:13px;text-align:center;padding:32px">Loading...</div></div>
+    </div>
+
+    <!-- TRADE HISTORY -->
+    <div id="tab-trades" style="display:none">
+      <div class="card" id="trades-list"><div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading trades...</div></div>
+    </div>
+
+    <!-- WALLET -->
+    <div id="tab-wallet" style="display:none">
+      <div class="card">
+        <p style="font-size:13px;font-weight:500;margin-bottom:12px">Your wallet</p>
+        <label style="margin-bottom:6px">Deposit address (Polygon network)</label>
+        <div class="addr-box">
+          <span class="addr-text" id="dash-addr">—</span>
+          <button class="btn btn-sm" onclick="copyDashAddr()">Copy</button>
+        </div>
+        <p style="font-size:11px;color:var(--text3);margin-top:6px">Send USDC on Polygon only. Other networks = lost funds.</p>
+        <div class="info-row" style="margin-top:12px"><span class="info-label">USDC Balance</span><span class="info-val" id="wallet-balance">—</span></div>
+        <div class="info-row"><span class="info-label">In open positions</span><span class="info-val" id="wallet-locked">—</span></div>
+        <div class="info-row"><span class="info-label">Available</span><span class="info-val" id="wallet-free">—</span></div>
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button class="btn btn-sm" style="flex:1" onclick="refreshBalance()">Refresh</button>
+          <button class="btn btn-sm" style="flex:1" onclick="openMoonpay()">Buy USDC</button>
+          <button class="btn btn-sm btn-red" style="flex:1" onclick="toggleWithdraw()">Withdraw</button>
+        </div>
+        <div id="withdraw-form" style="display:none;margin-top:14px;border-top:0.5px solid var(--border);padding-top:14px">
+          <div class="field"><label>Withdraw to (Polygon address)</label><input type="text" id="withdraw-addr" placeholder="0x..."></div>
+          <div class="field"><label>Amount (USDC)</label><input type="text" id="withdraw-amount" placeholder="10.00"></div>
+          <div id="withdraw-alert"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-sm btn-red" style="flex:1" onclick="doWithdraw()">Confirm</button>
+            <button class="btn btn-sm" style="flex:1" onclick="toggleWithdraw()">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROFILE -->
+    <div id="tab-profile" style="display:none">
+      <div class="card">
+        <div class="profile-header">
+          <div class="profile-avatar" id="profile-initials">?</div>
+          <div>
+            <div class="profile-name" id="profile-name-display">—</div>
+            <div class="profile-sub" id="profile-email-display">—</div>
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Account</p>
+        <div class="info-row"><span class="info-label">Member since</span><span class="info-val" id="profile-since">—</span></div>
+        <div class="info-row"><span class="info-label">Plan</span><span class="info-val"><span class="badge badge-blue">Pro</span></span></div>
+        <div class="info-row"><span class="info-label">Status</span><span class="info-val" id="profile-status">—</span></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <p style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Overall performance</p>
+        <div class="info-row"><span class="info-label">Total trades</span><span class="info-val" id="profile-trades">—</span></div>
+        <div class="info-row"><span class="info-label">Total invested</span><span class="info-val" id="profile-invested">—</span></div>
+        <div class="info-row"><span class="info-label">Total P&L</span><span class="info-val" id="profile-pnl">—</span></div>
+        <div class="info-row"><span class="info-label">Win rate</span><span class="info-val" id="profile-winrate">—</span></div>
+        <div class="info-row"><span class="info-label">Active traders</span><span class="info-val" id="profile-traders-count">—</span></div>
+        <div class="info-row"><span class="info-label">Balance</span><span class="info-val" id="profile-balance">—</span></div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <p style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Wallet</p>
+        <div class="addr-box">
+          <span class="addr-text" id="profile-addr">—</span>
+          <button class="btn btn-sm" onclick="copyProfileAddr()">Copy</button>
+        </div>
+      </div>
+      <button class="btn btn-red" onclick="doLogout()" style="margin-top:12px">Log out</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:3001';
+let token      = localStorage.getItem('cm_token') || null;
+let walletAddr = localStorage.getItem('cm_wallet') || null;
+let userEmail  = localStorage.getItem('cm_email') || null;
+let userName   = localStorage.getItem('cm_username') || null;
+let copyActive = false;
+
+if (token) { showScreen('screen-dashboard'); loadDashboard(); }
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showAlert(id, msg, type='error') {
+  const c = document.getElementById(id);
+  if (!c) return;
+  c.innerHTML = '<div class="alert alert-' + type + '">' + msg + '<button class="alert-close" onclick="this.parentElement.remove()">✕</button></div>';
+}
+function clearAlert(id) { const c = document.getElementById(id); if(c) c.innerHTML=''; }
+
+function setLoading(id, loading, label) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  btn.disabled = loading;
+  btn.innerHTML = loading ? '<span class="spinner"></span> Please wait...' : label;
+}
+
+async function api(method, path, body) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (token) opts.headers['Authorization'] = 'Bearer ' + token;
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API + path, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+  return data;
+}
+
+async function doLogin() {
+  clearAlert('login-alert');
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-pass').value;
+  if (!email || !pass) { showAlert('login-alert','Please fill in both fields.'); return; }
+  setLoading('login-btn', true);
+  try {
+    const data = await api('POST', '/auth/login', { email, password: pass });
+    token = data.token;
+    walletAddr = data.wallet && data.wallet.address;
+    userEmail = email;
+    localStorage.setItem('cm_token', token);
+    localStorage.setItem('cm_wallet', walletAddr);
+    localStorage.setItem('cm_email', email);
+    showScreen('screen-dashboard');
+    loadDashboard();
+  } catch(e) { showAlert('login-alert', e.message); }
+  finally { setLoading('login-btn', false, 'Sign in'); }
+}
+
+async function doRegister() {
+  clearAlert('reg-alert');
+  const username = document.getElementById('reg-username').value.trim();
+  const email    = document.getElementById('reg-email').value.trim();
+  const pass     = document.getElementById('reg-pass').value;
+  const pass2    = document.getElementById('reg-pass2').value;
+  if (!username) { showAlert('reg-alert','Please enter a username.'); return; }
+  if (!email)    { showAlert('reg-alert','Please enter your email.'); return; }
+  if (!pass)     { showAlert('reg-alert','Please enter a password.'); return; }
+  if (pass.length < 8) { showAlert('reg-alert','Password must be at least 8 characters.'); return; }
+  if (pass !== pass2)  { showAlert('reg-alert','Passwords do not match.'); return; }
+  setLoading('reg-btn', true);
+  try {
+    const data = await api('POST', '/auth/register', { email, username, password: pass });
+    token = data.token;
+    walletAddr = data.wallet && data.wallet.address;
+    userEmail = email;
+    userName = username;
+    localStorage.setItem('cm_token', token);
+    localStorage.setItem('cm_wallet', walletAddr);
+    localStorage.setItem('cm_email', email);
+    localStorage.setItem('cm_username', username);
+    showScreen('screen-dashboard');
+    loadDashboard();
+  } catch(e) { showAlert('reg-alert', e.message); }
+  finally { setLoading('reg-btn', false, 'Create account'); }
+}
+
+function doLogout() {
+  token = null; walletAddr = null; userEmail = null; userName = null;
+  localStorage.clear();
+  showScreen('screen-login');
+}
+
+function copyDashAddr() {
+  navigator.clipboard && navigator.clipboard.writeText(document.getElementById('dash-addr').textContent);
+  showAlert('dash-alert','Address copied!','success');
+  setTimeout(function(){ clearAlert('dash-alert'); }, 2000);
+}
+function copyProfileAddr() {
+  navigator.clipboard && navigator.clipboard.writeText(document.getElementById('profile-addr').textContent);
+}
+function openMoonpay() {
+  window.open('https://buy.moonpay.com?currencyCode=usdc_polygon&walletAddress=' + (walletAddr||''), '_blank');
+}
+
+async function refreshBalance() {
+  try {
+    const data = await api('GET', '/wallet/balance');
+    document.getElementById('wallet-balance').textContent = '$' + data.balance.toFixed(2);
+    document.getElementById('stat-balance').textContent   = '$' + data.balance.toFixed(2);
+    document.getElementById('profile-balance').textContent = '$' + data.balance.toFixed(2) + ' USDC';
+    document.getElementById('wallet-free').textContent    = '$' + data.balance.toFixed(2);
+  } catch(e) { showAlert('dash-alert', e.message); }
+}
+
+function toggleWithdraw() {
+  const f = document.getElementById('withdraw-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+
+async function doWithdraw() {
+  const addr   = document.getElementById('withdraw-addr').value.trim();
+  const amount = document.getElementById('withdraw-amount').value.trim();
+  if (!addr || !/^0x[0-9a-fA-F]{40}$/.test(addr)) { showAlert('withdraw-alert','Enter a valid Polygon wallet address.'); return; }
+  if (!amount || isNaN(amount) || parseFloat(amount) < 1) { showAlert('withdraw-alert','Minimum withdrawal is $1 USDC.'); return; }
+  try {
+    await api('POST', '/wallet/withdraw', { toAddress: addr, amount: parseFloat(amount) });
+    showAlert('withdraw-alert','Withdrawal submitted!','success');
+    toggleWithdraw();
+    setTimeout(refreshBalance, 3000);
+  } catch(e) { showAlert('withdraw-alert', e.message); }
+}
+
+function toggleAddForm() {
+  document.getElementById('add-trader-form').classList.toggle('open');
+}
+
+async function addTrader() {
+  clearAlert('add-trader-alert');
+  const wallet      = document.getElementById('new-trader-wallet').value.trim();
+  const budget      = parseInt(document.getElementById('sl-budget').value);
+  const maxPerTrade = parseInt(document.getElementById('sl-max').value);
+  const dailyLoss   = parseInt(document.getElementById('sl-loss').value);
+  if (!wallet) { showAlert('add-trader-alert','Please enter a wallet address.'); return; }
+  if (!/^0x[0-9a-fA-F]{40}$/.test(wallet)) { showAlert('add-trader-alert','Invalid address. Must start with 0x and be 42 characters.'); return; }
+  setLoading('add-trader-btn', true);
+  try {
+    await api('POST', '/copy/config', { targetWallet: wallet, budget, maxPerTrade, dailyLossLimit: dailyLoss });
+    await api('POST', '/copy/start');
+    document.getElementById('add-trader-form').classList.remove('open');
+    document.getElementById('new-trader-wallet').value = '';
+    showAlert('dash-alert','Trader added and copy trading started.','success');
+    loadDashboard();
+  } catch(e) { showAlert('add-trader-alert', e.message); }
+  finally { setLoading('add-trader-btn', false, 'Start copying'); }
+}
+
+async function stopTrader(id) {
+  try {
+    await api('POST', '/copy/stop', { id });
+    showAlert('dash-alert','Copy trading paused.','success');
+    loadDashboard();
+  } catch(e) { showAlert('dash-alert', e.message); }
+}
+
+async function resumeTrader(id) {
+  try {
+    const bal = await api('GET', '/wallet/balance');
+    if (bal.balance < 10) { showAlert('dash-alert','You need at least $10 USDC to start copying. Please deposit first.'); return; }
+    await api('POST', '/copy/start', { id });
+    showAlert('dash-alert','Copy trading resumed.','success');
+    loadDashboard();
+  } catch(e) { showAlert('dash-alert', e.message); }
+}
+
+async function deleteTrader(id) {
+  if (!confirm('Remove this trader? This will stop copying them.')) return;
+  try {
+    await api('DELETE', '/copy/config/' + id);
+    showAlert('dash-alert','Trader removed.','success');
+    loadDashboard();
+  } catch(e) { showAlert('dash-alert', e.message); }
+}
+
+function renderTraders(config) {
+  const container = document.getElementById('traders-list');
+  if (!config || !config.configured || !config.traders || !config.traders.length) {
+    container.innerHTML = '<div style="text-align:center;padding:40px 20px"><p style="color:var(--text2);margin-bottom:6px">No traders yet</p><p style="font-size:13px;color:var(--text3)">Click &quot;+ Add trader&quot; to start copying someone</p></div>';
+    return;
+  }
+  container.innerHTML = config.traders.map(function(t) {
+    const tw = t.targetWallet;
+    const short = tw ? tw.slice(0,6)+'...'+tw.slice(-4) : '—';
+    return '<div class="trader-card">' +
+      '<div class="trader-avatar">' + short.slice(2,4).toUpperCase() + '</div>' +
+      '<div class="trader-info">' +
+        '<div style="font-size:13px;font-weight:500;margin-bottom:2px">' + short + '</div>' +
+        '<div class="trader-stats">' +
+          '<div class="trader-stat">Budget <span>$' + t.budget + '</span></div>' +
+          '<div class="trader-stat">Max/trade <span>$' + t.maxPerTrade + '</span></div>' +
+          '<div class="trader-stat">Loss limit <span>$' + t.dailyLossLimit + '/day</span></div>' +
+        '</div>' +
+        '<div style="margin-top:6px">' + (t.isActive
+          ? '<span class="badge badge-green"><span class="dot dot-green"></span> Copying</span>'
+          : '<span class="badge badge-gray"><span class="dot dot-gray"></span> Paused</span>') +
+        '</div>' +
+      '</div>' +
+      '<div class="trader-actions">' + (t.isActive
+        ? '<button class="btn btn-sm btn-red" onclick="stopTrader(\'' + t.id + '\')">Pause</button>'
+        : '<button class="btn btn-sm btn-green" onclick="resumeTrader(\'' + t.id + '\')">Resume</button>') +
+      '<button class="btn btn-sm btn-red" onclick="deleteTrader(\'' + t.id + '\')" style="margin-left:4px">Remove</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function renderTrades(trades) {
+  const c = document.getElementById('trades-list');
+  if (!trades || trades.length === 0) {
+    c.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:24px">No trades yet. Waiting for the trader to make a move.</div>';
+    return;
+  }
+  c.innerHTML = trades.map(function(t) {
+    const isBuy  = t.side === 'BUY';
+    const isSkip = t.status === 'SKIPPED';
+    const pnlColor = (t.pnl||0) >= 0 ? 'var(--green)' : 'var(--red)';
+    const pnlText  = t.pnl != null ? ((t.pnl>=0?'+':'') + '$' + Math.abs(t.pnl).toFixed(2)) : '—';
+    const badge = isSkip
+      ? '<span class="badge badge-yellow">SKIP</span>'
+      : isBuy ? '<span class="badge badge-green">BUY</span>' : '<span class="badge badge-red">SELL</span>';
+    const meta = isSkip
+      ? (t.skip_reason||'Skipped')
+      : ('$' + parseFloat(t.size).toFixed(2) + ' · ' + t.outcome + ' @ ' + parseFloat(t.price).toFixed(3) + ' · ' + timeAgo(t.created_at));
+    return '<div class="trade-row">' + badge +
+      '<div class="trade-name"><div>' + (t.market_name||t.condition_id.slice(0,32)+'...') + '</div><div class="trade-meta">' + meta + '</div></div>' +
+      '<div style="font-size:13px;font-weight:500;color:' + pnlColor + ';flex-shrink:0">' + pnlText + '</div></div>';
+  }).join('');
+}
+
+async function loadDashboard() {
+  try {
+    const results = await Promise.all([
+      api('GET', '/dashboard/stats'),
+      api('GET', '/dashboard/trades?limit=20'),
+      api('GET', '/wallet'),
+      api('GET', '/copy/status'),
+    ]);
+    const stats      = results[0];
+    const tradesData = results[1];
+    const walletData = results[2];
+    const config     = results[3];
+
+    const pnl   = stats.totalPnl || 0;
+    const today = stats.todayPnl || 0;
+    const bal   = stats.balance;
+
+    document.getElementById('stat-balance').textContent     = bal != null ? '$' + bal.toFixed(2) : '—';
+    document.getElementById('stat-pnl').textContent         = (pnl>=0?'+':'') + '$' + Math.abs(pnl).toFixed(2);
+    document.getElementById('stat-pnl').style.color         = pnl>=0?'var(--green)':'var(--red)';
+    document.getElementById('stat-today').textContent       = (today>=0?'+':'') + '$' + Math.abs(today).toFixed(2);
+    document.getElementById('stat-today').style.color       = today>=0?'var(--green)':'var(--red)';
+    document.getElementById('stat-winrate').textContent     = stats.winRate != null ? stats.winRate + '%' : '—';
+    document.getElementById('stat-trades-sub').textContent  = (stats.totalTrades||0) + ' trades';
+    document.getElementById('stat-traders').textContent     = config.traders ? config.traders.length : '0';
+
+    copyActive = config.isActive;
+    const badge = document.getElementById('status-badge');
+    if (copyActive) {
+      badge.className = 'badge badge-green';
+      badge.innerHTML = '<span class="dot dot-green"></span> Live';
+    } else {
+      badge.className = 'badge badge-gray';
+      badge.innerHTML = '<span class="dot dot-gray"></span> Paused';
+    }
+
+    walletAddr = walletData.address;
+    localStorage.setItem('cm_wallet', walletAddr);
+    document.getElementById('dash-addr').textContent     = walletAddr || '—';
+    document.getElementById('profile-addr').textContent  = walletAddr || '—';
+    document.getElementById('wallet-balance').textContent = bal != null ? '$' + bal.toFixed(2) : '—';
+    document.getElementById('wallet-locked').textContent  = '—';
+    document.getElementById('wallet-free').textContent    = bal != null ? '$' + bal.toFixed(2) : '—';
+
+    const uname = userName || localStorage.getItem('cm_username') || '—';
+    const uemail = userEmail || localStorage.getItem('cm_email') || '—';
+    document.getElementById('profile-name-display').textContent  = uname;
+    document.getElementById('profile-email-display').textContent = uemail;
+    document.getElementById('profile-initials').textContent      = uname !== '—' ? uname[0].toUpperCase() : '?';
+    document.getElementById('profile-since').textContent         = walletData.createdAt ? new Date(walletData.createdAt).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}) : '—';
+    document.getElementById('profile-status').innerHTML          = copyActive ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-gray">Paused</span>';
+    document.getElementById('profile-trades').textContent        = stats.totalTrades || '0';
+    document.getElementById('profile-invested').textContent      = '$' + ((stats.totalInvested||0)).toFixed(2);
+    document.getElementById('profile-pnl').textContent           = (pnl>=0?'+':'') + '$' + Math.abs(pnl).toFixed(2);
+    document.getElementById('profile-pnl').style.color           = pnl>=0?'var(--green)':'var(--red)';
+    document.getElementById('profile-winrate').textContent       = stats.winRate != null ? stats.winRate + '%' : '—';
+    document.getElementById('profile-traders-count').textContent = config.traders ? config.traders.length : '0';
+    document.getElementById('profile-balance').textContent       = bal != null ? '$' + bal.toFixed(2) + ' USDC' : '—';
+
+    renderTraders(config);
+    renderTrades(tradesData.trades);
+
+    clearTimeout(window._dashTimer);
+    window._dashTimer = setTimeout(loadDashboard, 30000);
+  } catch(e) {
+    showAlert('dash-alert', 'Could not load dashboard: ' + e.message);
+  }
+}
+
+function switchTab(btn, tabId) {
+  document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+  btn.classList.add('active');
+  ['tab-traders','tab-trades','tab-wallet','tab-profile'].forEach(function(id){
+    document.getElementById(id).style.display = id===tabId ? 'block' : 'none';
+  });
+}
+
+function timeAgo(ts) {
+  const d = Math.floor((Date.now() - new Date(ts)) / 1000);
+  if (d < 60)    return d + 's ago';
+  if (d < 3600)  return Math.floor(d/60) + 'm ago';
+  if (d < 86400) return Math.floor(d/3600) + 'h ago';
+  return Math.floor(d/86400) + 'd ago';
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  if (document.getElementById('screen-login').classList.contains('active'))    doLogin();
+  if (document.getElementById('screen-register').classList.contains('active')) doRegister();
+});
+</script>
+</body>
+</html>

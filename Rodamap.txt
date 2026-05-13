@@ -1,0 +1,6 @@
+1. Tg profil
+2. Tg licna grupa
+3. TG grupe oko polymarketa
+4. VA koji salje dnevno poruka u grupe i ljudima iz grupe + discord link 
+5. Bot rezultati u licnu grupu
+6. Bot dodatna pitanja

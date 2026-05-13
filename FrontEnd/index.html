@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CopyMarket — Copy Top Polymarket Traders</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0a0a0f;--bg2:#111118;--bg3:#1a1a24;
+    --border:#ffffff12;--border2:#ffffff20;
+    --text:#f0f0f5;--text2:#9090a8;--text3:#5a5a70;
+    --green:#22c97a;--green-dim:#22c97a22;
+    --blue:#4f8ef7;--red:#f75a5a;
+    --radius:12px;--radius-sm:8px;
+  }
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:16px;line-height:1.6;overflow-x:hidden}
+
+  nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 5%;height:64px;background:rgba(10,10,15,.85);backdrop-filter:blur(12px);border-bottom:0.5px solid var(--border)}
+  .logo{display:flex;align-items:center;gap:8px;font-size:18px;font-weight:600;color:var(--text)}
+  .logo-dot{width:28px;height:28px;background:var(--green);border-radius:8px;display:flex;align-items:center;justify-content:center}
+  .logo-dot svg{width:16px;height:16px;fill:none;stroke:#000;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+  nav a{font-size:14px;color:var(--text2);text-decoration:none;transition:color .2s}
+  nav a:hover{color:var(--text)}
+  .nav-links{display:flex;gap:28px;align-items:center}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 20px;border-radius:var(--radius-sm);font-size:14px;font-weight:500;cursor:pointer;transition:all .2s;border:none;text-decoration:none}
+  .btn-primary{background:var(--green);color:#000}
+  .btn-primary:hover{background:#1db36a;transform:translateY(-1px)}
+  .btn-outline{background:transparent;color:var(--text);border:0.5px solid var(--border2)}
+  .btn-outline:hover{background:var(--bg3)}
+
+  .hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:80px 5% 60px;position:relative;overflow:hidden}
+  .hero-glow{position:absolute;top:20%;left:50%;transform:translateX(-50%);width:600px;height:300px;background:radial-gradient(ellipse,rgba(34,201,122,.12) 0%,transparent 70%);pointer-events:none}
+  .badge-new{display:inline-flex;align-items:center;gap:6px;background:var(--green-dim);border:0.5px solid rgba(34,201,122,.25);color:var(--green);font-size:12px;padding:5px 14px;border-radius:20px;margin-bottom:28px}
+  .badge-pulse{width:6px;height:6px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  h1{font-size:clamp(36px,6vw,72px);font-weight:700;line-height:1.1;letter-spacing:-1.5px;margin-bottom:24px;max-width:800px}
+  h1 span{color:var(--green)}
+  .hero-sub{font-size:clamp(16px,2vw,20px);color:var(--text2);max-width:520px;margin-bottom:40px;line-height:1.65}
+  .hero-cta{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:64px}
+  .hero-note{font-size:13px;color:var(--text3)}
+
+  .ticker{width:100%;max-width:680px;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden}
+  .ticker-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:0.5px solid var(--border);font-size:12px;color:var(--text2)}
+  .ticker-live{display:flex;align-items:center;gap:6px;color:var(--green);font-size:12px}
+  .trade-item{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:0.5px solid var(--border);animation:slideIn .4s ease}
+  .trade-item:last-child{border-bottom:none}
+  @keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+  .trade-tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:5px;flex-shrink:0}
+  .tag-buy{background:rgba(34,201,122,.15);color:var(--green)}
+  .tag-sell{background:rgba(247,90,90,.15);color:var(--red)}
+  .trade-name{font-size:13px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .trade-amt{font-size:13px;font-weight:500;flex-shrink:0;color:var(--text2)}
+  .trade-pnl{font-size:12px;flex-shrink:0;min-width:50px;text-align:right}
+
+  .stats{display:flex;gap:0;border-top:0.5px solid var(--border);border-bottom:0.5px solid var(--border);margin-top:80px}
+  .stat{flex:1;text-align:center;padding:36px 20px;border-right:0.5px solid var(--border)}
+  .stat:last-child{border-right:none}
+  .stat-num{font-size:clamp(28px,4vw,42px);font-weight:700;letter-spacing:-1px}
+  .stat-num span{color:var(--green)}
+  .stat-desc{font-size:13px;color:var(--text2);margin-top:4px}
+
+  section{padding:100px 5%}
+  .section-tag{font-size:12px;color:var(--green);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px}
+  h2{font-size:clamp(28px,4vw,42px);font-weight:700;letter-spacing:-0.5px;margin-bottom:16px}
+  .section-sub{font-size:17px;color:var(--text2);max-width:480px;margin-bottom:56px}
+  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:24px}
+  .step-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:28px 24px;position:relative;overflow:hidden}
+  .step-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--green),transparent)}
+  .step-num{font-size:11px;color:var(--text3);margin-bottom:16px;font-weight:600;letter-spacing:.05em}
+  .step-icon{width:40px;height:40px;background:var(--green-dim);border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:16px;font-size:20px}
+  .step-card h3{font-size:16px;font-weight:600;margin-bottom:8px}
+  .step-card p{font-size:13px;color:var(--text2);line-height:1.6}
+
+  .features{background:var(--bg2);border-top:0.5px solid var(--border);border-bottom:0.5px solid var(--border)}
+  .features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1px;background:var(--border)}
+  .feature{background:var(--bg2);padding:36px 32px}
+  .feature-icon{font-size:24px;margin-bottom:16px}
+  .feature h3{font-size:16px;font-weight:600;margin-bottom:8px}
+  .feature p{font-size:14px;color:var(--text2);line-height:1.65}
+
+  .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;max-width:900px;margin:0 auto}
+  .plan{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:32px 28px}
+  .plan.featured{border-color:var(--green);position:relative}
+  .plan-badge{position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--green);color:#000;font-size:11px;font-weight:700;padding:4px 14px;border-radius:20px;white-space:nowrap}
+  .plan-name{font-size:14px;color:var(--text2);margin-bottom:8px}
+  .plan-price{font-size:40px;font-weight:700;letter-spacing:-1px;margin-bottom:4px}
+  .plan-price sup{font-size:20px;vertical-align:top;margin-top:8px;display:inline-block}
+  .plan-price sub{font-size:14px;color:var(--text2);font-weight:400}
+  .plan-desc{font-size:13px;color:var(--text2);margin-bottom:24px;padding-bottom:24px;border-bottom:0.5px solid var(--border)}
+  .plan-features{list-style:none;margin-bottom:28px}
+  .plan-features li{font-size:14px;padding:7px 0;display:flex;align-items:center;gap:10px;color:var(--text2)}
+  .plan-features li::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0}
+  .plan .btn{width:100%;justify-content:center}
+
+  .cta-section{text-align:center;padding:100px 5%}
+  .cta-section h2{max-width:600px;margin:0 auto 20px}
+  .cta-section p{color:var(--text2);margin-bottom:36px;font-size:17px}
+
+  footer{background:var(--bg2);border-top:0.5px solid var(--border);padding:40px 5%;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px}
+  footer p{font-size:13px;color:var(--text3)}
+  .footer-links{display:flex;gap:20px}
+  .footer-links a{font-size:13px;color:var(--text3);text-decoration:none}
+  .footer-links a:hover{color:var(--text2)}
+
+  .disclaimer{background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:14px 18px;max-width:680px;margin:0 auto;text-align:left}
+  .disclaimer p{font-size:12px;color:var(--text3);line-height:1.6}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">
+    <div class="logo-dot">
+      <svg viewBox="0 0 16 16"><polyline points="2,12 6,7 9,10 14,4"/></svg>
+    </div>
+    CopyMarket
+  </div>
+  <div class="nav-links">
+    <a href="#how">How it works</a>
+    <a href="#features">Features</a>
+    <a href="#pricing">Pricing</a>
+  </div>
+  <a href="/app.html" class="btn btn-primary">Start for free</a>
+</nav>
+
+<section class="hero">
+  <div class="hero-glow"></div>
+  <div class="badge-new"><div class="badge-pulse"></div> New · Auto-copy trading is live</div>
+  <h1>Copy top traders<br>on <span>Polymarket</span>.<br>Automatically.</h1>
+  <p class="hero-sub">Pick a top-performing trader, set your budget, and our system automatically mirrors every trade they make — proportional to your money.</p>
+  <div class="hero-cta">
+    <a href="/app.html" class="btn btn-primary" style="font-size:15px;padding:12px 28px">Get started free →</a>
+    <a href="#how" class="btn btn-outline" style="font-size:15px;padding:12px 28px">How it works</a>
+  </div>
+  <p class="hero-note">No MetaMask. No crypto experience needed. Wallet created automatically.</p>
+
+  <div class="ticker">
+    <div class="ticker-head">
+      <span>Live copied trades</span>
+      <div class="ticker-live"><div class="badge-pulse"></div> Live</div>
+    </div>
+    <div id="ticker-body"></div>
+  </div>
+</section>
+
+<div class="stats">
+  <div class="stat"><div class="stat-num">$<span>2.4M</span></div><div class="stat-desc">Total volume of copied trades</div></div>
+  <div class="stat"><div class="stat-num"><span>+31</span>%</div><div class="stat-desc">Avg. return of top copied trader</div></div>
+  <div class="stat"><div class="stat-num"><span>1,240</span></div><div class="stat-desc">Active users</div></div>
+  <div class="stat"><div class="stat-num"><span>2</span> min</div><div class="stat-desc">To your first copied trade</div></div>
+</div>
+
+<section id="how">
+  <div class="section-tag">How it works</div>
+  <h2>Three steps to auto-copy trading</h2>
+  <p class="section-sub">No complex setup. No crypto knowledge required. Just sign up and go.</p>
+  <div class="steps">
+    <div class="step-card">
+      <div class="step-num">STEP 01</div>
+      <div class="step-icon">📧</div>
+      <h3>Create an account</h3>
+      <p>Sign up with your email. We automatically create a Polygon wallet for you — no MetaMask or seed phrase needed.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">STEP 02</div>
+      <div class="step-icon">💵</div>
+      <h3>Deposit USDC</h3>
+      <p>Fund your wallet by card via Moonpay, or send USDC directly from any wallet (MetaMask, Coinbase, exchange) to your personal deposit address. Minimum $10.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">STEP 03</div>
+      <div class="step-icon">🎯</div>
+      <h3>Choose a trader</h3>
+      <p>Paste a top trader's wallet address from the Polymarket leaderboard. Set your budget and safety limits.</p>
+    </div>
+    <div class="step-card">
+      <div class="step-num">STEP 04</div>
+      <div class="step-icon">⚡</div>
+      <h3>Auto-copy starts</h3>
+      <p>Every trade they make gets mirrored proportionally to your budget. Sit back and track your P&L.</p>
+    </div>
+  </div>
+</section>
+
+<section class="features" id="features" style="padding:0">
+  <div style="padding:80px 5% 48px">
+    <div class="section-tag">Features</div>
+    <h2>Everything you need to copy smart</h2>
+  </div>
+  <div class="features-grid">
+    <div class="feature"><div class="feature-icon">💳</div><h3>Flexible deposits</h3><p>Fund your account by card via Moonpay, or send USDC directly from any external wallet or exchange — MetaMask, Coinbase, Binance, whatever you use.</p></div>
+    <div class="feature"><div class="feature-icon">🔒</div><h3>Proportional scaling</h3><p>If a trader bets 10% of their portfolio, you bet 10% of yours — regardless of the difference in size.</p></div>
+    <div class="feature"><div class="feature-icon">🛡️</div><h3>Automatic safety limits</h3><p>Set a max per trade and a daily loss limit. Copy trading pauses automatically when limits are hit.</p></div>
+    <div class="feature"><div class="feature-icon">📊</div><h3>Live dashboard</h3><p>Track every copied trade in real time. P&L, win rate, open positions — all in one place.</p></div>
+    <div class="feature"><div class="feature-icon">🔔</div><h3>Trade notifications</h3><p>Get a push notification for every trade executed on your behalf. You always know what's happening.</p></div>
+    <div class="feature"><div class="feature-icon">💧</div><h3>Liquidity filter</h3><p>Trades with too little volume are automatically skipped — you never enter a market you can't exit.</p></div>
+    <div class="feature"><div class="feature-icon">⏸️</div><h3>Pause in one click</h3><p>Pause all copy trading instantly. Your money stays in open positions — no new trades are placed.</p></div>
+  </div>
+</section>
+
+<section id="pricing" style="text-align:center">
+  <div class="section-tag" style="display:inline-block">Pricing</div>
+  <h2 style="margin-bottom:12px">Simple, transparent pricing</h2>
+  <p style="color:var(--text2);margin-bottom:48px;font-size:17px">Start for free, upgrade when you're ready.</p>
+  <div class="plans">
+    <div class="plan">
+      <div class="plan-name">Starter</div>
+      <div class="plan-price"><sup>$</sup>0<sub>/mo</sub></div>
+      <div class="plan-desc">To get started and test it out</div>
+      <ul class="plan-features">
+        <li>1 trader to copy</li>
+        <li>Max $100 budget</li>
+        <li>Basic dashboard</li>
+        <li>Email notifications</li>
+      </ul>
+      <a href="#signup" class="btn btn-outline">Start for free</a>
+    </div>
+    <div class="plan featured">
+      <div class="plan-badge">Most popular</div>
+      <div class="plan-name">Pro</div>
+      <div class="plan-price"><sup>$</sup>29<sub>/mo</sub></div>
+      <div class="plan-desc">For serious traders</div>
+      <ul class="plan-features">
+        <li>Up to 5 traders at once</li>
+        <li>Unlimited budget</li>
+        <li>Live P&L analytics</li>
+        <li>Push notifications</li>
+        <li>Priority support</li>
+      </ul>
+      <a href="#signup" class="btn btn-primary">Start Pro →</a>
+    </div>
+    <div class="plan">
+      <div class="plan-name">Performance</div>
+      <div class="plan-price" style="font-size:28px;padding-top:8px">10% of profit</div>
+      <div class="plan-desc">Pay only when you earn</div>
+      <ul class="plan-features">
+        <li>Everything in Pro</li>
+        <li>No fixed monthly fee</li>
+        <li>Ideal for larger amounts</li>
+        <li>Dedicated support</li>
+      </ul>
+      <a href="#signup" class="btn btn-outline">Contact us</a>
+    </div>
+  </div>
+</section>
+
+<div style="padding:0 5% 60px;text-align:center">
+  <div class="disclaimer">
+    <p>⚠️ <strong>Risk warning:</strong> Trading on prediction markets involves risk of capital loss. Past performance of any trader does not guarantee future returns. This tool does not constitute financial advice — use it at your own risk and only with money you can afford to lose.</p>
+  </div>
+</div>
+
+<section class="cta-section" id="signup">
+  <div class="section-tag" style="display:inline-block">Get started</div>
+  <h2>Ready to start auto-copy trading?</h2>
+  <p>Sign up in 30 seconds. No credit card required for the Starter plan.</p>
+  <a href="/app.html" class="btn btn-primary" style="font-size:15px;padding:13px 32px">Create your free account →</a>
+</section>
+
+<footer>
+  <div class="logo" style="font-size:15px">
+    <div class="logo-dot" style="width:22px;height:22px">
+      <svg viewBox="0 0 16 16"><polyline points="2,12 6,7 9,10 14,4"/></svg>
+    </div>
+    CopyMarket
+  </div>
+  <p>© 2026 CopyMarket. Not financial advice.</p>
+  <div class="footer-links">
+    <a href="#">Terms</a>
+    <a href="#">Privacy</a>
+    <a href="#">Support</a>
+  </div>
+</footer>
+
+<script>
+const trades=[
+  {tag:'BUY',name:'Will BTC hit $120k by July 2026?',amt:'$8.40',pnl:'+$3.20',pos:true},
+  {tag:'BUY',name:'Will Democrats win the Senate in 2026?',amt:'$12.00',pnl:'+$4.80',pos:true},
+  {tag:'SELL',name:'Will the Fed cut rates in June?',amt:'$5.00',pnl:'-$1.50',pos:false},
+  {tag:'BUY',name:'Will Brazil win the 2026 FIFA World Cup?',amt:'$15.00',pnl:'+$9.60',pos:true},
+  {tag:'BUY',name:'Will SpaceX reach Mars orbit in 2026?',amt:'$6.50',pnl:'+$2.10',pos:true},
+  {tag:'SELL',name:'Will Apple launch AR glasses in 2026?',amt:'$9.00',pnl:'-$2.30',pos:false},
+  {tag:'BUY',name:'Will Ethereum reach $10k?',amt:'$11.00',pnl:'+$6.40',pos:true},
+  {tag:'BUY',name:'Will Trump sign a crypto bill in 2026?',amt:'$7.00',pnl:'+$1.90',pos:true},
+];
+
+let idx=0;
+const body=document.getElementById('ticker-body');
+
+function addTrade(){
+  const t=trades[idx%trades.length];idx++;
+  const el=document.createElement('div');
+  el.className='trade-item';
+  el.innerHTML=`
+    <span class="trade-tag ${t.tag==='BUY'?'tag-buy':'tag-sell'}">${t.tag}</span>
+    <span class="trade-name">${t.name}</span>
+    <span class="trade-amt">${t.amt}</span>
+    <span class="trade-pnl" style="color:${t.pos?'var(--green)':'var(--red)'}">${t.pnl}</span>
+  `;
+  body.insertBefore(el,body.firstChild);
+  if(body.children.length>4)body.removeChild(body.lastChild);
+}
+
+for(let i=0;i<4;i++)addTrade();
+setInterval(addTrade,2800);
+</script>
+</body>
+</html>
