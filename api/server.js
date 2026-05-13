@@ -6,7 +6,10 @@ const rateLimit = require('express-rate-limit');
 const { getAllActiveConfigs } = require('../db');
 const { startCopyEngine } = require('../engine');
 
+const express = require("express");
 const app = express();
+
+app.set("trust proxy", 1);
 
 app.use(helmet());
 app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
