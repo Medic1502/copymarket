@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 
 const { getAllActiveConfigs } = require('../db');
 const { startCopyEngine } = require('../engine');
@@ -35,6 +36,12 @@ app.use('/dashboard', require('./routes/dashboard'));
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', ts: new Date().toISOString() });
+});
+
+app.use(express.static(path.join(__dirname, '../FrontEnd')));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../FrontEnd/index.html'));
 });
 
 app.use(require('./middleware/errors'));
