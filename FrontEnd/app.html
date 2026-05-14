@@ -486,7 +486,25 @@ async function doExportKey() {
 
 function copyKey() {
   const key = document.getElementById('export-key-value').textContent;
-  navigator.clipboard && navigator.clipboard.writeText(key);
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(key).then(() => {
+      showAlert('export-key-alert', 'Private key copied!', 'success');
+      setTimeout(() => clearAlert('export-key-alert'), 3000);
+    }).catch(() => fallbackCopy(key));
+  } else {
+    fallbackCopy(key);
+  }
+}
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
   showAlert('export-key-alert', 'Private key copied!', 'success');
   setTimeout(() => clearAlert('export-key-alert'), 3000);
 }
