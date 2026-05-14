@@ -42,13 +42,24 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/test-db', async (req, res) => {
-  const { query } = require('../db/client');
+  const { Client } = require('pg');
   const dbUrl = process.env.DATABASE_URL || '';
+
+  let urlInfo = { raw: 'parse failed' };
   try {
-    const result = await query('SELECT current_database(), version()');
-    res.json({ ok: true, db: result.rows[0], urlHost: dbUrl.split('@')[1]?.split('/')[0] || 'unknown' });
+    const u = new URL(dbUrl);
+    urlInfo = { host: u.host, db: u.pathname, user: u.username, params: Object.fromEntries(u.searchParams) };
+  } catch {}
+
+  const client = new Client({ connectionString: dbUrl, connectionTimeoutMillis: 8000 });
+  try {
+    await client.connect();
+    const r = await client.query('SELECT current_database() AS db, version() AS ver');
+    await client.end();
+    res.json({ ok: true, row: r.rows[0], urlInfo });
   } catch (err) {
-    res.status(500).json({ ok: false, error: err.message, code: err.code, urlHost: dbUrl.split('@')[1]?.split('/')[0] || 'unknown' });
+    try { await client.end(); } catch {}
+    res.status(500).json({ ok: false, error: err.message, code: err.code, detail: err.detail, urlInfo });
   }
 });
 
