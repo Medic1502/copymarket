@@ -43,7 +43,7 @@ async function getUserByEmail(email) {
 }
 
 async function getUserById(id) {
-  const res = await query('SELECT id, email, created_at, is_active FROM users WHERE id = $1', [id]);
+  const res = await query('SELECT id, email, password_hash, created_at, is_active FROM users WHERE id = $1', [id]);
   return res.rows[0] ?? null;
 }
 
