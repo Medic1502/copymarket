@@ -37,7 +37,8 @@ const ORDER_TYPES = {
 const activeJobs = {};
 const snapshots  = {};
 // Track sizes we actually bought so we know what to sell
-const userBought = {}; // { userId: Map<conditionId_outcome, usdcAmount> }
+// FIX 2: track { usdc, shares } instead of just a number
+const userBought = {}; // { userId: Map<key, { usdc, shares }> }
 
 const logger = {
   info:  (msg, data = {}) => console.log(JSON.stringify({ level: 'INFO',  msg, ...data, ts: new Date().toISOString() })),
@@ -188,22 +189,30 @@ async function getAuthHeaders(wallet) {
   };
 }
 
+// FIX 2 + placeOrder update:
 // side: 0 = BUY, 1 = SELL
-// usdcAmount: USDC value of trade (for BUY: how much USDC to spend; for SELL: how much USDC value to receive)
-async function placeOrder(wallet, tokenId, side, price, usdcAmount) {
+// amount: USDC to spend (BUY), shares to sell (SELL with isShares=true), or USDC value (SELL fallback)
+// isShares: when true and side=SELL, amount is treated as number of shares
+async function placeOrder(wallet, tokenId, side, price, amount, isShares = false) {
   const { default: fetch } = await import('node-fetch');
 
   const salt = BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
   const isBuy = side === 0;
 
-  // BUY:  makerAmount = USDC to spend,  takerAmount = shares to receive
-  // SELL: makerAmount = shares to give, takerAmount = USDC to receive
-  const makerAmount = isBuy
-    ? BigInt(Math.round(usdcAmount * 1e6))
-    : BigInt(Math.round((usdcAmount / price) * 1e6));
-  const takerAmount = isBuy
-    ? BigInt(Math.round((usdcAmount / price) * 1e6))
-    : BigInt(Math.round(usdcAmount * 1e6));
+  let makerAmount, takerAmount;
+  if (isBuy) {
+    // amount = USDC to spend
+    makerAmount = BigInt(Math.round(amount * 1e6));
+    takerAmount = BigInt(Math.round((amount / price) * 1e6));
+  } else if (isShares) {
+    // amount = shares to sell
+    makerAmount = BigInt(Math.round(amount * 1e6));
+    takerAmount = BigInt(Math.round(amount * price * 1e6));
+  } else {
+    // amount = USDC value (fallback)
+    makerAmount = BigInt(Math.round((amount / price) * 1e6));
+    takerAmount = BigInt(Math.round(amount * 1e6));
+  }
 
   const orderData = {
     salt,
@@ -269,7 +278,8 @@ async function startCopyEngine(user, targetWallet) {
 
   try {
     const initial = await getPositions(targetWallet);
-    snapshots[targetWallet] = new Map(initial.map(p => [snapshotKey(p), p]));
+    // FIX 1: use composite key to avoid collision when two users copy the same trader
+    snapshots[`${user.id}_${targetWallet}`] = new Map(initial.map(p => [snapshotKey(p), p]));
     logger.info('Snapshot loaded', { userId: user.id, positions: initial.length });
   } catch (err) {
     logger.error('Snapshot failed', { userId: user.id, error: err.message });
@@ -281,12 +291,21 @@ async function startCopyEngine(user, targetWallet) {
   // One-time USDC approval for both CTF Exchange contracts
   await ensureApprovals(wallet);
 
+  // FIX 3: polling lock to prevent concurrent poll executions for the same user
+  const pollingLock = { active: false };
+
   const job = setInterval(async () => {
+    // FIX 3: skip this tick if previous one is still running
+    if (pollingLock.active) return;
+    pollingLock.active = true;
+
     try {
       const positions = await getPositions(targetWallet);
-      const prev = snapshots[targetWallet] ?? new Map();
+      // FIX 1: use composite key for snapshot lookup and update
+      const snapshotId = `${user.id}_${targetWallet}`;
+      const prev = snapshots[snapshotId] ?? new Map();
       const { opened, closed } = diffPositions(prev, positions);
-      snapshots[targetWallet] = new Map(positions.map(p => [snapshotKey(p), p]));
+      snapshots[snapshotId] = new Map(positions.map(p => [snapshotKey(p), p]));
 
       // BUY - follow opened/increased positions
       for (const signal of opened) {
@@ -309,14 +328,20 @@ async function startCopyEngine(user, targetWallet) {
             continue;
           }
 
-          // Category check
+          // FIX 5: fetch market info for category check AND capture market name
+          let marketName = signal.conditionId;
           if (user.categories && user.categories.length > 0) {
             const market = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
+            if (market) marketName = market.question || market.title || market.market_slug || signal.conditionId;
             const cat = market?.category || market?.market_type || '';
             if (!user.categories.some(c => cat.toLowerCase().includes(c.toLowerCase()))) {
               logger.info('Skipping - category not followed', { category: cat });
               continue;
             }
+          } else {
+            // Still try to get market name even if not filtering by category
+            const market = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
+            if (market) marketName = market.question || market.title || market.market_slug || signal.conditionId;
           }
 
           const price = await getBestPrice(tokenId, 0);
@@ -333,19 +358,29 @@ async function startCopyEngine(user, targetWallet) {
 
           const size = calcTradeSize(user, signal);
 
+          // FIX 4: check USDC balance before placing BUY order
+          const userBalance = await getWalletBalance(user.walletAddress);
+          if (userBalance < size) {
+            logger.warn('Skipping BUY - insufficient USDC balance', { userId: user.id, balance: userBalance, needed: size });
+            continue;
+          }
+
           logger.trade('Placing BUY', { userId: user.id, conditionId: signal.conditionId, outcome: signal.outcome, size, price });
 
           const result = await placeOrder(wallet, tokenId, 0, price, size);
 
           logger.trade('BUY placed', { userId: user.id, orderId: result.orderID, status: result.status });
 
-          // Remember how much USDC we spent so we can sell the right amount later
+          // FIX 2: remember USDC spent and estimated shares received
           const key = snapshotKey(signal);
-          userBought[user.id].set(key, (userBought[user.id].get(key) || 0) + size);
+          const prev2 = userBought[user.id].get(key) || { usdc: 0, shares: 0 };
+          const newShares = size / price;
+          userBought[user.id].set(key, { usdc: prev2.usdc + size, shares: prev2.shares + newShares });
 
           await db.saveTrade(user.id, {
             conditionId: signal.conditionId,
-            marketName:  signal.conditionId,
+            // FIX 5: use resolved market name
+            marketName,
             outcome:     signal.outcome,
             side:        'BUY',
             size,
@@ -379,9 +414,10 @@ async function startCopyEngine(user, targetWallet) {
       // SELL - follow closed/reduced positions
       for (const signal of closed) {
         try {
-          const key      = snapshotKey(signal);
-          const boughtAt = userBought[user.id]?.get(key);
-          if (!boughtAt) continue; // we never bought this position, skip
+          const key = snapshotKey(signal);
+          // FIX 2: use { usdc, shares } tracking
+          const pos = userBought[user.id]?.get(key);
+          if (!pos || pos.shares <= 0) continue; // we never bought this position, skip
 
           const tokenId = signal.tokenId || await getTokenId(signal.conditionId, signal.outcome);
           if (!tokenId) continue;
@@ -389,26 +425,36 @@ async function startCopyEngine(user, targetWallet) {
           const price = await getBestPrice(tokenId, 1);
           if (!price || price <= 0) continue;
 
-          const sellUsdcValue = signal.type === 'CLOSED' ? boughtAt : boughtAt * 0.5;
+          // FIX 5: resolve market name for SELL trade record
+          let marketName = signal.conditionId;
+          const sellMarket = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
+          if (sellMarket) marketName = sellMarket.question || sellMarket.title || sellMarket.market_slug || signal.conditionId;
 
-          logger.trade('Placing SELL', { userId: user.id, conditionId: signal.conditionId, outcome: signal.outcome, sellUsdcValue, price });
+          // FIX 2: sell by actual share count
+          const sharesToSell = signal.type === 'CLOSED' ? pos.shares : pos.shares * 0.5;
+          const expectedUsdc = sharesToSell * price;
 
-          const result = await placeOrder(wallet, tokenId, 1, price, sellUsdcValue);
+          logger.trade('Placing SELL', { userId: user.id, conditionId: signal.conditionId, outcome: signal.outcome, sharesToSell, price });
+
+          // FIX 2: pass isShares=true so placeOrder uses share-based amounts
+          const result = await placeOrder(wallet, tokenId, 1, price, sharesToSell, true);
 
           logger.trade('SELL placed', { userId: user.id, orderId: result.orderID, status: result.status });
 
           if (signal.type === 'CLOSED') {
             userBought[user.id].delete(key);
           } else {
-            userBought[user.id].set(key, boughtAt - sellUsdcValue);
+            // FIX 2: update remaining position after partial sell
+            userBought[user.id].set(key, { usdc: pos.usdc * 0.5, shares: pos.shares - sharesToSell });
           }
 
           await db.saveTrade(user.id, {
             conditionId: signal.conditionId,
-            marketName:  signal.conditionId,
+            // FIX 5: use resolved market name for SELL
+            marketName,
             outcome:     signal.outcome,
             side:        'SELL',
-            size:        sellUsdcValue,
+            size:        expectedUsdc,
             price,
             orderId:     result.orderID || null,
             filledSize:  null,
@@ -423,6 +469,9 @@ async function startCopyEngine(user, targetWallet) {
       }
     } catch (err) {
       logger.error('Poll failed', { userId: user.id, error: err.message });
+    } finally {
+      // FIX 3: always release the lock, even on error
+      pollingLock.active = false;
     }
   }, POLL_INTERVAL_MS);
 
