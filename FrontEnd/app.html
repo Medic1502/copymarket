@@ -295,14 +295,15 @@ input[type=range]{width:100%;accent-color:var(--green)}
                 <button class="btn btn-sm btn-green" onclick="copyMnemonic()" style="width:100%;margin-bottom:12px">Copy seed phrase</button>
               </div>
 
-              <!-- Private key as alternative -->
-              <details style="margin-bottom:10px">
-                <summary style="font-size:12px;color:var(--text3);cursor:pointer;margin-bottom:6px">Or use private key instead</summary>
-                <div class="addr-box" style="flex-direction:column;align-items:stretch;gap:8px;margin-top:8px">
+              <!-- Private key (shown directly if no mnemonic, or as alternative) -->
+              <div id="export-pk-section" style="display:none;margin-bottom:12px">
+                <label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:6px">Private key</label>
+                <div class="addr-box" style="flex-direction:column;align-items:stretch;gap:8px">
                   <span class="addr-text" id="export-key-value" style="word-break:break-all;font-size:11px"></span>
-                  <button class="btn btn-sm" onclick="copyKey()">Copy private key</button>
+                  <button class="btn btn-sm btn-green" onclick="copyKey()" style="width:100%">Copy private key</button>
                 </div>
-              </details>
+                <p style="font-size:11px;color:var(--text3);margin-top:6px">MetaMask → Import account → select "Private Key" → paste → Import</p>
+              </div>
 
               <!-- Instructions -->
               <div style="background:var(--bg3);border-radius:8px;padding:12px;font-size:12px;color:var(--text2);line-height:1.7">
@@ -500,9 +501,10 @@ async function doExportKey() {
     const data = await api('POST', '/wallet/export-key', { password: pass });
     document.getElementById('export-key-value').textContent = data.privateKey;
 
-    // Show seed phrase as word grid
+    // Show seed phrase as word grid (if available)
     _exportedMnemonic = data.mnemonic || '';
     const mnemonicSection = document.getElementById('export-mnemonic-section');
+    const pkSection       = document.getElementById('export-pk-section');
     const grid = document.getElementById('export-mnemonic-grid');
     if (data.mnemonic) {
       const words = data.mnemonic.split(' ');
@@ -512,8 +514,10 @@ async function doExportKey() {
         '<strong>' + w + '</strong></div>'
       ).join('');
       mnemonicSection.style.display = 'block';
+      pkSection.style.display = 'none';
     } else {
       mnemonicSection.style.display = 'none';
+      pkSection.style.display = 'block';
     }
 
     document.getElementById('export-key-result').style.display = 'block';
