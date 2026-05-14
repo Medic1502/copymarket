@@ -110,12 +110,13 @@ async function getWalletBalance(walletAddress) {
   return parseFloat(ethers.formatUnits(raw, 6));
 }
 
-function scaleTrade({ traderBetSize, traderTotalBalance, userBudget, maxPerTrade }) {
-  if (traderTotalBalance <= 0) return null;
-  const ratio = traderBetSize / traderTotalBalance;
-  const raw   = ratio * userBudget;
-  const size  = Math.min(Math.max(raw, 1.00), maxPerTrade);
-  return parseFloat(size.toFixed(2));
+function calcTradeSize(user, signal) {
+  if (user.copyMode === 'fixed') {
+    return user.fixedAmount;
+  }
+  // percentage of trader's bet
+  const size = parseFloat((signal.size * (user.copyPercentage / 100)).toFixed(2));
+  return Math.max(size, 1.0);
 }
 
 function snapshotKey(pos) {
@@ -245,18 +246,6 @@ async function startCopyEngine(user, targetWallet) {
 
   const job = setInterval(async () => {
     try {
-      // Daily loss limit check
-      const todayLoss = await db.getTodayLoss(user.id);
-      if (todayLoss >= user.dailyLossLimit) {
-        logger.warn('Daily loss limit reached, stopping engine', { userId: user.id, todayLoss, limit: user.dailyLossLimit });
-        stopCopyEngine(user.id);
-        await db.setActive(user.id, false, 'Daily loss limit reached');
-        return;
-      }
-
-      let traderBalance = 0;
-      try { traderBalance = await getWalletBalance(targetWallet); } catch {}
-
       const positions = await getPositions(targetWallet);
       const prev = snapshots[targetWallet] ?? new Map();
       const { opened, closed } = diffPositions(prev, positions);
@@ -265,13 +254,17 @@ async function startCopyEngine(user, targetWallet) {
       // BUY - follow opened/increased positions
       for (const signal of opened) {
         try {
-          const size = scaleTrade({
-            traderBetSize:    signal.size,
-            traderTotalBalance: traderBalance,
-            userBudget:       user.budget,
-            maxPerTrade:      user.maxPerTrade,
-          });
-          if (!size) continue;
+          // Check min/max trader bet
+          if (signal.size < user.minTraderBet || signal.size > user.maxTraderBet) {
+            logger.info('Skipping - trader bet out of range', { size: signal.size, min: user.minTraderBet, max: user.maxTraderBet });
+            continue;
+          }
+
+          // Follow mode check (skip INCREASED if initial_only)
+          if (user.followMode === 'initial_only' && signal.type === 'INCREASED') {
+            logger.info('Skipping INCREASED - initial_only mode', { userId: user.id });
+            continue;
+          }
 
           const tokenId = signal.tokenId || await getTokenId(signal.conditionId, signal.outcome);
           if (!tokenId) {
@@ -279,11 +272,29 @@ async function startCopyEngine(user, targetWallet) {
             continue;
           }
 
+          // Category check
+          if (user.categories && user.categories.length > 0) {
+            const market = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
+            const cat = market?.category || market?.market_type || '';
+            if (!user.categories.some(c => cat.toLowerCase().includes(c.toLowerCase()))) {
+              logger.info('Skipping - category not followed', { category: cat });
+              continue;
+            }
+          }
+
           const price = await getBestPrice(tokenId, 0);
           if (!price || price <= 0 || price >= 1) {
             logger.warn('Skipping - invalid price', { userId: user.id, conditionId: signal.conditionId, price });
             continue;
           }
+
+          // Share price check
+          if (price < user.minSharePrice || price > user.maxSharePrice) {
+            logger.info('Skipping - share price out of range', { price, min: user.minSharePrice, max: user.maxSharePrice });
+            continue;
+          }
+
+          const size = calcTradeSize(user, signal);
 
           logger.trade('Placing BUY', { userId: user.id, conditionId: signal.conditionId, outcome: signal.outcome, size, price });
 
@@ -307,6 +318,7 @@ async function startCopyEngine(user, targetWallet) {
             status:      result.status || 'PENDING',
             skipReason:  null,
             pnl:         null,
+            configId:    user.configId,
           });
         } catch (err) {
           logger.error('BUY failed', { userId: user.id, conditionId: signal.conditionId, error: err.message });
@@ -322,6 +334,7 @@ async function startCopyEngine(user, targetWallet) {
             status:      'FAILED',
             skipReason:  err.message.slice(0, 200),
             pnl:         null,
+            configId:    user.configId,
           });
         }
       }
@@ -365,6 +378,7 @@ async function startCopyEngine(user, targetWallet) {
             status:      result.status || 'PENDING',
             skipReason:  null,
             pnl:         null,
+            configId:    user.configId,
           });
         } catch (err) {
           logger.error('SELL failed', { userId: user.id, conditionId: signal.conditionId, error: err.message });

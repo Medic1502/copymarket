@@ -94,6 +94,28 @@ async function migrate() {
     await run(`CREATE INDEX IF NOT EXISTS idx_trades_user_id ON trades(user_id)`);
     await run(`CREATE INDEX IF NOT EXISTS idx_trades_created  ON trades(created_at DESC)`);
     await run(`CREATE INDEX IF NOT EXISTS idx_daily_pnl_user  ON daily_pnl(user_id, date DESC)`);
+
+    // Allow multiple traders per user
+    await run(`ALTER TABLE copy_configs DROP CONSTRAINT IF EXISTS copy_configs_user_id_key`);
+
+    // Remove old columns
+    await run(`ALTER TABLE copy_configs DROP COLUMN IF EXISTS budget`);
+    await run(`ALTER TABLE copy_configs DROP COLUMN IF EXISTS max_per_trade`);
+    await run(`ALTER TABLE copy_configs DROP COLUMN IF EXISTS daily_loss_limit`);
+
+    // Add new columns
+    await run(`ALTER TABLE copy_configs ADD COLUMN IF NOT EXISTS copy_mode TEXT DEFAULT 'percentage'`);
+    await run(`ALTER TABLE copy_configs ADD COLUMN IF NOT EXISTS copy_percentage NUMERIC(5,2) DEFAULT 10`);
+    await run(`ALTER TABLE copy_configs ADD COLUMN IF NOT EXISTS fixed_amount NUMERIC(12,2) DEFAULT 10`);
+    await run(`ALTER TABLE copy_configs ADD COLUMN IF NOT EXISTS min_trader_bet NUMERIC(12,2) DEFAULT 5`);
+    await run(`ALTER TABLE copy_configs ADD COLUMN IF NOT EXISTS max_trader_bet NUMERIC(12,2) DEFAULT 100000`);
+    await run(`ALTER TABLE copy_configs ADD COLUMN IF NOT EXISTS categories TEXT[] DEFAULT '{}'`);
+    await run(`ALTER TABLE copy_configs ADD COLUMN IF NOT EXISTS follow_mode TEXT DEFAULT 'all'`);
+    await run(`ALTER TABLE copy_configs ADD COLUMN IF NOT EXISTS min_share_price NUMERIC(5,4) DEFAULT 0.02`);
+    await run(`ALTER TABLE copy_configs ADD COLUMN IF NOT EXISTS max_share_price NUMERIC(5,4) DEFAULT 0.98`);
+
+    // Add config_id to trades for per-trader stats
+    await run(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS config_id UUID REFERENCES copy_configs(id) ON DELETE SET NULL`);
     console.log('Database migration complete.');
   } catch (err) {
     console.error('Migration failed (server will continue):', err.message);

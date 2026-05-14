@@ -70,12 +70,19 @@ async function restoreActiveEngines() {
 
     for (const cfg of configs) {
       await startCopyEngine({
-        id: cfg.user_id,
-        budget: parseFloat(cfg.budget),
-        maxPerTrade: parseFloat(cfg.max_per_trade),
-        dailyLossLimit: parseFloat(cfg.daily_loss_limit),
+        id:                  cfg.user_id,
+        configId:            cfg.id,
+        copyMode:            cfg.copy_mode || 'percentage',
+        copyPercentage:      parseFloat(cfg.copy_percentage)||10,
+        fixedAmount:         parseFloat(cfg.fixed_amount)||10,
+        minTraderBet:        parseFloat(cfg.min_trader_bet)||5,
+        maxTraderBet:        parseFloat(cfg.max_trader_bet)||100000,
+        categories:          cfg.categories || [],
+        followMode:          cfg.follow_mode || 'all',
+        minSharePrice:       parseFloat(cfg.min_share_price)||0.02,
+        maxSharePrice:       parseFloat(cfg.max_share_price)||0.98,
         encryptedPrivateKey: cfg.encrypted_private_key,
-        walletAddress: cfg.wallet_address,
+        walletAddress:       cfg.wallet_address,
       }, cfg.target_wallet);
     }
 

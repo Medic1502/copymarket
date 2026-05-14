@@ -8,16 +8,13 @@ router.use(requireAuth);
 
 router.post('/config',
   validate({
-    targetWallet:   { required: true, type: 'wallet' },
-    budget:         { required: true, min: 10, max: 100000 },
-    maxPerTrade:    { required: true, min: 1,  max: 10000  },
-    dailyLossLimit: { required: true, min: 1,  max: 100000 },
+    targetWallet: { required: true, type: 'wallet' },
   }),
   async (req, res, next) => {
     try {
-      const { targetWallet, budget, maxPerTrade, dailyLossLimit, nickname } = req.body;
+      const { targetWallet, nickname, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice } = req.body;
       const config = await db.saveCopyConfig(req.userId, {
-        targetWallet, budget, maxPerTrade, dailyLossLimit, nickname,
+        targetWallet, nickname, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice
       });
       res.json({ config, message: 'Settings saved.' });
     } catch (err) { next(err); }
@@ -33,11 +30,18 @@ router.post('/start', async (req, res, next) => {
 
     await startCopyEngine({
       id:                  req.userId,
-      budget:              parseFloat(config.budget),
-      maxPerTrade:         parseFloat(config.max_per_trade),
-      dailyLossLimit:      parseFloat(config.daily_loss_limit),
+      configId:            config.id,
+      copyMode:            config.copy_mode || 'percentage',
+      copyPercentage:      parseFloat(config.copy_percentage)||10,
+      fixedAmount:         parseFloat(config.fixed_amount)||10,
+      minTraderBet:        parseFloat(config.min_trader_bet)||5,
+      maxTraderBet:        parseFloat(config.max_trader_bet)||100000,
+      categories:          config.categories || [],
+      followMode:          config.follow_mode || 'all',
+      minSharePrice:       parseFloat(config.min_share_price)||0.02,
+      maxSharePrice:       parseFloat(config.max_share_price)||0.98,
       encryptedPrivateKey: wallet.encrypted_private_key,
-   walletAddress:       wallet.address,
+      walletAddress:       wallet.address,
     }, config.target_wallet);
     await db.setActive(req.userId, true);
     res.json({ status: 'active', message: 'Copy trading started.' });
@@ -64,21 +68,28 @@ router.get('/status', async (req, res, next) => {
   try {
     const configs = await db.getCopyConfig(req.userId);
     if (!configs.length) return res.json({ configured: false });
-    res.json({
-      configured: true,
-      traders: configs.map(c => ({
+    const traders = await Promise.all(configs.map(async c => {
+      const stats = await db.getTraderStats(c.id);
+      return {
         id:             c.id,
         isActive:       c.is_active,
         pausedReason:   c.paused_reason,
         targetWallet:   c.target_wallet,
         nickname:       c.nickname || null,
-        budget:         parseFloat(c.budget),
-        maxPerTrade:    parseFloat(c.max_per_trade),
-        dailyLossLimit: parseFloat(c.daily_loss_limit),
+        copyMode:       c.copy_mode || 'percentage',
+        copyPercentage: parseFloat(c.copy_percentage)||10,
+        fixedAmount:    parseFloat(c.fixed_amount)||10,
+        minTraderBet:   parseFloat(c.min_trader_bet)||5,
+        maxTraderBet:   parseFloat(c.max_trader_bet)||100000,
+        categories:     c.categories || [],
+        followMode:     c.follow_mode || 'all',
+        minSharePrice:  parseFloat(c.min_share_price)||0.02,
+        maxSharePrice:  parseFloat(c.max_share_price)||0.98,
         updatedAt:      c.updated_at,
-      })),
-      isActive: configs.some(c => c.is_active),
-    });
+        stats,
+      };
+    }));
+    res.json({ configured: true, traders, isActive: configs.some(c => c.is_active) });
   } catch (err) { next(err); }
 });
 

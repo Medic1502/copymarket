@@ -77,12 +77,11 @@ async function getUSDCBalance(address) {
 }
 
 // COPY CONFIGS
-async function saveCopyConfig(userId, { targetWallet, budget, maxPerTrade, dailyLossLimit, nickname }) {
+async function saveCopyConfig(userId, { targetWallet, nickname, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice }) {
   const res = await query(
-    `INSERT INTO copy_configs (user_id, target_wallet, budget, max_per_trade, daily_loss_limit, nickname)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING *`,
-    [userId, targetWallet, budget, maxPerTrade, dailyLossLimit, nickname || null]
+    `INSERT INTO copy_configs (user_id, target_wallet, nickname, copy_mode, copy_percentage, fixed_amount, min_trader_bet, max_trader_bet, categories, follow_mode, min_share_price, max_share_price)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    [userId, targetWallet, nickname||null, copyMode||'percentage', copyPercentage||10, fixedAmount||10, minTraderBet||5, maxTraderBet||100000, categories||[], followMode||'all', minSharePrice||0.02, maxSharePrice||0.98]
   );
   return res.rows[0];
 }
@@ -111,14 +110,36 @@ async function getAllActiveConfigs() {
 
 // TRADES
 async function saveTrade(userId, trade) {
-  const { conditionId, marketName, outcome, side, size, price, orderId, filledSize, status, skipReason, pnl } = trade;
+  const { conditionId, marketName, outcome, side, size, price, orderId, filledSize, status, skipReason, pnl, configId } = trade;
   const res = await query(
-    `INSERT INTO trades (user_id, condition_id, market_name, outcome, side, size, price, order_id, filled_size, status, skip_reason, pnl)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-    [userId, conditionId, marketName, outcome, side, size, price, orderId, filledSize, status, skipReason, pnl]
+    `INSERT INTO trades (user_id, config_id, condition_id, market_name, outcome, side, size, price, order_id, filled_size, status, skip_reason, pnl)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+    [userId, configId||null, conditionId, marketName, outcome, side, size, price, orderId, filledSize, status, skipReason, pnl]
   );
   if (pnl != null) await upsertDailyPnl(userId, pnl);
   return res.rows[0];
+}
+
+async function getTraderStats(configId) {
+  const res = await query(
+    `SELECT
+      COUNT(*) FILTER (WHERE status='FILLED') AS total_trades,
+      COALESCE(SUM(pnl),0) AS total_pnl,
+      COALESCE(SUM(size) FILTER (WHERE side='BUY' AND status='FILLED'),0) AS total_invested,
+      COUNT(*) FILTER (WHERE pnl > 0) AS wins,
+      COUNT(*) FILTER (WHERE pnl < 0) AS losses
+     FROM trades WHERE config_id = $1`,
+    [configId]
+  );
+  const row = res.rows[0];
+  const wins = parseInt(row.wins)||0;
+  const losses = parseInt(row.losses)||0;
+  return {
+    totalTrades: parseInt(row.total_trades)||0,
+    totalPnl: parseFloat(row.total_pnl),
+    totalInvested: parseFloat(row.total_invested),
+    winRate: wins+losses>0 ? Math.round(wins/(wins+losses)*100) : null,
+  };
 }
 
 async function upsertDailyPnl(userId, pnlDelta) {
@@ -167,6 +188,6 @@ module.exports = {
   createUser, getUserByEmail, getUserById, verifyPassword,
   createWalletForUser, getWalletByUserId, getUSDCBalance,
   saveCopyConfig, getCopyConfig, setActive, getAllActiveConfigs, deleteCopyConfig,
-  saveTrade, getRecentTrades, getDashboardStats, getTodayLoss,
+  saveTrade, getRecentTrades, getDashboardStats, getTodayLoss, getTraderStats,
   encryptPrivateKey, decryptPrivateKey,
 };

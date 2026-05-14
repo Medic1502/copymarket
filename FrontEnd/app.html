@@ -188,14 +188,63 @@ input[type=range]{width:100%;accent-color:var(--green)}
       <div class="add-trader-form" id="add-trader-form">
         <div class="field"><label>Nickname (optional)</label><input type="text" id="new-trader-nickname" placeholder="e.g. Whale #1, CryptoGod..."></div>
         <div class="field"><label>Trader wallet address</label><input type="text" id="new-trader-wallet" placeholder="0x... Polymarket trader address"></div>
-        <div class="slider-row"><label style="margin:0">Budget</label><span class="slider-val" id="lbl-budget">$100</span></div>
-        <input type="range" min="10" max="1000" step="10" value="100" id="sl-budget" oninput="document.getElementById('lbl-budget').textContent='$'+this.value" style="margin-bottom:14px">
-        <div class="slider-row"><label style="margin:0">Max per trade</label><span class="slider-val" id="lbl-max">$20</span></div>
-        <input type="range" min="1" max="200" step="1" value="20" id="sl-max" oninput="document.getElementById('lbl-max').textContent='$'+this.value" style="margin-bottom:14px">
-        <div class="slider-row"><label style="margin:0">Daily loss limit</label><span class="slider-val" id="lbl-loss">$30</span></div>
-        <input type="range" min="5" max="500" step="5" value="30" id="sl-loss" oninput="document.getElementById('lbl-loss').textContent='$'+this.value" style="margin-bottom:14px">
+
+        <!-- Copy mode -->
+        <div style="margin-bottom:14px">
+          <label style="display:block;font-size:13px;color:var(--text2);margin-bottom:8px">Copy mode</label>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm" id="mode-pct-btn" onclick="setCopyMode('percentage')" style="flex:1;background:var(--green);color:#000;border-color:transparent">% of their bet</button>
+            <button class="btn btn-sm" id="mode-fix-btn" onclick="setCopyMode('fixed')" style="flex:1">Fixed amount</button>
+          </div>
+          <input type="hidden" id="new-copy-mode" value="percentage">
+          <div id="mode-pct-section" style="margin-top:10px">
+            <div class="slider-row"><label style="margin:0">Copy percentage</label><span class="slider-val" id="lbl-pct">10%</span></div>
+            <input type="range" min="1" max="100" step="1" value="10" id="sl-pct" oninput="document.getElementById('lbl-pct').textContent=this.value+'%'" style="margin-bottom:4px">
+          </div>
+          <div id="mode-fix-section" style="display:none;margin-top:10px">
+            <div class="field" style="margin-bottom:0"><label>Fixed USDC per trade</label><input type="number" id="new-fixed-amount" value="10" min="1" placeholder="10"></div>
+          </div>
+        </div>
+
+        <!-- Trader bet filter -->
+        <div style="margin-bottom:14px">
+          <label style="display:block;font-size:13px;color:var(--text2);margin-bottom:8px">Follow trader bets between</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div style="flex:1"><label style="font-size:12px;color:var(--text3)">Min bet ($)</label><input type="number" id="new-min-bet" value="5" min="0" style="margin-top:4px"></div>
+            <span style="color:var(--text3);padding-top:18px">—</span>
+            <div style="flex:1"><label style="font-size:12px;color:var(--text3)">Max bet ($)</label><input type="number" id="new-max-bet" value="100000" min="0" style="margin-top:4px"></div>
+          </div>
+        </div>
+
+        <!-- Share price range -->
+        <div style="margin-bottom:14px">
+          <label style="display:block;font-size:13px;color:var(--text2);margin-bottom:8px">Share price range (skip outside)</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div style="flex:1"><label style="font-size:12px;color:var(--text3)">Min price (¢)</label><input type="number" id="new-min-price" value="2" min="1" max="99" style="margin-top:4px"></div>
+            <span style="color:var(--text3);padding-top:18px">—</span>
+            <div style="flex:1"><label style="font-size:12px;color:var(--text3)">Max price (¢)</label><input type="number" id="new-max-price" value="98" min="1" max="99" style="margin-top:4px"></div>
+          </div>
+        </div>
+
+        <!-- Follow mode -->
+        <div style="margin-bottom:14px">
+          <label style="display:block;font-size:13px;color:var(--text2);margin-bottom:8px">When trader adds to same position</label>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm" id="follow-all-btn" onclick="setFollowMode('all')" style="flex:1;background:var(--green);color:#000;border-color:transparent">Follow all buys</button>
+            <button class="btn btn-sm" id="follow-init-btn" onclick="setFollowMode('initial_only')" style="flex:1">Initial buy only</button>
+          </div>
+          <input type="hidden" id="new-follow-mode" value="all">
+        </div>
+
+        <!-- Categories -->
+        <div style="margin-bottom:14px">
+          <label style="display:block;font-size:13px;color:var(--text2);margin-bottom:8px">Categories to follow <span style="color:var(--text3)">(empty = all)</span></label>
+          <div style="display:flex;flex-wrap:wrap;gap:6px" id="category-chips">
+          </div>
+        </div>
+
         <div id="add-trader-alert"></div>
-        <div style="display:flex;gap:8px;margin-top:4px">
+        <div style="display:flex;gap:8px;margin-top:12px">
           <button class="btn btn-green" id="add-trader-btn" onclick="addTrader()" style="flex:1">Start copying</button>
           <button class="btn btn-sm" onclick="toggleAddForm()" style="width:auto;padding:10px 16px">Cancel</button>
         </div>
@@ -407,22 +456,79 @@ async function doWithdraw() {
   } catch(e) { showAlert('withdraw-alert', e.message); }
 }
 
+const CATEGORIES = ['Politics','Sports','Crypto','Business','Science','Entertainment','AI','Economics','Global'];
+
+function initCategoryChips() {
+  const container = document.getElementById('category-chips');
+  if (!container) return;
+  container.innerHTML = CATEGORIES.map(c =>
+    '<button class="cat-chip btn btn-sm" data-cat="' + c + '" onclick="toggleCat(this)" style="font-size:12px;padding:4px 10px">' + c + '</button>'
+  ).join('');
+}
+
+function toggleCat(el) {
+  el.classList.toggle('active');
+  if (el.classList.contains('active')) {
+    el.style.background = 'var(--blue)';
+    el.style.color = '#fff';
+    el.style.borderColor = 'transparent';
+  } else {
+    el.style.background = '';
+    el.style.color = '';
+    el.style.borderColor = '';
+  }
+}
+
+function setCopyMode(mode) {
+  document.getElementById('new-copy-mode').value = mode;
+  if (mode === 'percentage') {
+    document.getElementById('mode-pct-btn').style.cssText = 'flex:1;background:var(--green);color:#000;border-color:transparent';
+    document.getElementById('mode-fix-btn').style.cssText = 'flex:1';
+    document.getElementById('mode-pct-section').style.display = 'block';
+    document.getElementById('mode-fix-section').style.display = 'none';
+  } else {
+    document.getElementById('mode-fix-btn').style.cssText = 'flex:1;background:var(--green);color:#000;border-color:transparent';
+    document.getElementById('mode-pct-btn').style.cssText = 'flex:1';
+    document.getElementById('mode-pct-section').style.display = 'none';
+    document.getElementById('mode-fix-section').style.display = 'block';
+  }
+}
+
+function setFollowMode(mode) {
+  document.getElementById('new-follow-mode').value = mode;
+  if (mode === 'all') {
+    document.getElementById('follow-all-btn').style.cssText = 'flex:1;background:var(--green);color:#000;border-color:transparent';
+    document.getElementById('follow-init-btn').style.cssText = 'flex:1';
+  } else {
+    document.getElementById('follow-init-btn').style.cssText = 'flex:1;background:var(--green);color:#000;border-color:transparent';
+    document.getElementById('follow-all-btn').style.cssText = 'flex:1';
+  }
+}
+
 function toggleAddForm() {
-  document.getElementById('add-trader-form').classList.toggle('open');
+  const form = document.getElementById('add-trader-form');
+  form.classList.toggle('open');
+  if (form.classList.contains('open')) initCategoryChips();
 }
 
 async function addTrader() {
   clearAlert('add-trader-alert');
-  const wallet      = document.getElementById('new-trader-wallet').value.trim();
-  const nickname    = document.getElementById('new-trader-nickname').value.trim();
-  const budget      = parseInt(document.getElementById('sl-budget').value);
-  const maxPerTrade = parseInt(document.getElementById('sl-max').value);
-  const dailyLoss   = parseInt(document.getElementById('sl-loss').value);
+  const wallet        = document.getElementById('new-trader-wallet').value.trim();
+  const nickname      = document.getElementById('new-trader-nickname').value.trim();
+  const copyMode      = document.getElementById('new-copy-mode').value;
+  const copyPct       = parseInt(document.getElementById('sl-pct').value);
+  const fixedAmt      = parseFloat(document.getElementById('new-fixed-amount').value);
+  const minBet        = parseFloat(document.getElementById('new-min-bet').value);
+  const maxBet        = parseFloat(document.getElementById('new-max-bet').value);
+  const minPrice      = parseFloat(document.getElementById('new-min-price').value) / 100;
+  const maxPrice      = parseFloat(document.getElementById('new-max-price').value) / 100;
+  const followMode    = document.getElementById('new-follow-mode').value;
+  const categories    = Array.from(document.querySelectorAll('.cat-chip.active')).map(el => el.dataset.cat);
   if (!wallet) { showAlert('add-trader-alert','Please enter a wallet address.'); return; }
   if (!/^0x[0-9a-fA-F]{40}$/.test(wallet)) { showAlert('add-trader-alert','Invalid address. Must start with 0x and be 42 characters.'); return; }
   setLoading('add-trader-btn', true);
   try {
-    await api('POST', '/copy/config', { targetWallet: wallet, budget, maxPerTrade, dailyLossLimit: dailyLoss, nickname: nickname || null });
+    await api('POST', '/copy/config', { targetWallet: wallet, nickname: nickname||null, copyMode, copyPercentage: copyPct, fixedAmount: fixedAmt, minTraderBet: minBet, maxTraderBet: maxBet, categories, followMode, minSharePrice: minPrice, maxSharePrice: maxPrice });
     await api('POST', '/copy/start');
     document.getElementById('add-trader-form').classList.remove('open');
     document.getElementById('new-trader-wallet').value = '';
@@ -471,25 +577,42 @@ function renderTraders(config) {
     const short = tw ? tw.slice(0,6)+'...'+tw.slice(-4) : '—';
     const label = t.nickname || short;
     const initials = t.nickname ? t.nickname.slice(0,2).toUpperCase() : short.slice(2,4).toUpperCase();
-    return '<div class="trader-card">' +
-      '<div class="trader-avatar">' + initials + '</div>' +
-      '<div class="trader-info">' +
-        '<div style="font-size:13px;font-weight:500;margin-bottom:2px">' + label + '</div>' +
-        (t.nickname ? '<div style="font-size:11px;color:var(--text3);margin-bottom:2px;font-family:monospace">' + short + '</div>' : '') +
-        '<div class="trader-stats">' +
-          '<div class="trader-stat">Budget <span>$' + t.budget + '</span></div>' +
-          '<div class="trader-stat">Max/trade <span>$' + t.maxPerTrade + '</span></div>' +
-          '<div class="trader-stat">Loss limit <span>$' + t.dailyLossLimit + '/day</span></div>' +
+    const pnl = t.stats ? t.stats.totalPnl : 0;
+    const pnlColor = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    const pnlText = (pnl>=0?'+':'') + '$' + Math.abs(pnl).toFixed(2);
+    const modeText = t.copyMode === 'fixed' ? '$' + t.fixedAmount + ' fixed' : t.copyPercentage + '% of bet';
+    const cats = t.categories && t.categories.length ? t.categories.join(', ') : 'All';
+    return '<div class="trader-card" style="flex-direction:column;align-items:stretch;gap:12px">' +
+      '<div style="display:flex;align-items:center;gap:14px">' +
+        '<div class="trader-avatar">' + initials + '</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div style="font-size:14px;font-weight:600">' + label + '</div>' +
+          (t.nickname ? '<div style="font-size:11px;color:var(--text3);font-family:monospace">' + short + '</div>' : '') +
+          '<div style="margin-top:4px">' + (t.isActive
+            ? '<span class="badge badge-green"><span class="dot dot-green"></span> Copying</span>'
+            : '<span class="badge badge-gray"><span class="dot dot-gray"></span> Paused</span>') + '</div>' +
         '</div>' +
-        '<div style="margin-top:6px">' + (t.isActive
-          ? '<span class="badge badge-green"><span class="dot dot-green"></span> Copying</span>'
-          : '<span class="badge badge-gray"><span class="dot dot-gray"></span> Paused</span>') +
+        '<div style="text-align:right;flex-shrink:0">' +
+          '<div style="font-size:18px;font-weight:700;color:' + pnlColor + '">' + pnlText + '</div>' +
+          '<div style="font-size:11px;color:var(--text3)">Total P&L</div>' +
         '</div>' +
       '</div>' +
-      '<div class="trader-actions">' + (t.isActive
-        ? '<button class="btn btn-sm btn-red" onclick="stopTrader(\'' + t.id + '\')">Pause</button>'
-        : '<button class="btn btn-sm btn-green" onclick="resumeTrader(\'' + t.id + '\')">Resume</button>') +
-      '<button class="btn btn-sm btn-red" onclick="deleteTrader(\'' + t.id + '\')" style="margin-left:4px">Remove</button>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">' +
+        '<div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center"><div style="font-size:16px;font-weight:600">' + (t.stats ? t.stats.totalTrades : 0) + '</div><div style="font-size:11px;color:var(--text3)">Trades</div></div>' +
+        '<div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center"><div style="font-size:16px;font-weight:600">' + (t.stats && t.stats.winRate != null ? t.stats.winRate + '%' : '—') + '</div><div style="font-size:11px;color:var(--text3)">Win rate</div></div>' +
+        '<div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center"><div style="font-size:16px;font-weight:600">$' + (t.stats ? t.stats.totalInvested.toFixed(0) : 0) + '</div><div style="font-size:11px;color:var(--text3)">Invested</div></div>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--text3);display:flex;flex-wrap:wrap;gap:8px">' +
+        '<span>Copy: <strong style="color:var(--text)">' + modeText + '</strong></span>' +
+        '<span>Bet range: <strong style="color:var(--text)">$' + t.minTraderBet + '–$' + t.maxTraderBet + '</strong></span>' +
+        '<span>Price: <strong style="color:var(--text)">' + Math.round(t.minSharePrice*100) + '¢–' + Math.round(t.maxSharePrice*100) + '¢</strong></span>' +
+        '<span>Mode: <strong style="color:var(--text)">' + (t.followMode === 'initial_only' ? 'Initial only' : 'All buys') + '</strong></span>' +
+        '<span>Categories: <strong style="color:var(--text)">' + cats + '</strong></span>' +
+      '</div>' +
+      '<div style="display:flex;gap:6px">' + (t.isActive
+        ? '<button class="btn btn-sm btn-red" onclick="stopTrader(\'' + t.id + '\')" style="flex:1">Pause</button>'
+        : '<button class="btn btn-sm btn-green" onclick="resumeTrader(\'' + t.id + '\')" style="flex:1">Resume</button>') +
+      '<button class="btn btn-sm btn-red" onclick="deleteTrader(\'' + t.id + '\')" style="flex:1">Remove</button>' +
       '</div>' +
     '</div>';
   }).join('');
