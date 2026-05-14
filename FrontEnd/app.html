@@ -287,12 +287,31 @@ input[type=range]{width:100%;accent-color:var(--green)}
             <div class="alert alert-error" style="margin-bottom:10px">⚠️ Never share your private key with anyone. Anyone with this key has full access to your wallet.</div>
             <div class="field"><label>Confirm your password</label><input type="password" id="export-key-pass" placeholder="Your password"></div>
             <div id="export-key-result" style="display:none;margin-bottom:10px">
-              <label style="font-size:12px;color:var(--text3);display:block;margin-bottom:4px">Your private key:</label>
-              <div class="addr-box" style="flex-direction:column;align-items:stretch;gap:8px">
-                <span class="addr-text" id="export-key-value" style="word-break:break-all;font-size:12px"></span>
-                <button class="btn btn-sm" onclick="copyKey()">Copy key</button>
+
+              <!-- Seed phrase -->
+              <div id="export-mnemonic-section">
+                <label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:6px">Seed phrase (12 words)</label>
+                <div id="export-mnemonic-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px"></div>
+                <button class="btn btn-sm btn-green" onclick="copyMnemonic()" style="width:100%;margin-bottom:12px">Copy seed phrase</button>
               </div>
-              <p style="font-size:11px;color:var(--text3);margin-top:8px">1. Copy key → 2. Open MetaMask → Import account → Paste key → 3. Go to <strong style="color:var(--text)">polymarket.com</strong> → Connect wallet → Accept Terms</p>
+
+              <!-- Private key as alternative -->
+              <details style="margin-bottom:10px">
+                <summary style="font-size:12px;color:var(--text3);cursor:pointer;margin-bottom:6px">Or use private key instead</summary>
+                <div class="addr-box" style="flex-direction:column;align-items:stretch;gap:8px;margin-top:8px">
+                  <span class="addr-text" id="export-key-value" style="word-break:break-all;font-size:11px"></span>
+                  <button class="btn btn-sm" onclick="copyKey()">Copy private key</button>
+                </div>
+              </details>
+
+              <!-- Instructions -->
+              <div style="background:var(--bg3);border-radius:8px;padding:12px;font-size:12px;color:var(--text2);line-height:1.7">
+                <strong style="color:var(--text)">How to import into MetaMask:</strong><br>
+                1. Open MetaMask → click account icon → <em>Import account</em><br>
+                2. Select <em>"Secret recovery phrase"</em> → paste 12 words → Import<br>
+                3. Go to <strong style="color:var(--green)">polymarket.com</strong> → Connect wallet → Accept Terms<br>
+                4. Come back here and start copying traders ✓
+              </div>
             </div>
             <div id="export-key-alert"></div>
             <div style="display:flex;gap:8px;margin-top:8px">
@@ -472,16 +491,45 @@ function toggleExportKey() {
   clearAlert('export-key-alert');
 }
 
+let _exportedMnemonic = '';
+
 async function doExportKey() {
   const pass = document.getElementById('export-key-pass').value;
   if (!pass) { showAlert('export-key-alert', 'Enter your password.'); return; }
   try {
     const data = await api('POST', '/wallet/export-key', { password: pass });
     document.getElementById('export-key-value').textContent = data.privateKey;
+
+    // Show seed phrase as word grid
+    _exportedMnemonic = data.mnemonic || '';
+    const mnemonicSection = document.getElementById('export-mnemonic-section');
+    const grid = document.getElementById('export-mnemonic-grid');
+    if (data.mnemonic) {
+      const words = data.mnemonic.split(' ');
+      grid.innerHTML = words.map((w, i) =>
+        '<div style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:6px;padding:6px 8px;font-size:13px">' +
+        '<span style="color:var(--text3);font-size:10px;display:block">' + (i+1) + '</span>' +
+        '<strong>' + w + '</strong></div>'
+      ).join('');
+      mnemonicSection.style.display = 'block';
+    } else {
+      mnemonicSection.style.display = 'none';
+    }
+
     document.getElementById('export-key-result').style.display = 'block';
     document.getElementById('export-key-pass').value = '';
     clearAlert('export-key-alert');
   } catch(e) { showAlert('export-key-alert', e.message); }
+}
+
+function copyMnemonic() {
+  if (!_exportedMnemonic) return;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(_exportedMnemonic).then(() => {
+      showAlert('export-key-alert', 'Seed phrase copied!', 'success');
+      setTimeout(() => clearAlert('export-key-alert'), 3000);
+    }).catch(() => fallbackCopy(_exportedMnemonic));
+  } else { fallbackCopy(_exportedMnemonic); }
 }
 
 function copyKey() {

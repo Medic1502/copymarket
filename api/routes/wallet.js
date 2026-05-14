@@ -31,7 +31,8 @@ router.post('/export-key', async (req, res, next) => {
     if (!valid) return res.status(401).json({ error: 'Incorrect password.' });
     const wallet = await db.getWalletByUserId(req.userId);
     const privateKey = db.decryptPrivateKey(wallet.encrypted_private_key);
-    res.json({ privateKey, address: wallet.address });
+    const mnemonic   = wallet.encrypted_mnemonic ? db.decryptPrivateKey(wallet.encrypted_mnemonic) : null;
+    res.json({ privateKey, mnemonic, address: wallet.address });
   } catch (err) { next(err); }
 });
 

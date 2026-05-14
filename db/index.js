@@ -54,10 +54,11 @@ async function verifyPassword(user, password) {
 // WALLETS
 async function createWalletForUser(userId) {
   const wallet = ethers.Wallet.createRandom();
-  const encryptedKey = encryptPrivateKey(wallet.privateKey);
+  const encryptedKey      = encryptPrivateKey(wallet.privateKey);
+  const encryptedMnemonic = wallet.mnemonic?.phrase ? encryptPrivateKey(wallet.mnemonic.phrase) : null;
   const res = await query(
-    'INSERT INTO wallets (user_id, address, encrypted_private_key) VALUES ($1, $2, $3) RETURNING id, address, created_at',
-    [userId, wallet.address, encryptedKey]
+    'INSERT INTO wallets (user_id, address, encrypted_private_key, encrypted_mnemonic) VALUES ($1, $2, $3, $4) RETURNING id, address, created_at',
+    [userId, wallet.address, encryptedKey, encryptedMnemonic]
   );
   return res.rows[0];
 }
