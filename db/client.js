@@ -3,8 +3,9 @@ const { Pool } = require('pg');
 
 const dbUrl = process.env.DATABASE_URL || '';
 
-// Disable SSL cert verification - needed for Railway Postgres with Node.js 22+
-const ssl = { rejectUnauthorized: false };
+// Internal Railway URL (postgres.railway.internal) doesn't need SSL
+// External proxy URL needs SSL - but prefer internal URL via Variable Reference
+const ssl = dbUrl.includes('.railway.internal') ? false : { rejectUnauthorized: false };
 
 const pool = new Pool({
   connectionString: dbUrl,
