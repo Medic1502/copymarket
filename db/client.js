@@ -3,8 +3,8 @@ const { Pool } = require('pg');
 
 const dbUrl = process.env.DATABASE_URL || '';
 
-// Railway internal connections don't use SSL; external proxy does
-const ssl = dbUrl.includes('.railway.internal') ? false : { rejectUnauthorized: false };
+// Disable SSL cert verification - needed for Railway Postgres with Node.js 22+
+const ssl = { rejectUnauthorized: false };
 
 const pool = new Pool({
   connectionString: dbUrl,

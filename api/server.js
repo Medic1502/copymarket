@@ -41,6 +41,17 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', ts: new Date().toISOString() });
 });
 
+app.get('/test-db', async (req, res) => {
+  const { query } = require('../db/client');
+  const dbUrl = process.env.DATABASE_URL || '';
+  try {
+    const result = await query('SELECT current_database(), version()');
+    res.json({ ok: true, db: result.rows[0], urlHost: dbUrl.split('@')[1]?.split('/')[0] || 'unknown' });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message, code: err.code, urlHost: dbUrl.split('@')[1]?.split('/')[0] || 'unknown' });
+  }
+});
+
 app.use(express.static(path.join(__dirname, '../FrontEnd')));
 
 app.get('*', (req, res) => {
