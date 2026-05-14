@@ -21,4 +21,18 @@ router.get('/balance', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.post('/export-key', async (req, res, next) => {
+  try {
+    const { password } = req.body;
+    if (!password) return res.status(400).json({ error: 'Password required.' });
+    const user = await db.getUserById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+    const valid = await db.verifyPassword(user, password);
+    if (!valid) return res.status(401).json({ error: 'Incorrect password.' });
+    const wallet = await db.getWalletByUserId(req.userId);
+    const privateKey = db.decryptPrivateKey(wallet.encrypted_private_key);
+    res.json({ privateKey, address: wallet.address });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
