@@ -51,7 +51,7 @@ router.post('/start', async (req, res, next) => {
 router.post('/stop', async (req, res, next) => {
   try {
     stopCopyEngine(req.userId);
-    await db.setActive(req.body.id || req.userId, false, req.body.reason ?? null);
+    await db.setActive(req.userId, false, req.body.reason ?? null);
     res.json({ status: 'paused', message: 'Copy trading paused.' });
   } catch (err) { next(err); }
 });
