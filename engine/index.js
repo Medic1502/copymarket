@@ -101,13 +101,47 @@ async function getBestPrice(tokenId, side) {
     : parseFloat(book.bids?.[0]?.price ?? 0);
 }
 
+const USDC_ADDRESS = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
+// Both exchange contracts need approval (standard + neg-risk markets)
+const CTF_EXCHANGES = [
+  process.env.CTF_EXCHANGE_ADDRESS       || '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E',
+  process.env.CTF_NEG_RISK_ADDRESS       || '0xC5d563A36AE78145C45a50134d48A1215220f80a',
+];
+
 async function getWalletBalance(walletAddress) {
-  const USDC = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
   const provider = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
   const abi = ['function balanceOf(address) view returns (uint256)'];
-  const contract = new ethers.Contract(USDC, abi, provider);
+  const contract = new ethers.Contract(USDC_ADDRESS, abi, provider);
   const raw = await contract.balanceOf(walletAddress);
   return parseFloat(ethers.formatUnits(raw, 6));
+}
+
+// Approve CTF Exchange contracts to spend USDC - called once when engine starts
+async function ensureApprovals(wallet) {
+  const provider = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
+  const walletWithProvider = wallet.connect(provider);
+  const abi = [
+    'function allowance(address owner, address spender) view returns (uint256)',
+    'function approve(address spender, uint256 amount) returns (bool)',
+  ];
+  const usdc = new ethers.Contract(USDC_ADDRESS, abi, walletWithProvider);
+  const threshold = ethers.parseUnits('1000', 6); // re-approve if below $1000
+
+  for (const exchange of CTF_EXCHANGES) {
+    try {
+      const allowance = await usdc.allowance(wallet.address, exchange);
+      if (allowance < threshold) {
+        logger.info('Approving USDC for exchange', { exchange, wallet: wallet.address });
+        const tx = await usdc.approve(exchange, ethers.MaxUint256);
+        await tx.wait();
+        logger.info('USDC approved', { exchange, txHash: tx.hash });
+      } else {
+        logger.info('USDC already approved', { exchange });
+      }
+    } catch (err) {
+      logger.warn('Approval failed (may lack MATIC for gas)', { exchange, error: err.message });
+    }
+  }
 }
 
 function calcTradeSize(user, signal) {
@@ -243,6 +277,9 @@ async function startCopyEngine(user, targetWallet) {
 
   const privateKey = decryptPrivateKey(user.encryptedPrivateKey);
   const wallet     = new ethers.Wallet(privateKey);
+
+  // One-time USDC approval for both CTF Exchange contracts
+  await ensureApprovals(wallet);
 
   const job = setInterval(async () => {
     try {
