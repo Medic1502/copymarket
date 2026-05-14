@@ -192,7 +192,7 @@ input[type=range]{width:100%;accent-color:var(--green)}
 
         <!-- Copy mode -->
         <div style="margin-bottom:14px">
-          <label style="display:block;font-size:13px;color:var(--text2);margin-bottom:8px">Copy mode</label>
+          <label style="display:block;font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px">Copy mode</label>
           <div style="display:flex;gap:8px">
             <button class="btn btn-sm" id="mode-pct-btn" onclick="setCopyMode('percentage')" style="flex:1;background:var(--green);color:#000;border-color:transparent">% of their bet</button>
             <button class="btn btn-sm" id="mode-fix-btn" onclick="setCopyMode('fixed')" style="flex:1">Fixed amount</button>
@@ -210,7 +210,7 @@ input[type=range]{width:100%;accent-color:var(--green)}
         <!-- Trader bet filter + Share price range (side by side) -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
           <div>
-            <label style="display:block;font-size:13px;color:var(--text2);margin-bottom:8px">Trader bet range ($)</label>
+            <label style="display:block;font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px">Trader bet range ($)</label>
             <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:4px;align-items:center">
               <input type="number" id="new-min-bet" value="5" min="0" placeholder="Min">
               <span style="color:var(--text3);text-align:center;font-size:12px;padding:0 2px">–</span>
@@ -218,7 +218,7 @@ input[type=range]{width:100%;accent-color:var(--green)}
             </div>
           </div>
           <div>
-            <label style="display:block;font-size:13px;color:var(--text2);margin-bottom:8px">Share price range (¢)</label>
+            <label style="display:block;font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px">Share price range (¢)</label>
             <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:4px;align-items:center">
               <input type="number" id="new-min-price" value="2" min="1" max="99" placeholder="Min">
               <span style="color:var(--text3);text-align:center;font-size:12px;padding:0 2px">–</span>
@@ -229,7 +229,7 @@ input[type=range]{width:100%;accent-color:var(--green)}
 
         <!-- Follow mode -->
         <div style="margin-bottom:14px">
-          <label style="display:block;font-size:13px;color:var(--text2);margin-bottom:8px">When trader adds to same position</label>
+          <label style="display:block;font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px">When trader adds to same position</label>
           <div style="display:flex;gap:8px">
             <button class="btn btn-sm" id="follow-all-btn" onclick="setFollowMode('all')" style="flex:1;background:var(--green);color:#000;border-color:transparent">Follow all buys</button>
             <button class="btn btn-sm" id="follow-init-btn" onclick="setFollowMode('initial_only')" style="flex:1">Initial buy only</button>
@@ -239,7 +239,7 @@ input[type=range]{width:100%;accent-color:var(--green)}
 
         <!-- Categories -->
         <div style="margin-bottom:14px">
-          <label style="display:block;font-size:13px;color:var(--text2);margin-bottom:8px">Categories to follow <span style="color:var(--text3)">(empty = all)</span></label>
+          <label style="display:block;font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px">Categories to follow <span style="color:var(--text3)">(empty = all)</span></label>
           <div style="display:flex;flex-wrap:wrap;gap:6px" id="category-chips">
           </div>
         </div>
