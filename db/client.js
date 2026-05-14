@@ -91,6 +91,20 @@ async function migrate() {
       )
     `);
     await run(`ALTER TABLE wallets ADD COLUMN IF NOT EXISTS encrypted_mnemonic TEXT`);
+    await run(`
+      CREATE TABLE IF NOT EXISTS bot_positions (
+        id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id      UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        config_id    UUID REFERENCES copy_configs(id) ON DELETE SET NULL,
+        condition_id TEXT NOT NULL,
+        outcome      TEXT NOT NULL,
+        usdc_spent   NUMERIC(12,4) NOT NULL DEFAULT 0,
+        shares       NUMERIC(16,6) NOT NULL DEFAULT 0,
+        updated_at   TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(user_id, condition_id, outcome)
+      )
+    `);
+    await run(`CREATE INDEX IF NOT EXISTS idx_bot_positions_user ON bot_positions(user_id)`);
     await run(`ALTER TABLE copy_configs ADD COLUMN IF NOT EXISTS nickname TEXT`);
     await run(`CREATE INDEX IF NOT EXISTS idx_trades_user_id ON trades(user_id)`);
     await run(`CREATE INDEX IF NOT EXISTS idx_trades_created  ON trades(created_at DESC)`);

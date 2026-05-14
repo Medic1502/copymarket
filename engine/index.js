@@ -274,7 +274,20 @@ async function startCopyEngine(user, targetWallet) {
 
   logger.info('Starting copy engine', { userId: user.id, targetWallet });
 
-  if (!userBought[user.id]) userBought[user.id] = new Map();
+  // Load persisted positions from DB so sells survive server restarts
+  if (!userBought[user.id]) {
+    userBought[user.id] = new Map();
+    try {
+      const saved = await db.getBotPositions(user.id);
+      for (const p of saved) {
+        const key = `${p.condition_id}_${p.outcome}`;
+        userBought[user.id].set(key, { usdc: parseFloat(p.usdc_spent), shares: parseFloat(p.shares) });
+      }
+      logger.info('Loaded persisted positions', { userId: user.id, count: saved.length });
+    } catch (err) {
+      logger.warn('Could not load persisted positions', { userId: user.id, error: err.message });
+    }
+  }
 
   try {
     const initial = await getPositions(targetWallet);
@@ -375,7 +388,9 @@ async function startCopyEngine(user, targetWallet) {
           const key = snapshotKey(signal);
           const prev2 = userBought[user.id].get(key) || { usdc: 0, shares: 0 };
           const newShares = size / price;
-          userBought[user.id].set(key, { usdc: prev2.usdc + size, shares: prev2.shares + newShares });
+          const newPos = { usdc: prev2.usdc + size, shares: prev2.shares + newShares };
+          userBought[user.id].set(key, newPos);
+          await db.upsertBotPosition(user.id, user.configId, signal.conditionId, signal.outcome, size, newShares).catch(() => {});
 
           await db.saveTrade(user.id, {
             conditionId: signal.conditionId,
@@ -443,9 +458,11 @@ async function startCopyEngine(user, targetWallet) {
 
           if (signal.type === 'CLOSED') {
             userBought[user.id].delete(key);
+            await db.deleteBotPosition(user.id, signal.conditionId, signal.outcome).catch(() => {});
           } else {
-            // FIX 2: update remaining position after partial sell
-            userBought[user.id].set(key, { usdc: pos.usdc * 0.5, shares: pos.shares - sharesToSell });
+            const remaining = { usdc: pos.usdc * 0.5, shares: pos.shares - sharesToSell };
+            userBought[user.id].set(key, remaining);
+            await db.upsertBotPosition(user.id, user.configId, signal.conditionId, signal.outcome, -sharesToSell * price, -sharesToSell).catch(() => {});
           }
 
           await db.saveTrade(user.id, {

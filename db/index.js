@@ -175,6 +175,35 @@ async function getDashboardStats(userId) {
   };
 }
 
+// BOT POSITIONS (persisted so sells survive server restarts)
+async function upsertBotPosition(userId, configId, conditionId, outcome, usdcDelta, sharesDelta) {
+  await query(
+    `INSERT INTO bot_positions (user_id, config_id, condition_id, outcome, usdc_spent, shares)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     ON CONFLICT (user_id, condition_id, outcome)
+     DO UPDATE SET
+       usdc_spent = bot_positions.usdc_spent + EXCLUDED.usdc_spent,
+       shares     = bot_positions.shares     + EXCLUDED.shares,
+       updated_at = NOW()`,
+    [userId, configId, conditionId, outcome, usdcDelta, sharesDelta]
+  );
+}
+
+async function deleteBotPosition(userId, conditionId, outcome) {
+  await query(
+    'DELETE FROM bot_positions WHERE user_id=$1 AND condition_id=$2 AND outcome=$3',
+    [userId, conditionId, outcome]
+  );
+}
+
+async function getBotPositions(userId) {
+  const res = await query(
+    'SELECT * FROM bot_positions WHERE user_id=$1 AND shares > 0',
+    [userId]
+  );
+  return res.rows;
+}
+
 async function deleteCopyConfig(id, userId) {
   await query('DELETE FROM copy_configs WHERE id = $1 AND user_id = $2', [id, userId]);
 }
@@ -190,5 +219,6 @@ module.exports = {
   createWalletForUser, getWalletByUserId, getUSDCBalance,
   saveCopyConfig, getCopyConfig, setActive, getAllActiveConfigs, deleteCopyConfig,
   saveTrade, getRecentTrades, getDashboardStats, getTodayLoss, getTraderStats,
+  upsertBotPosition, deleteBotPosition, getBotPositions,
   encryptPrivateKey, decryptPrivateKey,
 };
