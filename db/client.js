@@ -3,14 +3,8 @@ const { Pool } = require('pg');
 
 const dbUrl = process.env.DATABASE_URL || '';
 
-const ssl = {
-  rejectUnauthorized: false,
-  ciphers: 'DEFAULT@SECLEVEL=0',
-};
-
 const pool = new Pool({
   connectionString: dbUrl,
-  ssl,
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
