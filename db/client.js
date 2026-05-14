@@ -2,16 +2,24 @@ require('dotenv').config();
 const { Pool } = require('pg');
 
 const dbUrl = process.env.DATABASE_URL || '';
-const ssl = dbUrl.includes('localhost') || dbUrl.includes('.railway.internal')
-  ? false
-  : { rejectUnauthorized: false };
 
-const pool = new Pool({
-  connectionString: dbUrl,
-  ssl,
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
+function buildPool(ssl) {
+  return new Pool({
+    connectionString: dbUrl,
+    ssl,
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+  });
+}
+
+let pool = buildPool(false);
+
+// If plain connection fails, retry with SSL
+pool.on('error', () => {});
+pool.connect().catch(() => {
+  console.log('Plain connection failed, retrying with SSL...');
+  pool = buildPool({ rejectUnauthorized: false });
 });
 
 pool.on('error', (err) => {
