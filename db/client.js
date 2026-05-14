@@ -3,23 +3,12 @@ const { Pool } = require('pg');
 
 const dbUrl = process.env.DATABASE_URL || '';
 
-function buildPool(ssl) {
-  return new Pool({
-    connectionString: dbUrl,
-    ssl,
-    max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
-  });
-}
-
-let pool = buildPool(false);
-
-// If plain connection fails, retry with SSL
-pool.on('error', () => {});
-pool.connect().catch(() => {
-  console.log('Plain connection failed, retrying with SSL...');
-  pool = buildPool({ rejectUnauthorized: false });
+const pool = new Pool({
+  connectionString: dbUrl,
+  ssl: false,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
 });
 
 pool.on('error', (err) => {
