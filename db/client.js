@@ -90,6 +90,7 @@ async function migrate() {
         UNIQUE (user_id, date)
       )
     `);
+    await run(`ALTER TABLE copy_configs ADD COLUMN IF NOT EXISTS nickname TEXT`);
     await run(`CREATE INDEX IF NOT EXISTS idx_trades_user_id ON trades(user_id)`);
     await run(`CREATE INDEX IF NOT EXISTS idx_trades_created  ON trades(created_at DESC)`);
     await run(`CREATE INDEX IF NOT EXISTS idx_daily_pnl_user  ON daily_pnl(user_id, date DESC)`);

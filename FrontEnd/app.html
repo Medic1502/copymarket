@@ -101,6 +101,18 @@ input[type=range]{width:100%;accent-color:var(--green)}
 .info-val{font-size:13px;font-weight:500}
 .add-trader-form{background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;display:none}
 .add-trader-form.open{display:block}
+@media(max-width:600px){
+  .page-wide{padding:16px 12px}
+  .page{padding:28px 16px}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;gap:0}
+  .tab{padding:8px 12px;white-space:nowrap;flex-shrink:0}
+  .topnav{padding:0 12px}
+  .trader-card{flex-wrap:wrap;gap:10px}
+  .trader-actions{width:100%;display:flex;justify-content:flex-end}
+  .trader-stats{gap:8px}
+  .stat-val{font-size:18px}
+}
 </style>
 </head>
 <body>
@@ -174,6 +186,7 @@ input[type=range]{width:100%;accent-color:var(--green)}
         <button class="btn btn-sm btn-blue" onclick="toggleAddForm()">+ Add trader</button>
       </div>
       <div class="add-trader-form" id="add-trader-form">
+        <div class="field"><label>Nickname (optional)</label><input type="text" id="new-trader-nickname" placeholder="e.g. Whale #1, CryptoGod..."></div>
         <div class="field"><label>Trader wallet address</label><input type="text" id="new-trader-wallet" placeholder="0x... Polymarket trader address"></div>
         <div class="slider-row"><label style="margin:0">Budget</label><span class="slider-val" id="lbl-budget">$100</span></div>
         <input type="range" min="10" max="1000" step="10" value="100" id="sl-budget" oninput="document.getElementById('lbl-budget').textContent='$'+this.value" style="margin-bottom:14px">
@@ -401,6 +414,7 @@ function toggleAddForm() {
 async function addTrader() {
   clearAlert('add-trader-alert');
   const wallet      = document.getElementById('new-trader-wallet').value.trim();
+  const nickname    = document.getElementById('new-trader-nickname').value.trim();
   const budget      = parseInt(document.getElementById('sl-budget').value);
   const maxPerTrade = parseInt(document.getElementById('sl-max').value);
   const dailyLoss   = parseInt(document.getElementById('sl-loss').value);
@@ -408,10 +422,11 @@ async function addTrader() {
   if (!/^0x[0-9a-fA-F]{40}$/.test(wallet)) { showAlert('add-trader-alert','Invalid address. Must start with 0x and be 42 characters.'); return; }
   setLoading('add-trader-btn', true);
   try {
-    await api('POST', '/copy/config', { targetWallet: wallet, budget, maxPerTrade, dailyLossLimit: dailyLoss });
+    await api('POST', '/copy/config', { targetWallet: wallet, budget, maxPerTrade, dailyLossLimit: dailyLoss, nickname: nickname || null });
     await api('POST', '/copy/start');
     document.getElementById('add-trader-form').classList.remove('open');
     document.getElementById('new-trader-wallet').value = '';
+    document.getElementById('new-trader-nickname').value = '';
     showAlert('dash-alert','Trader added and copy trading started.','success');
     loadDashboard();
   } catch(e) { showAlert('add-trader-alert', e.message); }
@@ -454,10 +469,13 @@ function renderTraders(config) {
   container.innerHTML = config.traders.map(function(t) {
     const tw = t.targetWallet;
     const short = tw ? tw.slice(0,6)+'...'+tw.slice(-4) : '—';
+    const label = t.nickname || short;
+    const initials = t.nickname ? t.nickname.slice(0,2).toUpperCase() : short.slice(2,4).toUpperCase();
     return '<div class="trader-card">' +
-      '<div class="trader-avatar">' + short.slice(2,4).toUpperCase() + '</div>' +
+      '<div class="trader-avatar">' + initials + '</div>' +
       '<div class="trader-info">' +
-        '<div style="font-size:13px;font-weight:500;margin-bottom:2px">' + short + '</div>' +
+        '<div style="font-size:13px;font-weight:500;margin-bottom:2px">' + label + '</div>' +
+        (t.nickname ? '<div style="font-size:11px;color:var(--text3);margin-bottom:2px;font-family:monospace">' + short + '</div>' : '') +
         '<div class="trader-stats">' +
           '<div class="trader-stat">Budget <span>$' + t.budget + '</span></div>' +
           '<div class="trader-stat">Max/trade <span>$' + t.maxPerTrade + '</span></div>' +

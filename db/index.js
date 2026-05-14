@@ -77,13 +77,12 @@ async function getUSDCBalance(address) {
 }
 
 // COPY CONFIGS
-async function saveCopyConfig(userId, { targetWallet, budget, maxPerTrade, dailyLossLimit }) {
+async function saveCopyConfig(userId, { targetWallet, budget, maxPerTrade, dailyLossLimit, nickname }) {
   const res = await query(
-    `INSERT INTO copy_configs (user_id, target_wallet, budget, max_per_trade, daily_loss_limit)
-     VALUES ($1, $2, $3, $4, $5)
-     
+    `INSERT INTO copy_configs (user_id, target_wallet, budget, max_per_trade, daily_loss_limit, nickname)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
-    [userId, targetWallet, budget, maxPerTrade, dailyLossLimit]
+    [userId, targetWallet, budget, maxPerTrade, dailyLossLimit, nickname || null]
   );
   return res.rows[0];
 }

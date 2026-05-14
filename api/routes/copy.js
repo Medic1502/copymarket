@@ -15,9 +15,9 @@ router.post('/config',
   }),
   async (req, res, next) => {
     try {
-      const { targetWallet, budget, maxPerTrade, dailyLossLimit } = req.body;
+      const { targetWallet, budget, maxPerTrade, dailyLossLimit, nickname } = req.body;
       const config = await db.saveCopyConfig(req.userId, {
-        targetWallet, budget, maxPerTrade, dailyLossLimit,
+        targetWallet, budget, maxPerTrade, dailyLossLimit, nickname,
       });
       res.json({ config, message: 'Settings saved.' });
     } catch (err) { next(err); }
@@ -71,6 +71,7 @@ router.get('/status', async (req, res, next) => {
         isActive:       c.is_active,
         pausedReason:   c.paused_reason,
         targetWallet:   c.target_wallet,
+        nickname:       c.nickname || null,
         budget:         parseFloat(c.budget),
         maxPerTrade:    parseFloat(c.max_per_trade),
         dailyLossLimit: parseFloat(c.daily_loss_limit),
