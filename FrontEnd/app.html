@@ -827,7 +827,7 @@ async function loadDashboard() {
     renderTrades(tradesData.trades);
 
     clearTimeout(window._dashTimer);
-    window._dashTimer = setTimeout(loadDashboard, 30000);
+    window._dashTimer = setTimeout(loadDashboard, 60000);
   } catch(e) {
     showAlert('dash-alert', 'Could not load dashboard: ' + e.message);
   }

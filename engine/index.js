@@ -34,11 +34,12 @@ const ORDER_TYPES = {
   ],
 };
 
-const activeJobs = {};
-const snapshots  = {};
-// Track sizes we actually bought so we know what to sell
-// FIX 2: track { usdc, shares } instead of just a number
-const userBought = {}; // { userId: Map<key, { usdc, shares }> }
+// Shared polling: one Polymarket API call per unique target wallet regardless of how many users copy it
+// sharedPolls[targetWallet] = { interval, users: Map<userId, userConfig>, lock: bool }
+const sharedPolls = {};
+const snapshots   = {}; // targetWallet -> Map<snapshotKey, position>
+const activeEngines = {}; // userId -> targetWallet (to know which poll to leave on stop)
+const userBought  = {}; // userId -> Map<key, { usdc, shares }>
 
 const logger = {
   info:  (msg, data = {}) => console.log(JSON.stringify({ level: 'INFO',  msg, ...data, ts: new Date().toISOString() })),
@@ -266,243 +267,184 @@ async function placeOrder(wallet, tokenId, side, price, amount, isShares = false
   return res.json();
 }
 
+// Process one signal for one user - completely isolated per user
+async function processSignalForUser(user, wallet, signal, side) {
+  try {
+    if (side === 'BUY') {
+      if (signal.size < user.minTraderBet || signal.size > user.maxTraderBet) return;
+      if (user.followMode === 'initial_only' && signal.type === 'INCREASED') return;
+
+      const tokenId = signal.tokenId || await getTokenId(signal.conditionId, signal.outcome);
+      if (!tokenId) return;
+
+      // Fetch market info once for name + category
+      const market = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
+      const marketName = market?.question || market?.title || market?.market_slug || signal.conditionId;
+
+      if (user.categories?.length > 0) {
+        const cat = market?.category || market?.market_type || '';
+        if (!user.categories.some(c => cat.toLowerCase().includes(c.toLowerCase()))) return;
+      }
+
+      const price = await getBestPrice(tokenId, 0);
+      if (!price || price <= 0 || price >= 1) return;
+      if (price < user.minSharePrice || price > user.maxSharePrice) return;
+
+      const size = calcTradeSize(user, signal);
+
+      const balance = await getWalletBalance(user.walletAddress);
+      if (balance < size) {
+        logger.warn('Skipping BUY - low balance', { userId: user.id, balance, needed: size });
+        return;
+      }
+
+      logger.trade('Placing BUY', { userId: user.id, conditionId: signal.conditionId, size, price });
+      const result = await placeOrder(wallet, tokenId, 0, price, size);
+      logger.trade('BUY placed', { userId: user.id, orderId: result.orderID });
+
+      const key = snapshotKey(signal);
+      const prev = userBought[user.id]?.get(key) || { usdc: 0, shares: 0 };
+      const newShares = size / price;
+      userBought[user.id].set(key, { usdc: prev.usdc + size, shares: prev.shares + newShares });
+      await db.upsertBotPosition(user.id, user.configId, signal.conditionId, signal.outcome, size, newShares).catch(() => {});
+      await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName, outcome: signal.outcome, side: 'BUY', size, price, orderId: result.orderID || null, filledSize: null, status: result.status || 'PENDING', skipReason: null, pnl: null, configId: user.configId });
+
+    } else { // SELL
+      const key = snapshotKey(signal);
+      const pos = userBought[user.id]?.get(key);
+      if (!pos || pos.shares <= 0) return;
+
+      const tokenId = signal.tokenId || await getTokenId(signal.conditionId, signal.outcome);
+      if (!tokenId) return;
+
+      const price = await getBestPrice(tokenId, 1);
+      if (!price || price <= 0) return;
+
+      const market = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
+      const marketName = market?.question || market?.title || market?.market_slug || signal.conditionId;
+
+      const sharesToSell = signal.type === 'CLOSED' ? pos.shares : pos.shares * 0.5;
+      const expectedUsdc = sharesToSell * price;
+
+      logger.trade('Placing SELL', { userId: user.id, conditionId: signal.conditionId, sharesToSell, price });
+      const result = await placeOrder(wallet, tokenId, 1, price, sharesToSell, true);
+      logger.trade('SELL placed', { userId: user.id, orderId: result.orderID });
+
+      if (signal.type === 'CLOSED') {
+        userBought[user.id].delete(key);
+        await db.deleteBotPosition(user.id, signal.conditionId, signal.outcome).catch(() => {});
+      } else {
+        userBought[user.id].set(key, { usdc: pos.usdc * 0.5, shares: pos.shares - sharesToSell });
+        await db.upsertBotPosition(user.id, user.configId, signal.conditionId, signal.outcome, -sharesToSell * price, -sharesToSell).catch(() => {});
+      }
+      await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName, outcome: signal.outcome, side: 'SELL', size: expectedUsdc, price, orderId: result.orderID || null, filledSize: null, status: result.status || 'PENDING', skipReason: null, pnl: null, configId: user.configId });
+    }
+  } catch (err) {
+    logger.error(`${side} failed`, { userId: user.id, conditionId: signal.conditionId, error: err.message });
+    if (side === 'BUY') {
+      await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName: signal.conditionId, outcome: signal.outcome, side: 'BUY', size: 0, price: 0, orderId: null, filledSize: null, status: 'FAILED', skipReason: err.message.slice(0, 200), pnl: null, configId: user.configId }).catch(() => {});
+    }
+  }
+}
+
 async function startCopyEngine(user, targetWallet) {
-  if (activeJobs[user.id]) {
+  if (activeEngines[user.id]) {
     logger.warn('Engine already running', { userId: user.id });
     return;
   }
 
-  logger.info('Starting copy engine', { userId: user.id, targetWallet });
+  logger.info('Starting engine', { userId: user.id, targetWallet });
 
-  // Load persisted positions from DB so sells survive server restarts
-  if (!userBought[user.id]) {
-    userBought[user.id] = new Map();
-    try {
-      const saved = await db.getBotPositions(user.id);
-      for (const p of saved) {
-        const key = `${p.condition_id}_${p.outcome}`;
-        userBought[user.id].set(key, { usdc: parseFloat(p.usdc_spent), shares: parseFloat(p.shares) });
-      }
-      logger.info('Loaded persisted positions', { userId: user.id, count: saved.length });
-    } catch (err) {
-      logger.warn('Could not load persisted positions', { userId: user.id, error: err.message });
-    }
-  }
-
+  // Load user's persisted positions from DB (isolated per user)
+  userBought[user.id] = new Map();
   try {
-    const initial = await getPositions(targetWallet);
-    // FIX 1: use composite key to avoid collision when two users copy the same trader
-    snapshots[`${user.id}_${targetWallet}`] = new Map(initial.map(p => [snapshotKey(p), p]));
-    logger.info('Snapshot loaded', { userId: user.id, positions: initial.length });
+    const saved = await db.getBotPositions(user.id);
+    for (const p of saved) {
+      userBought[user.id].set(`${p.condition_id}_${p.outcome}`, {
+        usdc: parseFloat(p.usdc_spent), shares: parseFloat(p.shares),
+      });
+    }
+    logger.info('Positions loaded', { userId: user.id, count: saved.length });
   } catch (err) {
-    logger.error('Snapshot failed', { userId: user.id, error: err.message });
+    logger.warn('Could not load positions', { userId: user.id, error: err.message });
   }
 
+  // Decrypt key and approve USDC - fully isolated per user wallet
   const privateKey = decryptPrivateKey(user.encryptedPrivateKey);
-  const wallet     = new ethers.Wallet(privateKey);
-
-  // One-time USDC approval for both CTF Exchange contracts
+  const wallet = new ethers.Wallet(privateKey);
   await ensureApprovals(wallet);
 
-  // FIX 3: polling lock to prevent concurrent poll executions for the same user
-  const pollingLock = { active: false };
-
-  const job = setInterval(async () => {
-    // FIX 3: skip this tick if previous one is still running
-    if (pollingLock.active) return;
-    pollingLock.active = true;
-
+  // Register user in the shared poll for this target wallet
+  activeEngines[user.id] = targetWallet;
+  if (!sharedPolls[targetWallet]) {
+    // First user to watch this trader - initialize snapshot and start shared poll
     try {
-      const positions = await getPositions(targetWallet);
-      // FIX 1: use composite key for snapshot lookup and update
-      const snapshotId = `${user.id}_${targetWallet}`;
-      const prev = snapshots[snapshotId] ?? new Map();
-      const { opened, closed } = diffPositions(prev, positions);
-      snapshots[snapshotId] = new Map(positions.map(p => [snapshotKey(p), p]));
-
-      // BUY - follow opened/increased positions
-      for (const signal of opened) {
-        try {
-          // Check min/max trader bet
-          if (signal.size < user.minTraderBet || signal.size > user.maxTraderBet) {
-            logger.info('Skipping - trader bet out of range', { size: signal.size, min: user.minTraderBet, max: user.maxTraderBet });
-            continue;
-          }
-
-          // Follow mode check (skip INCREASED if initial_only)
-          if (user.followMode === 'initial_only' && signal.type === 'INCREASED') {
-            logger.info('Skipping INCREASED - initial_only mode', { userId: user.id });
-            continue;
-          }
-
-          const tokenId = signal.tokenId || await getTokenId(signal.conditionId, signal.outcome);
-          if (!tokenId) {
-            logger.warn('Skipping - token ID not found', { userId: user.id, conditionId: signal.conditionId });
-            continue;
-          }
-
-          // FIX 5: fetch market info for category check AND capture market name
-          let marketName = signal.conditionId;
-          if (user.categories && user.categories.length > 0) {
-            const market = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
-            if (market) marketName = market.question || market.title || market.market_slug || signal.conditionId;
-            const cat = market?.category || market?.market_type || '';
-            if (!user.categories.some(c => cat.toLowerCase().includes(c.toLowerCase()))) {
-              logger.info('Skipping - category not followed', { category: cat });
-              continue;
-            }
-          } else {
-            // Still try to get market name even if not filtering by category
-            const market = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
-            if (market) marketName = market.question || market.title || market.market_slug || signal.conditionId;
-          }
-
-          const price = await getBestPrice(tokenId, 0);
-          if (!price || price <= 0 || price >= 1) {
-            logger.warn('Skipping - invalid price', { userId: user.id, conditionId: signal.conditionId, price });
-            continue;
-          }
-
-          // Share price check
-          if (price < user.minSharePrice || price > user.maxSharePrice) {
-            logger.info('Skipping - share price out of range', { price, min: user.minSharePrice, max: user.maxSharePrice });
-            continue;
-          }
-
-          const size = calcTradeSize(user, signal);
-
-          // FIX 4: check USDC balance before placing BUY order
-          const userBalance = await getWalletBalance(user.walletAddress);
-          if (userBalance < size) {
-            logger.warn('Skipping BUY - insufficient USDC balance', { userId: user.id, balance: userBalance, needed: size });
-            continue;
-          }
-
-          logger.trade('Placing BUY', { userId: user.id, conditionId: signal.conditionId, outcome: signal.outcome, size, price });
-
-          const result = await placeOrder(wallet, tokenId, 0, price, size);
-
-          logger.trade('BUY placed', { userId: user.id, orderId: result.orderID, status: result.status });
-
-          // FIX 2: remember USDC spent and estimated shares received
-          const key = snapshotKey(signal);
-          const prev2 = userBought[user.id].get(key) || { usdc: 0, shares: 0 };
-          const newShares = size / price;
-          const newPos = { usdc: prev2.usdc + size, shares: prev2.shares + newShares };
-          userBought[user.id].set(key, newPos);
-          await db.upsertBotPosition(user.id, user.configId, signal.conditionId, signal.outcome, size, newShares).catch(() => {});
-
-          await db.saveTrade(user.id, {
-            conditionId: signal.conditionId,
-            // FIX 5: use resolved market name
-            marketName,
-            outcome:     signal.outcome,
-            side:        'BUY',
-            size,
-            price,
-            orderId:     result.orderID || null,
-            filledSize:  null,
-            status:      result.status || 'PENDING',
-            skipReason:  null,
-            pnl:         null,
-            configId:    user.configId,
-          });
-        } catch (err) {
-          logger.error('BUY failed', { userId: user.id, conditionId: signal.conditionId, error: err.message });
-          await db.saveTrade(user.id, {
-            conditionId: signal.conditionId,
-            marketName:  signal.conditionId,
-            outcome:     signal.outcome,
-            side:        'BUY',
-            size:        0,
-            price:       0,
-            orderId:     null,
-            filledSize:  null,
-            status:      'FAILED',
-            skipReason:  err.message.slice(0, 200),
-            pnl:         null,
-            configId:    user.configId,
-          });
-        }
-      }
-
-      // SELL - follow closed/reduced positions
-      for (const signal of closed) {
-        try {
-          const key = snapshotKey(signal);
-          // FIX 2: use { usdc, shares } tracking
-          const pos = userBought[user.id]?.get(key);
-          if (!pos || pos.shares <= 0) continue; // we never bought this position, skip
-
-          const tokenId = signal.tokenId || await getTokenId(signal.conditionId, signal.outcome);
-          if (!tokenId) continue;
-
-          const price = await getBestPrice(tokenId, 1);
-          if (!price || price <= 0) continue;
-
-          // FIX 5: resolve market name for SELL trade record
-          let marketName = signal.conditionId;
-          const sellMarket = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
-          if (sellMarket) marketName = sellMarket.question || sellMarket.title || sellMarket.market_slug || signal.conditionId;
-
-          // FIX 2: sell by actual share count
-          const sharesToSell = signal.type === 'CLOSED' ? pos.shares : pos.shares * 0.5;
-          const expectedUsdc = sharesToSell * price;
-
-          logger.trade('Placing SELL', { userId: user.id, conditionId: signal.conditionId, outcome: signal.outcome, sharesToSell, price });
-
-          // FIX 2: pass isShares=true so placeOrder uses share-based amounts
-          const result = await placeOrder(wallet, tokenId, 1, price, sharesToSell, true);
-
-          logger.trade('SELL placed', { userId: user.id, orderId: result.orderID, status: result.status });
-
-          if (signal.type === 'CLOSED') {
-            userBought[user.id].delete(key);
-            await db.deleteBotPosition(user.id, signal.conditionId, signal.outcome).catch(() => {});
-          } else {
-            const remaining = { usdc: pos.usdc * 0.5, shares: pos.shares - sharesToSell };
-            userBought[user.id].set(key, remaining);
-            await db.upsertBotPosition(user.id, user.configId, signal.conditionId, signal.outcome, -sharesToSell * price, -sharesToSell).catch(() => {});
-          }
-
-          await db.saveTrade(user.id, {
-            conditionId: signal.conditionId,
-            // FIX 5: use resolved market name for SELL
-            marketName,
-            outcome:     signal.outcome,
-            side:        'SELL',
-            size:        expectedUsdc,
-            price,
-            orderId:     result.orderID || null,
-            filledSize:  null,
-            status:      result.status || 'PENDING',
-            skipReason:  null,
-            pnl:         null,
-            configId:    user.configId,
-          });
-        } catch (err) {
-          logger.error('SELL failed', { userId: user.id, conditionId: signal.conditionId, error: err.message });
-        }
-      }
+      const initial = await getPositions(targetWallet);
+      snapshots[targetWallet] = new Map(initial.map(p => [snapshotKey(p), p]));
+      logger.info('Shared snapshot created', { targetWallet, positions: initial.length });
     } catch (err) {
-      logger.error('Poll failed', { userId: user.id, error: err.message });
-    } finally {
-      // FIX 3: always release the lock, even on error
-      pollingLock.active = false;
+      snapshots[targetWallet] = new Map();
+      logger.warn('Snapshot failed', { targetWallet, error: err.message });
     }
-  }, POLL_INTERVAL_MS);
 
-  activeJobs[user.id] = job;
+    sharedPolls[targetWallet] = {
+      users: new Map(),
+      lock: false,
+      interval: setInterval(async () => {
+        const poll = sharedPolls[targetWallet];
+        if (!poll || poll.users.size === 0) return;
+        if (poll.lock) return;
+        poll.lock = true;
+        try {
+          const positions = await getPositions(targetWallet);
+          const prev = snapshots[targetWallet] ?? new Map();
+          const { opened, closed } = diffPositions(prev, positions);
+          snapshots[targetWallet] = new Map(positions.map(p => [snapshotKey(p), p]));
+
+          if (opened.length === 0 && closed.length === 0) return;
+
+          // Process signals for EACH user independently - fully isolated
+          for (const [, { user: u, wallet: w }] of poll.users) {
+            for (const signal of opened) {
+              await processSignalForUser(u, w, signal, 'BUY');
+            }
+            for (const signal of closed) {
+              await processSignalForUser(u, w, signal, 'SELL');
+            }
+          }
+        } catch (err) {
+          logger.error('Shared poll failed', { targetWallet, error: err.message });
+        } finally {
+          poll.lock = false;
+        }
+      }, POLL_INTERVAL_MS),
+    };
+  }
+
+  sharedPolls[targetWallet].users.set(user.id, { user, wallet });
+  logger.info('User joined shared poll', { userId: user.id, targetWallet, totalWatchers: sharedPolls[targetWallet].users.size });
 }
 
 function stopCopyEngine(userId) {
-  const job = activeJobs[userId];
-  if (job) {
-    clearInterval(job);
-    delete activeJobs[userId];
-    delete userBought[userId];
-    logger.info('Engine stopped', { userId });
+  const targetWallet = activeEngines[userId];
+  if (!targetWallet) return;
+
+  const poll = sharedPolls[targetWallet];
+  if (poll) {
+    poll.users.delete(userId);
+    if (poll.users.size === 0) {
+      clearInterval(poll.interval);
+      delete sharedPolls[targetWallet];
+      delete snapshots[targetWallet];
+      logger.info('Shared poll stopped - no more watchers', { targetWallet });
+    } else {
+      logger.info('User left shared poll', { userId, targetWallet, remaining: poll.users.size });
+    }
   }
+
+  delete activeEngines[userId];
+  delete userBought[userId];
+  logger.info('Engine stopped', { userId });
 }
 
 module.exports = { startCopyEngine, stopCopyEngine };

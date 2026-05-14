@@ -5,7 +5,7 @@ const dbUrl = process.env.DATABASE_URL || '';
 
 const sql = postgres(dbUrl, {
   ssl: 'prefer',
-  max: 10,
+  max: 25,
   idle_timeout: 30,
   connect_timeout: 15,
   onnotice: () => {},

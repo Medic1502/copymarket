@@ -4,6 +4,16 @@ const { requireAuth } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const { startCopyEngine, stopCopyEngine } = require('../../engine');
 
+// Simple in-memory cache for trader stats (expensive aggregate queries)
+const statsCache = new Map(); // configId -> { data, expiresAt }
+async function getCachedStats(configId) {
+  const cached = statsCache.get(configId);
+  if (cached && Date.now() < cached.expiresAt) return cached.data;
+  const data = await db.getTraderStats(configId);
+  statsCache.set(configId, { data, expiresAt: Date.now() + 60000 }); // 60s TTL
+  return data;
+}
+
 router.use(requireAuth);
 
 router.post('/config',
@@ -69,7 +79,7 @@ router.get('/status', async (req, res, next) => {
     const configs = await db.getCopyConfig(req.userId);
     if (!configs.length) return res.json({ configured: false });
     const traders = await Promise.all(configs.map(async c => {
-      const stats = await db.getTraderStats(c.id);
+      const stats = await getCachedStats(c.id);
       return {
         id:             c.id,
         isActive:       c.is_active,
