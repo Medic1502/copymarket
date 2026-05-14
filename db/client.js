@@ -3,9 +3,7 @@ const { Pool } = require('pg');
 
 const dbUrl = process.env.DATABASE_URL || '';
 
-// Internal Railway URL (postgres.railway.internal) doesn't need SSL
-// External proxy URL needs SSL - but prefer internal URL via Variable Reference
-const ssl = dbUrl.includes('.railway.internal') ? false : { rejectUnauthorized: false };
+const ssl = { rejectUnauthorized: false };
 
 const pool = new Pool({
   connectionString: dbUrl,
