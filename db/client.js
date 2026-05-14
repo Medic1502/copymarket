@@ -1,9 +1,14 @@
 require('dotenv').config();
 const { Pool } = require('pg');
 
+const dbUrl = process.env.DATABASE_URL || '';
+const ssl = dbUrl.includes('localhost') || dbUrl.includes('.railway.internal')
+  ? false
+  : { rejectUnauthorized: false };
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
+  connectionString: dbUrl,
+  ssl,
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
