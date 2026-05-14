@@ -42,24 +42,15 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/test-db', async (req, res) => {
-  const { Client } = require('pg');
+  const { query } = require('../db/client');
   const dbUrl = process.env.DATABASE_URL || '';
-
-  let urlInfo = { raw: 'parse failed' };
+  let urlInfo = {};
+  try { const u = new URL(dbUrl); urlInfo = { host: u.host, db: u.pathname, user: u.username }; } catch {}
   try {
-    const u = new URL(dbUrl);
-    urlInfo = { host: u.host, db: u.pathname, user: u.username, params: Object.fromEntries(u.searchParams) };
-  } catch {}
-
-  const client = new Client({ connectionString: dbUrl, connectionTimeoutMillis: 8000 });
-  try {
-    await client.connect();
-    const r = await client.query('SELECT current_database() AS db, version() AS ver');
-    await client.end();
+    const r = await query('SELECT current_database() AS db, version() AS ver');
     res.json({ ok: true, row: r.rows[0], urlInfo });
   } catch (err) {
-    try { await client.end(); } catch {}
-    res.status(500).json({ ok: false, error: err.message, code: err.code, detail: err.detail, urlInfo });
+    res.status(500).json({ ok: false, error: err.message, code: err.code, urlInfo });
   }
 });
 

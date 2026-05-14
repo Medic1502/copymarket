@@ -1,30 +1,26 @@
 require('dotenv').config();
-const { Pool } = require('pg');
+const postgres = require('postgres');
 
 const dbUrl = process.env.DATABASE_URL || '';
 
-const pool = new Pool({
-  connectionString: dbUrl,
+const sql = postgres(dbUrl, {
+  ssl: 'prefer',
   max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
+  idle_timeout: 30,
+  connect_timeout: 15,
+  onnotice: () => {},
 });
 
-pool.on('error', (err) => {
-  console.error('Unexpected DB pool error', err.message);
-});
-
-async function query(text, params) {
-  const res = await pool.query(text, params);
-  return res;
+async function query(text, params = []) {
+  const result = await sql.unsafe(text, params);
+  return { rows: result };
 }
 
-async function run(sql) {
+async function run(text) {
   try {
-    await pool.query(sql);
+    await sql.unsafe(text);
   } catch (err) {
-    // Skip if already exists or permission denied - don't crash
-    if (!err.message.includes('already exists') && err.code !== '42P07' && err.code !== '42710') {
+    if (!err.message?.includes('already exists')) {
       console.warn('Migration warning:', err.message);
     }
   }
@@ -99,9 +95,8 @@ async function migrate() {
     await run(`CREATE INDEX IF NOT EXISTS idx_daily_pnl_user  ON daily_pnl(user_id, date DESC)`);
     console.log('Database migration complete.');
   } catch (err) {
-    // Log but never crash the server over migration
     console.error('Migration failed (server will continue):', err.message);
   }
 }
 
-module.exports = { pool, query, migrate };
+module.exports = { sql, query, migrate };

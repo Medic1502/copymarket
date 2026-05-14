@@ -1,7 +1,7 @@
 require('dotenv').config();
 const bcrypt = require('bcrypt');
 const { ethers } = require('ethers');
-const { pool, query } = require('./client');
+const { query } = require('./client');
 const crypto = require('crypto');
 
 const SALT_ROUNDS = 12;
@@ -136,27 +136,22 @@ async function getRecentTrades(userId, limit = 20) {
 }
 
 async function getDashboardStats(userId) {
-  const client = await pool.connect();
-  try {
-    const [totalRes, pnlRes, todayRes, winRes] = await Promise.all([
-      client.query("SELECT COUNT(*) AS total_trades, SUM(size) AS total_invested FROM trades WHERE user_id=$1 AND status='FILLED'", [userId]),
-      client.query('SELECT COALESCE(SUM(pnl),0) AS total_pnl FROM trades WHERE user_id=$1', [userId]),
-      client.query('SELECT COALESCE(SUM(pnl),0) AS today_pnl FROM daily_pnl WHERE user_id=$1 AND date=CURRENT_DATE', [userId]),
-      client.query("SELECT COUNT(*) FILTER (WHERE pnl > 0) AS wins, COUNT(*) FILTER (WHERE pnl < 0) AS losses FROM trades WHERE user_id=$1 AND pnl IS NOT NULL", [userId]),
-    ]);
-    const wins = parseInt(winRes.rows[0].wins) || 0;
-    const losses = parseInt(winRes.rows[0].losses) || 0;
-    const winRate = wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : null;
-    return {
-      totalTrades:   parseInt(totalRes.rows[0].total_trades) || 0,
-      totalInvested: parseFloat(totalRes.rows[0].total_invested) || 0,
-      totalPnl:      parseFloat(pnlRes.rows[0].total_pnl),
-      todayPnl:      parseFloat(todayRes.rows[0].today_pnl),
-      winRate,
-    };
-  } finally {
-    client.release();
-  }
+  const [totalRes, pnlRes, todayRes, winRes] = await Promise.all([
+    query("SELECT COUNT(*) AS total_trades, SUM(size) AS total_invested FROM trades WHERE user_id=$1 AND status='FILLED'", [userId]),
+    query('SELECT COALESCE(SUM(pnl),0) AS total_pnl FROM trades WHERE user_id=$1', [userId]),
+    query('SELECT COALESCE(SUM(pnl),0) AS today_pnl FROM daily_pnl WHERE user_id=$1 AND date=CURRENT_DATE', [userId]),
+    query("SELECT COUNT(*) FILTER (WHERE pnl > 0) AS wins, COUNT(*) FILTER (WHERE pnl < 0) AS losses FROM trades WHERE user_id=$1 AND pnl IS NOT NULL", [userId]),
+  ]);
+  const wins = parseInt(winRes.rows[0].wins) || 0;
+  const losses = parseInt(winRes.rows[0].losses) || 0;
+  const winRate = wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : null;
+  return {
+    totalTrades:   parseInt(totalRes.rows[0].total_trades) || 0,
+    totalInvested: parseFloat(totalRes.rows[0].total_invested) || 0,
+    totalPnl:      parseFloat(pnlRes.rows[0].total_pnl),
+    todayPnl:      parseFloat(todayRes.rows[0].today_pnl),
+    winRate,
+  };
 }
 
 async function deleteCopyConfig(id, userId) {
