@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 
 const { getAllActiveConfigs } = require('../db');
+const { migrate } = require('../db/client');
 const { startCopyEngine } = require('../engine');
 
 const app = express();
@@ -75,7 +76,8 @@ const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, '0.0.0.0', async () => {
   console.log(`CopyMarket API running on port ${PORT}`);
-  // await restoreActiveEngines();
+  await migrate();
+  await restoreActiveEngines();
 });
 
 module.exports = app;

@@ -39,7 +39,7 @@ router.post('/start', async (req, res, next) => {
       encryptedPrivateKey: wallet.encrypted_private_key,
    walletAddress:       wallet.address,
     }, config.target_wallet);
-    await db.setActive(config.id, true);
+    await db.setActive(req.userId, true);
     res.json({ status: 'active', message: 'Copy trading started.' });
   } catch (err) { next(err); }
 });
