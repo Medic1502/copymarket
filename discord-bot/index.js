@@ -208,6 +208,30 @@ function howToJoinEmbed() {
     .setFooter({ text: 'Jonin CT — Copy. Track. Win.' });
 }
 
+const DOWNLOAD_VERSION = '1.1.0';
+const DOWNLOAD_LINK = 'https://github.com/Medic1502/copymarket/releases/download/v1.1.0/Jonin-CT-Setup-1.1.0.exe';
+
+function downloadEmbed() {
+  return new EmbedBuilder()
+    .setColor(GREEN)
+    .setTitle(`📥 Jonin CT v${DOWNLOAD_VERSION} — Download`)
+    .setDescription(`🔗 **[Click here to download Jonin CT Setup v${DOWNLOAD_VERSION}](${DOWNLOAD_LINK})**`)
+    .addFields(
+      {
+        name: '💻 Installation',
+        value: '1. Click the link above to download\n2. Run the installer\n3. If Windows SmartScreen appears → **More info → Run anyway**\n4. Open Jonin CT and enter your license key from `/getkey`',
+        inline: false
+      },
+      {
+        name: '🔑 Don\'t have a key?',
+        value: 'Type `/getkey` in <#get-key> to receive your personal license key via DM.',
+        inline: false
+      }
+    )
+    .setFooter({ text: `Jonin CT v${DOWNLOAD_VERSION} — Windows x64` })
+    .setTimestamp();
+}
+
 function getKeyInfoEmbed() {
   return new EmbedBuilder()
     .setColor(GREEN)
@@ -250,6 +274,7 @@ async function registerCommands() {
             { name: 'How it works', value: 'howitworks' },
             { name: 'Setup guide', value: 'setup' },
             { name: 'How to join (Premium CT)', value: 'howtojoin' },
+            { name: 'Download app', value: 'download' },
             { name: 'Rules', value: 'rules' },
             { name: 'Get key info', value: 'getkey' },
             { name: 'Welcome', value: 'welcome' },
@@ -437,6 +462,7 @@ client.on('interactionCreate', async (interaction) => {
       if (type === 'howitworks' || type === 'all') await ch.send({ embeds: [howItWorksEmbed()] });
       if (type === 'setup'      || type === 'all') await ch.send({ embeds: [setupGuideEmbed()] });
       if (type === 'howtojoin'  || type === 'all') await ch.send({ embeds: [howToJoinEmbed()] });
+      if (type === 'download'   || type === 'all') await ch.send({ embeds: [downloadEmbed()] });
       if (type === 'rules'      || type === 'all') await ch.send({ embeds: [getRulesEmbed()] });
       if (type === 'getkey'     || type === 'all') await ch.send({ embeds: [getKeyInfoEmbed()] });
       if (type === 'welcome')                       await ch.send({ embeds: [welcomeEmbed(interaction.member)] });
