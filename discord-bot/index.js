@@ -276,6 +276,15 @@ async function registerCommands() {
       .toJSON(),
 
     new SlashCommandBuilder()
+      .setName('postdownload')
+      .setDescription('[Admin] Post download message to current channel')
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+      .addStringOption(opt => opt.setName('version').setDescription('Version number e.g. 1.1.0').setRequired(true))
+      .addStringOption(opt => opt.setName('link').setDescription('Direct download link').setRequired(true))
+      .addStringOption(opt => opt.setName('changelog').setDescription('What is new in this version (optional)').setRequired(false))
+      .toJSON(),
+
+    new SlashCommandBuilder()
       .setName('revokekey')
       .setDescription('[Admin] Revoke a user license key')
       .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
@@ -456,6 +465,44 @@ client.on('interactionCreate', async (interaction) => {
     try {
       await interaction.channel.send({ content: '@everyone', embeds: [embed] });
       await interaction.editReply({ content: '✅ Announcement sent!' });
+    } catch (err) {
+      await interaction.editReply({ content: `❌ Failed: ${err.message}` });
+    }
+    return;
+  }
+
+  // ── /postdownload ─────────────────────────────────────────────────────────
+  if (interaction.commandName === 'postdownload') {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const version   = interaction.options.getString('version');
+    const link      = interaction.options.getString('link');
+    const changelog = interaction.options.getString('changelog');
+
+    const embed = new EmbedBuilder()
+      .setColor(GREEN)
+      .setTitle(`📥 Jonin CT v${version} — Download`)
+      .setDescription(`The latest version of **Jonin CT Desktop** is now available.\n\n🔗 **[Download Jonin CT Setup v${version}](${link})**`)
+      .addFields(
+        {
+          name: '💻 Windows Installation',
+          value: '1. Click the download link above\n2. Run the installer\n3. If Windows SmartScreen appears → click **More info → Run anyway**\n4. Open Jonin CT and enter your license key',
+          inline: false
+        }
+      );
+
+    if (changelog) {
+      embed.addFields({ name: `✨ What's new in v${version}`, value: changelog, inline: false });
+    }
+
+    embed.addFields({
+      name: '🔑 Don\'t have a key yet?',
+      value: 'Type `/getkey` in <#get-key> to receive your personal license key.',
+      inline: false
+    }).setFooter({ text: 'Jonin CT — Copy. Track. Win.' }).setTimestamp();
+
+    try {
+      await interaction.channel.send({ embeds: [embed] });
+      await interaction.editReply({ content: '✅ Download message posted!' });
     } catch (err) {
       await interaction.editReply({ content: `❌ Failed: ${err.message}` });
     }
