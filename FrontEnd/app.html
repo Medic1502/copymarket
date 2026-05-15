@@ -20,14 +20,19 @@
 }
 html,body{height:100%;overflow:hidden;background:var(--bg)}
 body{color:var(--text);font-family:'Inter',-apple-system,sans-serif;font-size:14px}
-.app{display:flex;height:100vh}
+.app{display:flex;flex-direction:column;height:100vh}
+
+/* ── TOP HEADER (full width, one logo) ───────────── */
+.app-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:54px;background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0}
+.header-logo{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;letter-spacing:-.3px}
+.header-logo img{height:30px;width:30px;object-fit:contain}
+.header-logo span{color:var(--cyan)}
+
+/* ── BODY (sidebar + content) ────────────────────── */
+.app-body{display:flex;flex:1;overflow:hidden}
 
 /* ── SIDEBAR ──────────────────────────────────────── */
 .sidebar{width:220px;flex-shrink:0;background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column}
-.sb-logo{display:flex;align-items:center;gap:10px;padding:18px 16px;border-bottom:1px solid var(--border)}
-.sb-logo img{height:30px;width:30px;object-fit:contain}
-.sb-logo-text{font-size:17px;font-weight:700;letter-spacing:-.3px}
-.sb-logo-text span{color:var(--cyan)}
 .sb-nav{flex:1;padding:10px 8px;display:flex;flex-direction:column;gap:2px}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:var(--text2);font-size:13.5px;font-weight:500;cursor:pointer;transition:all .15s;border:none;background:none;width:100%;text-align:left}
 .nav-item:hover{background:rgba(255,255,255,.05);color:var(--text)}
@@ -40,9 +45,6 @@ body{color:var(--text);font-family:'Inter',-apple-system,sans-serif;font-size:14
 
 /* ── MAIN ─────────────────────────────────────────── */
 .main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:#111827}
-.main-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:54px;border-bottom:1px solid var(--border);flex-shrink:0}
-.header-logo{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:700}
-.header-logo img{height:26px;object-fit:contain}
 .live-badge{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--green)}
 .live-dot{width:7px;height:7px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
@@ -184,13 +186,22 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
 <body>
 <div class="app">
 
+<!-- ══ TOP HEADER ════════════════════════════════════════════════════════════ -->
+<header class="app-header">
+  <div class="header-logo">
+    <img src="logo.png" alt="Jonin CT">
+    Jonin <span>CT</span>
+  </div>
+  <div class="live-badge" id="status-badge">
+    <span class="live-dot"></span> Live
+  </div>
+</header>
+
+<!-- ══ BODY ══════════════════════════════════════════════════════════════════ -->
+<div class="app-body">
+
 <!-- ══ SIDEBAR ══════════════════════════════════════════════════════════════ -->
 <aside class="sidebar">
-  <div class="sb-logo">
-    <img src="logo.png" alt="Jonin CT">
-    <div class="sb-logo-text">Jonin <span>CT</span></div>
-  </div>
-
   <nav class="sb-nav">
     <button class="nav-item active" id="nav-traders" onclick="navSwitch('traders',this)">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -228,16 +239,6 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
 
 <!-- ══ MAIN ══════════════════════════════════════════════════════════════════ -->
 <main class="main">
-  <header class="main-header">
-    <div class="header-logo">
-      <img src="logo.png" alt="">
-      Jonin CT
-    </div>
-    <div class="live-badge" id="status-badge">
-      <span class="live-dot"></span> Live
-    </div>
-  </header>
-
   <div class="content">
     <div id="dash-alert"></div>
 
@@ -248,14 +249,6 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
       <div class="stat-card"><div class="stat-label">Today</div><div class="stat-value" id="stat-today">—</div><div class="stat-sub">P&amp;L today</div></div>
       <div class="stat-card"><div class="stat-label">Win Rate</div><div class="stat-value" id="stat-winrate">—</div><div class="stat-sub" id="stat-trades-sub">0 trades</div></div>
       <div class="stat-card"><div class="stat-label">Copying</div><div class="stat-value" id="stat-traders">0</div><div class="stat-sub">Active traders</div></div>
-    </div>
-
-    <!-- TAB NAV -->
-    <div class="tab-nav">
-      <button class="tab-btn active" id="tab-btn-traders" onclick="switchTab('traders',this)">My Traders</button>
-      <button class="tab-btn" id="tab-btn-trades" onclick="switchTab('trades',this)">Trade History</button>
-      <button class="tab-btn" id="tab-btn-wallet" onclick="switchTab('wallet',this)">Wallet</button>
-      <button class="tab-btn" id="tab-btn-profile" onclick="switchTab('profile',this)">Profile</button>
     </div>
 
     <!-- ── MY TRADERS ──────────────────────────────── -->
@@ -440,6 +433,8 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
 
   </div><!-- /content -->
 </main>
+
+</div><!-- /app-body -->
 </div><!-- /app -->
 
 <script>
@@ -456,24 +451,13 @@ loadDashboard();
 function navSwitch(key, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   if (el) el.classList.add('active');
-  const tabMap = { traders:'traders', trades:'trades', wallet:'wallet', profile:'profile' };
-  const tabId = tabMap[key];
-  switchTab(tabId, document.getElementById('tab-btn-' + tabId));
-}
-
-function switchTab(key, btn) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   const panel = document.getElementById('tab-' + key);
   if (panel) panel.classList.add('active');
-  // sync sidebar
-  const navEl = document.getElementById('nav-' + key);
-  if (navEl) {
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    navEl.classList.add('active');
-  }
 }
+
+// kept for backward compat if called anywhere
+function switchTab(key) { navSwitch(key, document.getElementById('nav-' + key)); }
 
 // ── ALERTS ──────────────────────────────────────────────────────────────────
 function showAlert(id, msg, type='error') {
