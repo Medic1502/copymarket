@@ -318,24 +318,6 @@ div.expand-panel.closed{display:none !important}
           <div class="field" style="margin-bottom:0"><label>Fixed USDC per trade</label><input type="number" id="new-fixed-amount" value="10" min="1"></div>
         </div>
 
-        <div class="two-col" style="margin-bottom:14px">
-          <div>
-            <div class="form-section-label" style="margin-bottom:8px">Trader bet range ($) <span class="info-icon" data-tip="Only copy trades where the trader bets between these amounts. Example: min $5, max $500 — trades below $5 or above $500 are skipped. Helps filter out very small or very large bets.">i</span></div>
-            <div class="three-col">
-              <input type="number" id="new-min-bet" value="5" min="0" placeholder="Min">
-              <span class="col-sep">–</span>
-              <input type="number" id="new-max-bet" value="100000" min="0" placeholder="Max">
-            </div>
-          </div>
-          <div>
-            <div class="form-section-label" style="margin-bottom:8px">Share price range (¢) <span class="info-icon" data-tip="Only copy trades where the share (outcome) price is within this range. Price is in cents: 2¢ = very unlikely, 98¢ = near certain. Skipping extremes reduces risk on very lopsided markets.">i</span></div>
-            <div class="three-col">
-              <input type="number" id="new-min-price" value="2" min="1" max="99" placeholder="Min">
-              <span class="col-sep">–</span>
-              <input type="number" id="new-max-price" value="98" min="1" max="99" placeholder="Max">
-            </div>
-          </div>
-        </div>
 
         <div class="form-section-label" style="margin-bottom:8px">When trader adds to same position <span class="info-icon" data-tip="Follow all buys: copies every time the trader buys more of the same market (averaging up). Initial buy only: only copies the first entry into a market, ignores add-ons.">i</span></div>
         <div style="display:flex;gap:8px;margin-bottom:14px">
@@ -346,6 +328,33 @@ div.expand-panel.closed{display:none !important}
 
         <div class="form-section-label" style="margin-bottom:8px">Categories <span style="color:var(--text3);font-weight:400">(empty = all)</span> <span class="info-icon" data-tip="Only copy trades from selected market categories. Leave empty to copy trades from all categories. Useful if you only want to follow a trader's crypto or politics bets, for example.">i</span></div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px" id="category-chips"></div>
+
+        <!-- ADVANCED SETTINGS -->
+        <div style="margin-bottom:12px">
+          <button type="button" class="btn btn-sm" id="adv-toggle-btn" onclick="toggleAdvanced()" style="width:auto;color:var(--text3);border-color:var(--border);font-size:12.5px;gap:6px">
+            <span id="adv-chevron" style="display:inline-block;transition:transform .2s">›</span> Advanced settings
+          </button>
+          <div id="adv-settings" style="display:none;margin-top:12px">
+            <div class="two-col">
+              <div>
+                <div class="form-section-label" style="margin-bottom:8px">Trader bet range ($) <span class="info-icon" data-tip="Only copy trades where the trader bets between these amounts. Example: min $5, max $500 — trades below $5 or above $500 are skipped. Helps filter out very small or very large bets.">i</span></div>
+                <div class="three-col">
+                  <input type="number" id="new-min-bet" value="5" min="0" placeholder="Min">
+                  <span class="col-sep">–</span>
+                  <input type="number" id="new-max-bet" value="100000" min="0" placeholder="Max">
+                </div>
+              </div>
+              <div>
+                <div class="form-section-label" style="margin-bottom:8px">Share price range (¢) <span class="info-icon" data-tip="Only copy trades where the share (outcome) price is within this range. Price is in cents: 2¢ = very unlikely, 98¢ = near certain. Skipping extremes reduces risk on very lopsided markets.">i</span></div>
+                <div class="three-col">
+                  <input type="number" id="new-min-price" value="2" min="1" max="99" placeholder="Min">
+                  <span class="col-sep">–</span>
+                  <input type="number" id="new-max-price" value="98" min="1" max="99" placeholder="Max">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div id="add-trader-alert"></div>
         <div style="display:flex;gap:8px;margin-top:12px">
@@ -721,10 +730,25 @@ function setFollowMode(mode) {
 }
 
 // ── ADD FORM ─────────────────────────────────────────────────────────────────
+function toggleAdvanced() {
+  const panel   = document.getElementById('adv-settings');
+  const chevron = document.getElementById('adv-chevron');
+  const open    = panel.style.display === 'none';
+  panel.style.display  = open ? 'block' : 'none';
+  chevron.style.transform = open ? 'rotate(90deg)' : 'rotate(0deg)';
+}
+
 function toggleAddForm() {
   const form = document.getElementById('add-trader-form');
   form.classList.toggle('open');
-  if (form.classList.contains('open')) initCategoryChips();
+  if (form.classList.contains('open')) {
+    initCategoryChips();
+    // reset advanced
+    const adv = document.getElementById('adv-settings');
+    const chev = document.getElementById('adv-chevron');
+    if (adv) adv.style.display = 'none';
+    if (chev) chev.style.transform = 'rotate(0deg)';
+  }
 }
 
 async function addTrader() {
