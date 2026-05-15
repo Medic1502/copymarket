@@ -131,6 +131,22 @@ async function migrate() {
 
     // Add config_id to trades for per-trader stats
     await run(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS config_id UUID REFERENCES copy_configs(id) ON DELETE SET NULL`);
+
+    // License keys for desktop app
+    await run(`
+      CREATE TABLE IF NOT EXISTS license_keys (
+        id              SERIAL PRIMARY KEY,
+        key             UUID DEFAULT gen_random_uuid() UNIQUE NOT NULL,
+        discord_user_id TEXT UNIQUE NOT NULL,
+        discord_username TEXT,
+        hwid            TEXT,
+        activated_at    TIMESTAMPTZ,
+        expires_at      TIMESTAMPTZ,
+        active          BOOLEAN DEFAULT TRUE,
+        created_at      TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+
     console.log('Database migration complete.');
   } catch (err) {
     console.error('Migration failed (server will continue):', err.message);

@@ -36,6 +36,7 @@ app.use('/auth', authLimiter, require('./routes/auth'));
 app.use('/wallet', require('./routes/wallet'));
 app.use('/copy', require('./routes/copy'));
 app.use('/dashboard', require('./routes/dashboard'));
+app.use('/api/license', require('./routes/license'));
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', ts: new Date().toISOString() });
