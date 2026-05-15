@@ -136,7 +136,7 @@ function setupGuideEmbed() {
       },
       {
         name: 'Step 2 — Download the app',
-        value: 'Go to <#downloads> and download the latest **Jonin CT Setup .exe**. Run the installer — it takes under 30 seconds.',
+        value: '📥 **[Download Jonin CT Setup v1.1.0](https://github.com/Medic1502/copymarket/releases/download/v1.1.0/Jonin-CT-Setup-1.1.0.exe)**\n\nRun the installer — it takes under 30 seconds. Windows may show a SmartScreen warning, click **More info → Run anyway**.',
         inline: false
       },
       {
@@ -186,7 +186,7 @@ function howToJoinEmbed() {
       },
       {
         name: '3️⃣  Download & activate',
-        value: 'Download the Jonin CT Desktop App from <#downloads>, paste your key and click **Activate**. Setup takes under 2 minutes.',
+        value: '📥 **[Download Jonin CT Setup v1.1.0](https://github.com/Medic1502/copymarket/releases/download/v1.1.0/Jonin-CT-Setup-1.1.0.exe)**\n\nPaste your license key and click **Activate**. Setup takes under 2 minutes.',
         inline: false
       },
       {
