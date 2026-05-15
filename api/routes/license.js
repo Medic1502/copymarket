@@ -44,10 +44,12 @@ router.post('/validate', async (req, res) => {
       });
     }
 
-    // Returning user — ensure user_id is linked (migration for old activations)
+    // Returning user — ensure user_id and wallet exist (migration for old activations)
     let userId = license.user_id;
     if (!userId) {
       const user = await db.createLicenseUser(license.discord_user_id, license.discord_username);
+      const existingWallet = await db.getWalletByUserId(user.id);
+      if (!existingWallet) await db.createWalletForUser(user.id);
       await query('UPDATE license_keys SET user_id = $1 WHERE key = $2', [user.id, key]);
       userId = user.id;
     }
