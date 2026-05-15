@@ -498,37 +498,10 @@ div.expand-panel.closed{display:none !important}
       </div>
 
       <div class="card">
-        <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">Dashboard</div>
-        <div class="info-row">
-          <span class="info-label">Auto-refresh interval</span>
-          <select id="setting-refresh" onchange="applyRefreshInterval()" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:5px 10px;color:var(--text);font-size:13px;font-family:'Inter',sans-serif;outline:none">
-            <option value="30000">30 seconds</option>
-            <option value="60000" selected>1 minute</option>
-            <option value="120000">2 minutes</option>
-            <option value="300000">5 minutes</option>
-          </select>
-        </div>
-        <div class="info-row" style="border-bottom:none">
-          <span class="info-label">Dashboard language</span>
-          <select style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:5px 10px;color:var(--text);font-size:13px;font-family:'Inter',sans-serif;outline:none">
-            <option selected>English</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="card">
-        <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">License</div>
-        <div class="info-row"><span class="info-label">Status</span><span class="info-val"><span class="badge b-buy">Premium CT Active</span></span></div>
-        <div class="info-row"><span class="info-label">Transfer to new machine</span><span style="font-size:12px;color:var(--text3)">Use <strong style="color:var(--blue-light)">/shufflekey</strong> in Discord</span></div>
-        <div class="info-row" style="border-bottom:none"><span class="info-label">Deactivate on this device</span>
-          <button class="btn btn-red btn-sm" onclick="deactivateFromSettings()">Deactivate</button>
-        </div>
-      </div>
-
-      <div class="card">
         <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">About</div>
         <div class="info-row"><span class="info-label">App</span><span class="info-val">Jonin CT Desktop</span></div>
         <div class="info-row"><span class="info-label">Version</span><span class="info-val" id="settings-version">—</span></div>
+        <div class="info-row"><span class="info-label">License</span><span class="info-val"><span class="badge b-buy">Active</span></span></div>
         <div class="info-row" style="border-bottom:none"><span class="info-label">Support</span><span class="info-val"><a href="https://discord.gg/SxumcmKcEm" target="_blank" style="color:var(--blue-light);text-decoration:none">Discord Server ↗</a></span></div>
       </div>
 
@@ -1063,7 +1036,7 @@ function deactivateFromSettings() {
 }
 
 // Show version in settings
-if (window.electron) {
+if (window.electron && window.electron.getVersion) {
   window.electron.getVersion().then(v => {
     const el = document.getElementById('settings-version');
     if (el) el.textContent = 'v' + v;
