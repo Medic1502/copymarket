@@ -3,286 +3,362 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Jonin CT — App</title>
+<title>Jonin CT</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0a0a0f;--bg2:#111118;--bg3:#1a1a24;
-  --border:#ffffff12;--border2:#ffffff22;
-  --text:#f0f0f5;--text2:#9090a8;--text3:#5a5a70;
-  --green:#22c97a;--green-dim:#22c97a20;
-  --red:#f75a5a;--red-dim:#f75a5a20;
-  --blue:#4f8ef7;--blue-dim:#4f8ef718;
-  --yellow:#f59e0b;--yellow-dim:#f59e0b18;
-  --radius:12px;--radius-sm:8px;
+  --bg:#0F172A;--bg2:#1E293B;--bg3:#293548;
+  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.15);
+  --text:#F1F5F9;--text2:#94A3B8;--text3:#64748B;
+  --blue:#2563EB;--blue2:#1D4ED8;--blue3:#1E3A5F;
+  --blue-dim:rgba(37,99,235,.15);--blue-light:#93C5FD;
+  --cyan:#06B6D4;
+  --green:#22C55E;--green-dim:rgba(34,197,94,.15);
+  --red:#EF4444;--red-dim:rgba(239,68,68,.15);
+  --yellow:#F59E0B;--yellow-dim:rgba(245,158,11,.15);
 }
-html,body{min-height:100%;overflow-x:hidden}
-body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.6}
-.screen{display:none}.screen.active{display:block}
-.page{max-width:500px;margin:0 auto;padding:40px 20px}
-.page-wide{max-width:1000px;margin:0 auto;padding:28px 24px}
-.topnav{background:var(--bg2);border-bottom:0.5px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
-.logo{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700;letter-spacing:-.3px}
-.logo img{border-radius:8px;display:block}
-.card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:1.25rem}
+html,body{height:100%;overflow:hidden;background:var(--bg)}
+body{color:var(--text);font-family:'Inter',-apple-system,sans-serif;font-size:14px}
+.app{display:flex;height:100vh}
+
+/* ── SIDEBAR ──────────────────────────────────────── */
+.sidebar{width:220px;flex-shrink:0;background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.sb-logo{display:flex;align-items:center;gap:10px;padding:18px 16px;border-bottom:1px solid var(--border)}
+.sb-logo img{height:30px;width:30px;object-fit:contain}
+.sb-logo-text{font-size:17px;font-weight:700;letter-spacing:-.3px}
+.sb-logo-text span{color:var(--cyan)}
+.sb-nav{flex:1;padding:10px 8px;display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:var(--text2);font-size:13.5px;font-weight:500;cursor:pointer;transition:all .15s;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:rgba(255,255,255,.05);color:var(--text)}
+.nav-item.active{background:rgba(37,99,235,.18);color:var(--blue-light)}
+.nav-item.disabled{opacity:.35;cursor:not-allowed;pointer-events:none}
+.nav-icon{width:17px;height:17px;flex-shrink:0;opacity:.9}
+.sb-bottom{padding:10px 8px 18px;border-top:1px solid var(--border)}
+.discord-btn{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:#7289DA;font-size:13.5px;font-weight:500;cursor:pointer;transition:all .15s;border:none;background:none;width:100%}
+.discord-btn:hover{background:rgba(114,137,218,.1)}
+
+/* ── MAIN ─────────────────────────────────────────── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;background:#111827}
+.main-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:54px;border-bottom:1px solid var(--border);flex-shrink:0}
+.header-logo{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:700}
+.header-logo img{height:26px;object-fit:contain}
+.live-badge{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--green)}
+.live-dot{width:7px;height:7px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.paused-badge{color:var(--text3)}
+.paused-dot{width:7px;height:7px;background:var(--text3);border-radius:50%}
+.content{flex:1;overflow-y:auto;padding:22px 24px}
+
+/* ── STATS ────────────────────────────────────────── */
+.stats-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:22px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.stat-label{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px}
+.stat-value{font-size:21px;font-weight:700;letter-spacing:-.5px;color:var(--text)}
+.stat-value.pos{color:var(--green)}
+.stat-value.neg{color:var(--red)}
+.stat-sub{font-size:11px;color:var(--text3);margin-top:4px}
+
+/* ── TABS ─────────────────────────────────────────── */
+.tab-nav{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px;gap:0}
+.tab-btn{padding:9px 18px;font-size:13.5px;font-weight:500;color:var(--text3);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif}
+.tab-btn:hover{color:var(--text2)}
+.tab-btn.active{color:var(--blue-light);border-bottom-color:var(--blue)}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* ── CARD ─────────────────────────────────────────── */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:18px}
 .card+.card{margin-top:12px}
-label{display:block;font-size:13px;color:var(--text2);margin-bottom:6px}
-input[type=text],input[type=email],input[type=password],input[type=number]{width:100%;background:var(--bg3);border:0.5px solid var(--border2);border-radius:var(--radius-sm);padding:10px 14px;color:var(--text);font-size:14px;outline:none;transition:border .2s}
-input[type=number]::-webkit-inner-spin-button{opacity:.4}
+.divider{height:1px;background:var(--border);margin:14px 0}
+
+/* ── INPUTS ───────────────────────────────────────── */
+label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+input[type=text],input[type=email],input[type=password],input[type=number]{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:9px 13px;color:var(--text);font-size:14px;font-family:'Inter',sans-serif;outline:none;transition:border .15s}
 input:focus{border-color:var(--blue)}
 input::placeholder{color:var(--text3)}
-input[type=range]{width:100%;accent-color:var(--green)}
-.field{margin-bottom:16px}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 20px;border-radius:var(--radius-sm);font-size:14px;font-weight:500;cursor:pointer;transition:all .18s;border:0.5px solid var(--border2);background:transparent;color:var(--text);width:100%}
-.btn:hover{background:var(--bg3)}
-.btn:active{transform:scale(.98)}
-.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
-.btn-green{background:var(--green);color:#000;border-color:transparent}
-.btn-green:hover{background:#1db36a}
-.btn-red{color:var(--red);border-color:rgba(247,90,90,.3)}
-.btn-red:hover{background:var(--red-dim)}
-.btn-blue{color:var(--blue);border-color:rgba(79,142,247,.3)}
-.btn-blue:hover{background:var(--blue-dim)}
-.btn-sm{padding:6px 14px;font-size:13px;width:auto}
-.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px}
-.badge-green{background:var(--green-dim);color:var(--green)}
-.badge-red{background:var(--red-dim);color:var(--red)}
-.badge-yellow{background:var(--yellow-dim);color:var(--yellow)}
-.badge-blue{background:var(--blue-dim);color:var(--blue)}
-.badge-gray{background:var(--bg3);color:var(--text2)}
-.dot{width:6px;height:6px;border-radius:50%;display:inline-block}
-.dot-green{background:var(--green);animation:pulse 2s infinite}
-.dot-gray{background:var(--text3)}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-.alert{border-radius:var(--radius-sm);padding:10px 14px;font-size:13px;margin-top:10px;display:flex;gap:8px;align-items:flex-start}
-.alert-error{background:var(--red-dim);border:0.5px solid rgba(247,90,90,.25);color:#ff8080}
-.alert-success{background:var(--green-dim);border:0.5px solid rgba(34,201,122,.25);color:var(--green)}
-.alert-info{background:var(--blue-dim);border:0.5px solid rgba(79,142,247,.2);color:#7aabff}
-.alert-close{margin-left:auto;cursor:pointer;opacity:.6;background:none;border:none;color:inherit;font-size:16px;line-height:1;flex-shrink:0}
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:20px}
-.stat-box{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:16px}
-.stat-label{font-size:11px;color:var(--text3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
-.stat-val{font-size:22px;font-weight:600;letter-spacing:-.5px}
-.stat-sub{font-size:11px;color:var(--text3);margin-top:2px}
-.tabs{display:flex;gap:4px;border-bottom:0.5px solid var(--border);margin-bottom:20px}
-.tab{padding:8px 16px;font-size:13px;color:var(--text2);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;white-space:nowrap}
-.tab.active{color:var(--green);border-bottom-color:var(--green)}
-.trade-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:0.5px solid var(--border)}
+input[type=range]{width:100%;accent-color:var(--blue)}
+input[type=number]::-webkit-inner-spin-button{opacity:.4}
+.field{margin-bottom:14px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.three-col{display:grid;grid-template-columns:1fr auto 1fr;gap:4px;align-items:center}
+.col-sep{color:var(--text3);text-align:center;font-size:12px}
+
+/* ── BUTTONS ──────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 16px;border-radius:8px;font-size:13.5px;font-weight:500;font-family:'Inter',sans-serif;cursor:pointer;transition:all .15s;border:1px solid var(--border2);background:transparent;color:var(--text)}
+.btn:hover:not(:disabled){background:rgba(255,255,255,.05)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btn-primary:hover:not(:disabled){background:var(--blue2);border-color:var(--blue2)}
+.btn-outline{background:transparent;color:var(--blue-light);border-color:rgba(37,99,235,.4)}
+.btn-outline:hover:not(:disabled){background:var(--blue-dim)}
+.btn-green{background:var(--green);color:#000;border-color:var(--green)}
+.btn-green:hover:not(:disabled){background:#16a34a}
+.btn-red{color:var(--red);border-color:rgba(239,68,68,.3)}
+.btn-red:hover:not(:disabled){background:var(--red-dim)}
+.btn-yellow{color:var(--yellow);border-color:rgba(245,158,11,.3)}
+.btn-yellow:hover:not(:disabled){background:var(--yellow-dim)}
+.btn-sm{padding:6px 12px;font-size:12.5px}
+.btn-block{width:100%}
+.mode-btn{flex:1}
+.mode-btn.selected{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+/* ── TRADERS TABLE ────────────────────────────────── */
+.section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.section-title{font-size:14px;font-weight:600;color:var(--text)}
+.table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.table-head{display:grid;grid-template-columns:2.2fr 1.1fr 1fr 1fr 1fr 36px;gap:0;padding:10px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--border)}
+.th{font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em}
+.trader-row{display:grid;grid-template-columns:2.2fr 1.1fr 1fr 1fr 1fr 36px;gap:0;padding:13px 16px;border-bottom:1px solid var(--border);align-items:center;transition:background .1s;cursor:default}
+.trader-row:hover{background:rgba(255,255,255,.02)}
+.trader-row:last-child{border-bottom:none}
+.trader-cell{display:flex;align-items:center}
+.t-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;margin-right:11px}
+.t-name{font-size:13.5px;font-weight:600}
+.t-addr{font-size:11px;color:var(--text3);font-family:monospace;margin-top:2px}
+.pnl-pos{color:var(--green);font-weight:600;font-size:13.5px}
+.pnl-neg{color:var(--red);font-weight:600;font-size:13.5px}
+.pnl-neu{color:var(--text);font-weight:600;font-size:13.5px}
+.copying-badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--green)}
+.paused-badge2{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--text3)}
+.sdot-g{width:6px;height:6px;background:var(--green);border-radius:50%}
+.sdot-gr{width:6px;height:6px;background:var(--text3);border-radius:50%}
+.menu-wrap{position:relative}
+.menu-btn{width:28px;height:28px;border-radius:6px;background:none;border:none;color:var(--text3);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;transition:all .15s}
+.menu-btn:hover{background:rgba(255,255,255,.08);color:var(--text)}
+.dropdown{position:absolute;right:0;top:calc(100% + 4px);background:var(--bg2);border:1px solid var(--border2);border-radius:8px;min-width:148px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.5);display:none}
+.dropdown.open{display:block}
+.dd-item{display:block;width:100%;padding:9px 14px;font-size:13px;color:var(--text2);background:none;border:none;cursor:pointer;text-align:left;font-family:'Inter',sans-serif;transition:all .1s}
+.dd-item:first-child{border-radius:8px 8px 0 0}
+.dd-item:last-child{border-radius:0 0 8px 8px}
+.dd-item:hover{background:rgba(255,255,255,.05);color:var(--text)}
+.dd-item.danger{color:var(--red)}
+.dd-item.danger:hover{background:var(--red-dim)}
+
+/* ── ADD TRADER FORM ──────────────────────────────── */
+.add-form{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:14px;display:none}
+.add-form.open{display:block}
+.form-section-label{font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px}
+
+/* ── TRADE ROWS ───────────────────────────────────── */
+.trade-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
 .trade-row:last-child{border-bottom:none}
-.trade-name{flex:1;font-size:13px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.trade-meta{font-size:11px;color:var(--text3);margin-top:1px}
-.slider-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-.slider-val{font-size:14px;font-weight:500;min-width:48px;text-align:right}
-.addr-box{display:flex;align-items:center;gap:8px;background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px}
+.trade-name{flex:1;min-width:0}
+.trade-market{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trade-meta{font-size:11px;color:var(--text3);margin-top:2px}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
+.b-buy{background:var(--green-dim);color:var(--green)}
+.b-sell{background:var(--red-dim);color:var(--red)}
+.b-skip{background:var(--yellow-dim);color:var(--yellow)}
+.b-blue{background:var(--blue-dim);color:var(--blue-light)}
+
+/* ── WALLET / PROFILE ─────────────────────────────── */
+.addr-box{display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 13px}
 .addr-text{flex:1;font-family:monospace;font-size:12px;color:var(--text2);word-break:break-all}
-.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.2);border-top-color:var(--green);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
-@keyframes spin{to{transform:rotate(360deg)}}
-.auth-logo{text-align:center;margin-bottom:32px}
-.auth-logo .logo{justify-content:center;font-size:22px}
-.auth-logo p{font-size:13px;color:var(--text2);margin-top:8px}
-.auth-switch{text-align:center;font-size:13px;color:var(--text2);margin-top:20px}
-.auth-switch button{background:none;border:none;color:var(--blue);cursor:pointer;font-size:13px;text-decoration:underline}
-.divider{display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--text3);font-size:12px}
-.divider::before,.divider::after{content:'';flex:1;height:0.5px;background:var(--border)}
-.trader-card{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:10px;display:flex;align-items:center;gap:14px}
-.trader-avatar{width:40px;height:40px;border-radius:50%;background:var(--blue-dim);border:0.5px solid rgba(79,142,247,.3);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--blue);flex-shrink:0;font-family:monospace}
-.trader-info{flex:1;min-width:0}
-.trader-stats{display:flex;gap:12px;margin-top:4px;flex-wrap:wrap}
-.trader-stat{font-size:11px;color:var(--text3)}
-.trader-stat span{color:var(--text);font-weight:500}
-.trader-actions{display:flex;gap:6px;flex-shrink:0}
-.profile-header{display:flex;align-items:center;gap:16px;margin-bottom:24px}
-.profile-avatar{width:56px;height:56px;border-radius:50%;background:var(--green-dim);border:0.5px solid rgba(34,201,122,.3);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--green)}
-.profile-name{font-size:18px;font-weight:600}
-.profile-sub{font-size:13px;color:var(--text2);margin-top:2px}
-.info-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
 .info-row:last-child{border-bottom:none}
 .info-label{font-size:13px;color:var(--text2)}
-.info-val{font-size:13px;font-weight:500}
-.add-trader-form{background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px;display:none}
-.add-trader-form.open{display:block}
-@media(max-width:600px){
-  .page-wide{padding:16px 12px}
-  .page{padding:28px 16px}
-  .stats-grid{grid-template-columns:repeat(2,1fr)}
-  .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;gap:0}
-  .tab{padding:8px 12px;white-space:nowrap;flex-shrink:0}
-  .topnav{padding:0 12px}
-  .trader-card{flex-wrap:wrap;gap:10px}
-  .trader-actions{width:100%;display:flex;justify-content:flex-end}
-  .trader-stats{gap:8px}
-  .stat-val{font-size:18px}
-}
+.info-val{font-size:13px;font-weight:600}
+.profile-av{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff}
+
+/* ── ALERTS ───────────────────────────────────────── */
+.alert{border-radius:8px;padding:10px 14px;font-size:13px;margin-top:10px;display:flex;gap:8px;align-items:flex-start}
+.alert-error{background:var(--red-dim);border:1px solid rgba(239,68,68,.25);color:#FCA5A5}
+.alert-success{background:var(--green-dim);border:1px solid rgba(34,197,94,.25);color:var(--green)}
+.alert-info{background:var(--blue-dim);border:1px solid rgba(37,99,235,.25);color:var(--blue-light)}
+.alert-close{margin-left:auto;cursor:pointer;opacity:.6;background:none;border:none;color:inherit;font-size:16px}
+.spinner{width:15px;height:15px;border:2px solid rgba(255,255,255,.2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── UTIL ─────────────────────────────────────────── */
+.empty-state{text-align:center;padding:48px 20px}
+.empty-state p{color:var(--text2);font-size:15px;font-weight:500;margin-bottom:6px}
+.empty-state small{color:var(--text3);font-size:13px}
+.slider-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.slider-val{font-size:14px;font-weight:600;color:var(--blue-light);min-width:48px;text-align:right}
+.text-muted{color:var(--text3);font-size:12px;margin-top:4px}
+.text-warn{color:var(--yellow);font-size:11px;margin-top:4px}
+#dash-alert:empty{display:none}
 </style>
 </head>
 <body>
+<div class="app">
 
-<!-- DASHBOARD -->
-<div id="screen-dashboard" class="screen active">
-  <div class="topnav">
-    <div class="logo"><img src="logo.png" style="height:36px;width:36px">Jonin CT</div>
-    <div style="display:flex;align-items:center;gap:10px">
-      <span class="badge badge-green" id="status-badge"><span class="dot dot-green"></span> Live</span>
-    </div>
+<!-- ══ SIDEBAR ══════════════════════════════════════════════════════════════ -->
+<aside class="sidebar">
+  <div class="sb-logo">
+    <img src="logo.png" alt="Jonin CT">
+    <div class="sb-logo-text">Jonin <span>CT</span></div>
   </div>
-  <div class="page-wide">
-    <div id="dash-alert" style="margin-bottom:16px"></div>
-    <div class="stats-grid">
-      <div class="stat-box"><div class="stat-label">Balance</div><div class="stat-val" id="stat-balance">—</div><div class="stat-sub">USDC</div></div>
-      <div class="stat-box"><div class="stat-label">Total P&L</div><div class="stat-val" id="stat-pnl">—</div><div class="stat-sub">all time</div></div>
-      <div class="stat-box"><div class="stat-label">Today</div><div class="stat-val" id="stat-today">—</div><div class="stat-sub">P&L today</div></div>
-      <div class="stat-box"><div class="stat-label">Win rate</div><div class="stat-val" id="stat-winrate">—</div><div class="stat-sub" id="stat-trades-sub">0 trades</div></div>
-      <div class="stat-box"><div class="stat-label">Copying</div><div class="stat-val" id="stat-traders">0</div><div class="stat-sub">active traders</div></div>
+
+  <nav class="sb-nav">
+    <button class="nav-item active" id="nav-traders" onclick="navSwitch('traders',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      My Traders
+    </button>
+    <button class="nav-item" id="nav-trades" onclick="navSwitch('trades',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
+      Trade History
+    </button>
+    <button class="nav-item" id="nav-wallet" onclick="navSwitch('wallet',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+      Wallet
+    </button>
+    <button class="nav-item" id="nav-profile" onclick="navSwitch('profile',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Profile
+    </button>
+    <button class="nav-item disabled">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
+      Rewards
+    </button>
+    <button class="nav-item disabled">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      Settings
+    </button>
+  </nav>
+
+  <div class="sb-bottom">
+    <button class="discord-btn" onclick="window.open('https://discord.gg/','_blank')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="#7289DA"><path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03z"/></svg>
+      Join Discord
+    </button>
+  </div>
+</aside>
+
+<!-- ══ MAIN ══════════════════════════════════════════════════════════════════ -->
+<main class="main">
+  <header class="main-header">
+    <div class="header-logo">
+      <img src="logo.png" alt="">
+      Jonin CT
     </div>
-    <div class="tabs">
-      <button class="tab active" onclick="switchTab(this,'tab-traders')">My Traders</button>
-      <button class="tab" onclick="switchTab(this,'tab-trades')">Trade History</button>
-      <button class="tab" onclick="switchTab(this,'tab-wallet')">Wallet</button>
-      <button class="tab" onclick="switchTab(this,'tab-profile')">Profile</button>
+    <div class="live-badge" id="status-badge">
+      <span class="live-dot"></span> Live
+    </div>
+  </header>
+
+  <div class="content">
+    <div id="dash-alert"></div>
+
+    <!-- STATS -->
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Balance</div><div class="stat-value" id="stat-balance">—</div><div class="stat-sub">USDC</div></div>
+      <div class="stat-card"><div class="stat-label">Total P&amp;L</div><div class="stat-value" id="stat-pnl">—</div><div class="stat-sub">All time</div></div>
+      <div class="stat-card"><div class="stat-label">Today</div><div class="stat-value" id="stat-today">—</div><div class="stat-sub">P&amp;L today</div></div>
+      <div class="stat-card"><div class="stat-label">Win Rate</div><div class="stat-value" id="stat-winrate">—</div><div class="stat-sub" id="stat-trades-sub">0 trades</div></div>
+      <div class="stat-card"><div class="stat-label">Copying</div><div class="stat-value" id="stat-traders">0</div><div class="stat-sub">Active traders</div></div>
     </div>
 
-    <!-- MY TRADERS -->
-    <div id="tab-traders">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-        <p style="font-size:14px;font-weight:500">Traders you're copying</p>
-        <button class="btn btn-sm btn-blue" onclick="toggleAddForm()">+ Add trader</button>
+    <!-- TAB NAV -->
+    <div class="tab-nav">
+      <button class="tab-btn active" id="tab-btn-traders" onclick="switchTab('traders',this)">My Traders</button>
+      <button class="tab-btn" id="tab-btn-trades" onclick="switchTab('trades',this)">Trade History</button>
+      <button class="tab-btn" id="tab-btn-wallet" onclick="switchTab('wallet',this)">Wallet</button>
+      <button class="tab-btn" id="tab-btn-profile" onclick="switchTab('profile',this)">Profile</button>
+    </div>
+
+    <!-- ── MY TRADERS ──────────────────────────────── -->
+    <div id="tab-traders" class="tab-panel active">
+      <div class="section-hdr">
+        <span class="section-title">Traders you're copying</span>
+        <button class="btn btn-outline btn-sm" onclick="toggleAddForm()">+ Add trader</button>
       </div>
-      <div class="add-trader-form" id="add-trader-form">
-        <div class="field"><label>Nickname (optional)</label><input type="text" id="new-trader-nickname" placeholder="e.g. Whale #1, CryptoGod..."></div>
-        <div class="field"><label>Trader wallet address</label><input type="text" id="new-trader-wallet" placeholder="0x... Polymarket trader address"></div>
 
-        <!-- Copy mode -->
-        <div style="margin-bottom:14px">
-          <label style="display:block;font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px">Copy mode</label>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-sm" id="mode-pct-btn" onclick="setCopyMode('percentage')" style="flex:1;background:var(--green);color:#000;border-color:transparent">% of their bet</button>
-            <button class="btn btn-sm" id="mode-fix-btn" onclick="setCopyMode('fixed')" style="flex:1">Fixed amount</button>
-          </div>
-          <input type="hidden" id="new-copy-mode" value="percentage">
-          <div id="mode-pct-section" style="margin-top:10px">
-            <div class="slider-row"><label style="margin:0">Copy percentage</label><span class="slider-val" id="lbl-pct">10%</span></div>
-            <input type="range" min="1" max="100" step="1" value="10" id="sl-pct" oninput="document.getElementById('lbl-pct').textContent=this.value+'%'" style="margin-bottom:4px">
-          </div>
-          <div id="mode-fix-section" style="display:none;margin-top:10px">
-            <div class="field" style="margin-bottom:0"><label>Fixed USDC per trade</label><input type="number" id="new-fixed-amount" value="10" min="1" placeholder="10"></div>
-          </div>
+      <!-- ADD FORM -->
+      <div class="add-form" id="add-trader-form">
+        <div class="two-col" style="margin-bottom:14px">
+          <div class="field" style="margin-bottom:0"><label>Nickname (optional)</label><input type="text" id="new-trader-nickname" placeholder="e.g. Whale #1"></div>
+          <div class="field" style="margin-bottom:0"><label>Trader wallet address</label><input type="text" id="new-trader-wallet" placeholder="0x..."></div>
         </div>
 
-        <!-- Trader bet filter + Share price range (side by side) -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div class="form-section-label" style="margin-bottom:8px">Copy mode</div>
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button class="btn btn-sm mode-btn selected" id="mode-pct-btn" onclick="setCopyMode('percentage')">% of their bet</button>
+          <button class="btn btn-sm mode-btn" id="mode-fix-btn" onclick="setCopyMode('fixed')">Fixed amount</button>
+        </div>
+        <input type="hidden" id="new-copy-mode" value="percentage">
+        <div id="mode-pct-section" style="margin-bottom:14px">
+          <div class="slider-row"><label style="margin:0;text-transform:none;font-size:13px;color:var(--text2)">Copy percentage</label><span class="slider-val" id="lbl-pct">10%</span></div>
+          <input type="range" min="1" max="100" value="10" id="sl-pct" oninput="document.getElementById('lbl-pct').textContent=this.value+'%'">
+        </div>
+        <div id="mode-fix-section" style="display:none;margin-bottom:14px">
+          <div class="field" style="margin-bottom:0"><label>Fixed USDC per trade</label><input type="number" id="new-fixed-amount" value="10" min="1"></div>
+        </div>
+
+        <div class="two-col" style="margin-bottom:14px">
           <div>
-            <label style="display:block;font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px">Trader bet range ($)</label>
-            <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:4px;align-items:center">
+            <div class="form-section-label" style="margin-bottom:8px">Trader bet range ($)</div>
+            <div class="three-col">
               <input type="number" id="new-min-bet" value="5" min="0" placeholder="Min">
-              <span style="color:var(--text3);text-align:center;font-size:12px;padding:0 2px">–</span>
+              <span class="col-sep">–</span>
               <input type="number" id="new-max-bet" value="100000" min="0" placeholder="Max">
             </div>
           </div>
           <div>
-            <label style="display:block;font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px">Share price range (¢)</label>
-            <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:4px;align-items:center">
+            <div class="form-section-label" style="margin-bottom:8px">Share price range (¢)</div>
+            <div class="three-col">
               <input type="number" id="new-min-price" value="2" min="1" max="99" placeholder="Min">
-              <span style="color:var(--text3);text-align:center;font-size:12px;padding:0 2px">–</span>
+              <span class="col-sep">–</span>
               <input type="number" id="new-max-price" value="98" min="1" max="99" placeholder="Max">
             </div>
           </div>
         </div>
 
-        <!-- Follow mode -->
-        <div style="margin-bottom:14px">
-          <label style="display:block;font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px">When trader adds to same position</label>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-sm" id="follow-all-btn" onclick="setFollowMode('all')" style="flex:1;background:var(--green);color:#000;border-color:transparent">Follow all buys</button>
-            <button class="btn btn-sm" id="follow-init-btn" onclick="setFollowMode('initial_only')" style="flex:1">Initial buy only</button>
-          </div>
-          <input type="hidden" id="new-follow-mode" value="all">
+        <div class="form-section-label" style="margin-bottom:8px">When trader adds to same position</div>
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button class="btn btn-sm mode-btn selected" id="follow-all-btn" onclick="setFollowMode('all')">Follow all buys</button>
+          <button class="btn btn-sm mode-btn" id="follow-init-btn" onclick="setFollowMode('initial_only')">Initial buy only</button>
         </div>
+        <input type="hidden" id="new-follow-mode" value="all">
 
-        <!-- Categories -->
-        <div style="margin-bottom:14px">
-          <label style="display:block;font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px">Categories to follow <span style="color:var(--text3)">(empty = all)</span></label>
-          <div style="display:flex;flex-wrap:wrap;gap:6px" id="category-chips">
-          </div>
-        </div>
+        <div class="form-section-label" style="margin-bottom:8px">Categories <span style="color:var(--text3);font-weight:400">(empty = all)</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px" id="category-chips"></div>
 
         <div id="add-trader-alert"></div>
         <div style="display:flex;gap:8px;margin-top:12px">
-          <button class="btn btn-green" id="add-trader-btn" onclick="addTrader()" style="flex:1">Start copying</button>
-          <button class="btn btn-sm" onclick="toggleAddForm()" style="width:auto;padding:10px 16px">Cancel</button>
+          <button class="btn btn-primary btn-sm" id="add-trader-btn" onclick="addTrader()" style="flex:1">Start copying</button>
+          <button class="btn btn-sm" onclick="toggleAddForm()">Cancel</button>
         </div>
       </div>
-      <div id="traders-list"><div style="color:var(--text3);font-size:13px;text-align:center;padding:32px">Loading...</div></div>
+
+      <!-- TRADERS TABLE -->
+      <div id="traders-list">
+        <div class="empty-state"><p>Loading...</p></div>
+      </div>
     </div>
 
-    <!-- TRADE HISTORY -->
-    <div id="tab-trades" style="display:none">
-      <div class="card" id="trades-list"><div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading trades...</div></div>
+    <!-- ── TRADE HISTORY ───────────────────────────── -->
+    <div id="tab-trades" class="tab-panel">
+      <div class="card" id="trades-list">
+        <div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading trades...</div>
+      </div>
     </div>
 
-    <!-- WALLET -->
-    <div id="tab-wallet" style="display:none">
+    <!-- ── WALLET ──────────────────────────────────── -->
+    <div id="tab-wallet" class="tab-panel">
       <div class="card">
-        <p style="font-size:13px;font-weight:500;margin-bottom:12px">Your wallet</p>
-        <label style="margin-bottom:6px">Deposit address (Polygon network)</label>
-        <div class="addr-box">
+        <div style="font-size:14px;font-weight:600;margin-bottom:14px">Your wallet</div>
+        <label>Deposit address (Polygon network)</label>
+        <div class="addr-box" style="margin-bottom:6px">
           <span class="addr-text" id="dash-addr">—</span>
           <button class="btn btn-sm" onclick="copyDashAddr()">Copy</button>
         </div>
-        <p style="font-size:11px;color:var(--text3);margin-top:6px">Send USDC on Polygon only. Other networks = lost funds.</p>
-        <p style="font-size:11px;color:var(--yellow);margin-top:4px">⚡ Also send ~0.5 MATIC to this address for gas (one-time setup fee, ~$0.20).</p>
-        <div class="info-row" style="margin-top:12px"><span class="info-label">USDC Balance</span><span class="info-val" id="wallet-balance">—</span></div>
+        <p class="text-muted">Send USDC on Polygon only. Other networks = lost funds.</p>
+        <p class="text-warn">⚡ Also send ~0.5 MATIC for gas (one-time, ~$0.20).</p>
+
+        <div class="divider"></div>
+        <div class="info-row"><span class="info-label">USDC Balance</span><span class="info-val" id="wallet-balance">—</span></div>
         <div class="info-row"><span class="info-label">In open positions</span><span class="info-val" id="wallet-locked">—</span></div>
         <div class="info-row"><span class="info-label">Available</span><span class="info-val" id="wallet-free">—</span></div>
         <div style="display:flex;gap:8px;margin-top:14px">
           <button class="btn btn-sm" style="flex:1" onclick="refreshBalance()">Refresh</button>
-          <button class="btn btn-sm" style="flex:1" onclick="openMoonpay()">Buy USDC</button>
+          <button class="btn btn-sm btn-primary" style="flex:1" onclick="openMoonpay()">Buy USDC</button>
           <button class="btn btn-sm btn-red" style="flex:1" onclick="toggleWithdraw()">Withdraw</button>
         </div>
 
-        <!-- Export private key -->
-        <div style="margin-top:14px;border-top:0.5px solid var(--border);padding-top:14px">
-          <p style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px">Connect to Polymarket</p>
-          <p style="font-size:12px;color:var(--text3);margin-bottom:10px">Export your private key to import into MetaMask, then connect to polymarket.com to activate trading.</p>
-          <button class="btn btn-sm btn-yellow" onclick="toggleExportKey()" style="color:var(--yellow);border-color:rgba(245,158,11,.3)">Export private key</button>
-          <div id="export-key-form" style="display:none;margin-top:12px">
-            <div class="alert alert-error" style="margin-bottom:10px">⚠️ Never share your private key with anyone. Anyone with this key has full access to your wallet.</div>
-            <div class="field"><label>Confirm your password</label><input type="password" id="export-key-pass" placeholder="Your password"></div>
-            <div id="export-key-result" style="display:none;margin-bottom:10px">
-
-              <!-- Seed phrase -->
-              <div id="export-mnemonic-section">
-                <label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:6px">Seed phrase (12 words)</label>
-                <div id="export-mnemonic-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px"></div>
-                <button class="btn btn-sm btn-green" onclick="copyMnemonic()" style="width:100%;margin-bottom:12px">Copy seed phrase</button>
-              </div>
-
-              <!-- Private key (shown directly if no mnemonic, or as alternative) -->
-              <div id="export-pk-section" style="display:none;margin-bottom:12px">
-                <label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:6px">Private key</label>
-                <div class="addr-box" style="flex-direction:column;align-items:stretch;gap:8px">
-                  <span class="addr-text" id="export-key-value" style="word-break:break-all;font-size:11px"></span>
-                  <button class="btn btn-sm btn-green" onclick="copyKey()" style="width:100%">Copy private key</button>
-                </div>
-                <p style="font-size:11px;color:var(--text3);margin-top:6px">MetaMask → Import account → select "Private Key" → paste → Import</p>
-              </div>
-
-              <!-- Instructions -->
-              <div style="background:var(--bg3);border-radius:8px;padding:12px;font-size:12px;color:var(--text2);line-height:1.7">
-                <strong style="color:var(--text)">How to import into MetaMask:</strong><br>
-                1. Open MetaMask → click account icon → <em>Import account</em><br>
-                2. Select <em>"Secret recovery phrase"</em> → paste 12 words → Import<br>
-                3. Go to <strong style="color:var(--green)">polymarket.com</strong> → Connect wallet → Accept Terms<br>
-                4. Come back here and start copying traders ✓
-              </div>
-            </div>
-            <div id="export-key-alert"></div>
-            <div style="display:flex;gap:8px;margin-top:8px">
-              <button class="btn btn-sm btn-yellow" onclick="doExportKey()" style="flex:1;color:var(--yellow);border-color:rgba(245,158,11,.3)">Reveal key</button>
-              <button class="btn btn-sm" onclick="toggleExportKey()" style="width:auto;padding:8px 14px">Cancel</button>
-            </div>
-          </div>
-        </div>
-        <div id="withdraw-form" style="display:none;margin-top:14px;border-top:0.5px solid var(--border);padding-top:14px">
+        <div id="withdraw-form" style="display:none;margin-top:14px">
+          <div class="divider"></div>
           <div class="field"><label>Withdraw to (Polygon address)</label><input type="text" id="withdraw-addr" placeholder="0x..."></div>
           <div class="field"><label>Amount (USDC)</label><input type="text" id="withdraw-amount" placeholder="10.00"></div>
           <div id="withdraw-alert"></div>
@@ -292,65 +368,120 @@ input[type=range]{width:100%;accent-color:var(--green)}
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- PROFILE -->
-    <div id="tab-profile" style="display:none">
       <div class="card">
-        <div class="profile-header">
-          <div class="profile-avatar" id="profile-initials">?</div>
-          <div>
-            <div class="profile-name" id="profile-name-display">—</div>
-            <div class="profile-sub" id="profile-email-display">—</div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:4px">Connect to Polymarket</div>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:12px">Export your private key to import into MetaMask, then accept ToS on polymarket.com to enable trading.</p>
+        <button class="btn btn-yellow btn-sm" onclick="toggleExportKey()">Export private key</button>
+        <div id="export-key-form" style="display:none;margin-top:14px">
+          <div class="alert alert-error" style="margin-bottom:10px">⚠️ Never share your private key. Anyone with it has full access to your wallet.</div>
+          <div class="field"><label>Confirm your password</label><input type="password" id="export-key-pass" placeholder="Your password"></div>
+          <div id="export-key-result" style="display:none;margin-bottom:10px">
+            <div id="export-mnemonic-section">
+              <label style="font-size:13px;text-transform:none;color:var(--text)">Seed phrase (12 words)</label>
+              <div id="export-mnemonic-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0"></div>
+              <button class="btn btn-green btn-sm btn-block" onclick="copyMnemonic()" style="margin-bottom:12px">Copy seed phrase</button>
+            </div>
+            <div id="export-pk-section" style="display:none;margin-bottom:12px">
+              <label style="font-size:13px;text-transform:none;color:var(--text)">Private key</label>
+              <div class="addr-box" style="flex-direction:column;align-items:stretch;gap:8px;margin-top:6px">
+                <span class="addr-text" id="export-key-value" style="font-size:11px"></span>
+                <button class="btn btn-green btn-sm btn-block" onclick="copyKey()">Copy private key</button>
+              </div>
+            </div>
+            <div style="background:var(--bg3);border-radius:8px;padding:12px;font-size:12px;color:var(--text2);line-height:1.8">
+              <strong style="color:var(--text)">How to import into MetaMask:</strong><br>
+              1. MetaMask → account icon → <em>Import account</em><br>
+              2. Select <em>"Secret recovery phrase"</em> → paste 12 words → Import<br>
+              3. Go to <strong style="color:var(--cyan)">polymarket.com</strong> → Connect wallet → Accept Terms ✓
+            </div>
+          </div>
+          <div id="export-key-alert"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-yellow btn-sm" style="flex:1" onclick="doExportKey()">Reveal key</button>
+            <button class="btn btn-sm" onclick="toggleExportKey()">Cancel</button>
           </div>
         </div>
-        <p style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Account</p>
+      </div>
+    </div>
+
+    <!-- ── PROFILE ─────────────────────────────────── -->
+    <div id="tab-profile" class="tab-panel">
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
+          <div class="profile-av" id="profile-initials">?</div>
+          <div>
+            <div style="font-size:17px;font-weight:700" id="profile-name-display">—</div>
+            <div style="font-size:13px;color:var(--text3);margin-top:2px" id="profile-email-display">—</div>
+          </div>
+        </div>
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Account</div>
         <div class="info-row"><span class="info-label">Member since</span><span class="info-val" id="profile-since">—</span></div>
-        <div class="info-row"><span class="info-label">Plan</span><span class="info-val"><span class="badge badge-blue">Pro</span></span></div>
+        <div class="info-row"><span class="info-label">Plan</span><span class="info-val"><span class="badge b-blue">Premium CT</span></span></div>
         <div class="info-row"><span class="info-label">Status</span><span class="info-val" id="profile-status">—</span></div>
       </div>
-      <div class="card" style="margin-top:12px">
-        <p style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Overall performance</p>
+      <div class="card">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Performance</div>
         <div class="info-row"><span class="info-label">Total trades</span><span class="info-val" id="profile-trades">—</span></div>
         <div class="info-row"><span class="info-label">Total invested</span><span class="info-val" id="profile-invested">—</span></div>
-        <div class="info-row"><span class="info-label">Total P&L</span><span class="info-val" id="profile-pnl">—</span></div>
+        <div class="info-row"><span class="info-label">Total P&amp;L</span><span class="info-val" id="profile-pnl">—</span></div>
         <div class="info-row"><span class="info-label">Win rate</span><span class="info-val" id="profile-winrate">—</span></div>
         <div class="info-row"><span class="info-label">Active traders</span><span class="info-val" id="profile-traders-count">—</span></div>
         <div class="info-row"><span class="info-label">Balance</span><span class="info-val" id="profile-balance">—</span></div>
       </div>
-      <div class="card" style="margin-top:12px">
-        <p style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Wallet</p>
+      <div class="card">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px">Wallet</div>
         <div class="addr-box">
           <span class="addr-text" id="profile-addr">—</span>
           <button class="btn btn-sm" onclick="copyProfileAddr()">Copy</button>
         </div>
       </div>
     </div>
-  </div>
-</div>
+
+  </div><!-- /content -->
+</main>
+</div><!-- /app -->
 
 <script>
 const API = '';
 let token      = localStorage.getItem('cm_token') || null;
 let walletAddr = localStorage.getItem('cm_wallet') || null;
-let userEmail  = localStorage.getItem('cm_email') || null;
+let userEmail  = localStorage.getItem('cm_email')  || null;
 let userName   = localStorage.getItem('cm_username') || null;
 let copyActive = false;
 
 loadDashboard();
 
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
+// ── NAVIGATION ──────────────────────────────────────────────────────────────
+function navSwitch(key, el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+  const tabMap = { traders:'traders', trades:'trades', wallet:'wallet', profile:'profile' };
+  const tabId = tabMap[key];
+  switchTab(tabId, document.getElementById('tab-btn-' + tabId));
 }
 
+function switchTab(key, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('tab-' + key);
+  if (panel) panel.classList.add('active');
+  // sync sidebar
+  const navEl = document.getElementById('nav-' + key);
+  if (navEl) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    navEl.classList.add('active');
+  }
+}
+
+// ── ALERTS ──────────────────────────────────────────────────────────────────
 function showAlert(id, msg, type='error') {
   const c = document.getElementById(id);
   if (!c) return;
   c.innerHTML = '<div class="alert alert-' + type + '">' + msg + '<button class="alert-close" onclick="this.parentElement.remove()">✕</button></div>';
 }
 function clearAlert(id) { const c = document.getElementById(id); if(c) c.innerHTML=''; }
-
 function setLoading(id, loading, label) {
   const btn = document.getElementById(id);
   if (!btn) return;
@@ -358,17 +489,18 @@ function setLoading(id, loading, label) {
   btn.innerHTML = loading ? '<span class="spinner"></span> Please wait...' : label;
 }
 
+// ── API ──────────────────────────────────────────────────────────────────────
 async function api(method, path, body) {
   const opts = { method, headers: {'Content-Type':'application/json'} };
   if (token) opts.headers['Authorization'] = 'Bearer ' + token;
   if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(API + path, opts);
+  const res  = await fetch(API + path, opts);
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Something went wrong.');
   return data;
 }
 
-
+// ── COPY / MISC ──────────────────────────────────────────────────────────────
 function copyDashAddr() {
   navigator.clipboard && navigator.clipboard.writeText(document.getElementById('dash-addr').textContent);
   showAlert('dash-alert','Address copied!','success');
@@ -391,6 +523,7 @@ async function refreshBalance() {
   } catch(e) { showAlert('dash-alert', e.message); }
 }
 
+// ── EXPORT KEY ───────────────────────────────────────────────────────────────
 function toggleExportKey() {
   const f = document.getElementById('export-key-form');
   f.style.display = f.style.display === 'none' ? 'block' : 'none';
@@ -407,8 +540,6 @@ async function doExportKey() {
   try {
     const data = await api('POST', '/wallet/export-key', { password: pass });
     document.getElementById('export-key-value').textContent = data.privateKey;
-
-    // Show seed phrase as word grid (if available)
     _exportedMnemonic = data.mnemonic || '';
     const mnemonicSection = document.getElementById('export-mnemonic-section');
     const pkSection       = document.getElementById('export-pk-section');
@@ -416,7 +547,7 @@ async function doExportKey() {
     if (data.mnemonic) {
       const words = data.mnemonic.split(' ');
       grid.innerHTML = words.map((w, i) =>
-        '<div style="background:var(--bg2);border:0.5px solid var(--border2);border-radius:6px;padding:6px 8px;font-size:13px">' +
+        '<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:6px 8px;font-size:13px">' +
         '<span style="color:var(--text3);font-size:10px;display:block">' + (i+1) + '</span>' +
         '<strong>' + w + '</strong></div>'
       ).join('');
@@ -426,7 +557,6 @@ async function doExportKey() {
       mnemonicSection.style.display = 'none';
       pkSection.style.display = 'block';
     }
-
     document.getElementById('export-key-result').style.display = 'block';
     document.getElementById('export-key-pass').value = '';
     clearAlert('export-key-alert');
@@ -437,46 +567,38 @@ function copyMnemonic() {
   if (!_exportedMnemonic) return;
   if (navigator.clipboard) {
     navigator.clipboard.writeText(_exportedMnemonic).then(() => {
-      showAlert('export-key-alert', 'Seed phrase copied!', 'success');
+      showAlert('export-key-alert','Seed phrase copied!','success');
       setTimeout(() => clearAlert('export-key-alert'), 3000);
     }).catch(() => fallbackCopy(_exportedMnemonic));
   } else { fallbackCopy(_exportedMnemonic); }
 }
-
 function copyKey() {
   const key = document.getElementById('export-key-value').textContent;
   if (navigator.clipboard) {
     navigator.clipboard.writeText(key).then(() => {
-      showAlert('export-key-alert', 'Private key copied!', 'success');
+      showAlert('export-key-alert','Private key copied!','success');
       setTimeout(() => clearAlert('export-key-alert'), 3000);
     }).catch(() => fallbackCopy(key));
-  } else {
-    fallbackCopy(key);
-  }
+  } else { fallbackCopy(key); }
 }
 function fallbackCopy(text) {
   const ta = document.createElement('textarea');
-  ta.value = text;
-  ta.style.position = 'fixed';
-  ta.style.opacity = '0';
-  document.body.appendChild(ta);
-  ta.focus();
-  ta.select();
-  document.execCommand('copy');
-  document.body.removeChild(ta);
-  showAlert('export-key-alert', 'Private key copied!', 'success');
+  ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  document.execCommand('copy'); document.body.removeChild(ta);
+  showAlert('export-key-alert','Copied!','success');
   setTimeout(() => clearAlert('export-key-alert'), 3000);
 }
 
+// ── WITHDRAW ─────────────────────────────────────────────────────────────────
 function toggleWithdraw() {
   const f = document.getElementById('withdraw-form');
   f.style.display = f.style.display === 'none' ? 'block' : 'none';
 }
-
 async function doWithdraw() {
   const addr   = document.getElementById('withdraw-addr').value.trim();
   const amount = document.getElementById('withdraw-amount').value.trim();
-  if (!addr || !/^0x[0-9a-fA-F]{40}$/.test(addr)) { showAlert('withdraw-alert','Enter a valid Polygon wallet address.'); return; }
+  if (!addr || !/^0x[0-9a-fA-F]{40}$/.test(addr)) { showAlert('withdraw-alert','Enter a valid Polygon address.'); return; }
   if (!amount || isNaN(amount) || parseFloat(amount) < 1) { showAlert('withdraw-alert','Minimum withdrawal is $1 USDC.'); return; }
   try {
     await api('POST', '/wallet/withdraw', { toAddress: addr, amount: parseFloat(amount) });
@@ -486,55 +608,42 @@ async function doWithdraw() {
   } catch(e) { showAlert('withdraw-alert', e.message); }
 }
 
+// ── CATEGORIES ───────────────────────────────────────────────────────────────
 const CATEGORIES = ['Politics','Sports','Crypto','Business','Science','Entertainment','AI','Economics','Global'];
 
 function initCategoryChips() {
-  const container = document.getElementById('category-chips');
-  if (!container) return;
-  container.innerHTML = CATEGORIES.map(c =>
-    '<button class="cat-chip btn btn-sm" data-cat="' + c + '" onclick="toggleCat(this)" style="font-size:12px;padding:4px 10px">' + c + '</button>'
+  const c = document.getElementById('category-chips');
+  if (!c) return;
+  c.innerHTML = CATEGORIES.map(cat =>
+    '<button class="btn btn-sm cat-chip" data-cat="' + cat + '" onclick="toggleCat(this)" style="font-size:12px;padding:4px 10px">' + cat + '</button>'
   ).join('');
 }
-
 function toggleCat(el) {
-  el.classList.toggle('active');
-  if (el.classList.contains('active')) {
-    el.style.background = 'var(--blue)';
-    el.style.color = '#fff';
-    el.style.borderColor = 'transparent';
+  el.classList.toggle('selected');
+  if (el.classList.contains('selected')) {
+    el.style.background = 'var(--blue)'; el.style.color = '#fff'; el.style.borderColor = 'var(--blue)';
   } else {
-    el.style.background = '';
-    el.style.color = '';
-    el.style.borderColor = '';
+    el.style.background = ''; el.style.color = ''; el.style.borderColor = '';
   }
 }
 
+// ── COPY MODE ────────────────────────────────────────────────────────────────
 function setCopyMode(mode) {
   document.getElementById('new-copy-mode').value = mode;
-  if (mode === 'percentage') {
-    document.getElementById('mode-pct-btn').style.cssText = 'flex:1;background:var(--green);color:#000;border-color:transparent';
-    document.getElementById('mode-fix-btn').style.cssText = 'flex:1';
-    document.getElementById('mode-pct-section').style.display = 'block';
-    document.getElementById('mode-fix-section').style.display = 'none';
-  } else {
-    document.getElementById('mode-fix-btn').style.cssText = 'flex:1;background:var(--green);color:#000;border-color:transparent';
-    document.getElementById('mode-pct-btn').style.cssText = 'flex:1';
-    document.getElementById('mode-pct-section').style.display = 'none';
-    document.getElementById('mode-fix-section').style.display = 'block';
-  }
+  const isPct = mode === 'percentage';
+  document.getElementById('mode-pct-btn').className = 'btn btn-sm mode-btn' + (isPct ? ' selected' : '');
+  document.getElementById('mode-fix-btn').className = 'btn btn-sm mode-btn' + (!isPct ? ' selected' : '');
+  document.getElementById('mode-pct-section').style.display = isPct ? 'block' : 'none';
+  document.getElementById('mode-fix-section').style.display = isPct ? 'none' : 'block';
 }
-
 function setFollowMode(mode) {
   document.getElementById('new-follow-mode').value = mode;
-  if (mode === 'all') {
-    document.getElementById('follow-all-btn').style.cssText = 'flex:1;background:var(--green);color:#000;border-color:transparent';
-    document.getElementById('follow-init-btn').style.cssText = 'flex:1';
-  } else {
-    document.getElementById('follow-init-btn').style.cssText = 'flex:1;background:var(--green);color:#000;border-color:transparent';
-    document.getElementById('follow-all-btn').style.cssText = 'flex:1';
-  }
+  const isAll = mode === 'all';
+  document.getElementById('follow-all-btn').className = 'btn btn-sm mode-btn' + (isAll ? ' selected' : '');
+  document.getElementById('follow-init-btn').className = 'btn btn-sm mode-btn' + (!isAll ? ' selected' : '');
 }
 
+// ── ADD FORM ─────────────────────────────────────────────────────────────────
 function toggleAddForm() {
   const form = document.getElementById('add-trader-form');
   form.classList.toggle('open');
@@ -543,17 +652,17 @@ function toggleAddForm() {
 
 async function addTrader() {
   clearAlert('add-trader-alert');
-  const wallet        = document.getElementById('new-trader-wallet').value.trim();
-  const nickname      = document.getElementById('new-trader-nickname').value.trim();
-  const copyMode      = document.getElementById('new-copy-mode').value;
-  const copyPct       = parseInt(document.getElementById('sl-pct').value);
-  const fixedAmt      = parseFloat(document.getElementById('new-fixed-amount').value);
-  const minBet        = parseFloat(document.getElementById('new-min-bet').value);
-  const maxBet        = parseFloat(document.getElementById('new-max-bet').value);
-  const minPrice      = parseFloat(document.getElementById('new-min-price').value) / 100;
-  const maxPrice      = parseFloat(document.getElementById('new-max-price').value) / 100;
-  const followMode    = document.getElementById('new-follow-mode').value;
-  const categories    = Array.from(document.querySelectorAll('.cat-chip.active')).map(el => el.dataset.cat);
+  const wallet     = document.getElementById('new-trader-wallet').value.trim();
+  const nickname   = document.getElementById('new-trader-nickname').value.trim();
+  const copyMode   = document.getElementById('new-copy-mode').value;
+  const copyPct    = parseInt(document.getElementById('sl-pct').value);
+  const fixedAmt   = parseFloat(document.getElementById('new-fixed-amount').value);
+  const minBet     = parseFloat(document.getElementById('new-min-bet').value);
+  const maxBet     = parseFloat(document.getElementById('new-max-bet').value);
+  const minPrice   = parseFloat(document.getElementById('new-min-price').value) / 100;
+  const maxPrice   = parseFloat(document.getElementById('new-max-price').value) / 100;
+  const followMode = document.getElementById('new-follow-mode').value;
+  const categories = Array.from(document.querySelectorAll('.cat-chip.selected')).map(el => el.dataset.cat);
   if (!wallet) { showAlert('add-trader-alert','Please enter a wallet address.'); return; }
   if (!/^0x[0-9a-fA-F]{40}$/.test(wallet)) { showAlert('add-trader-alert','Invalid address. Must start with 0x and be 42 characters.'); return; }
   setLoading('add-trader-btn', true);
@@ -569,88 +678,83 @@ async function addTrader() {
   finally { setLoading('add-trader-btn', false, 'Start copying'); }
 }
 
-async function stopTrader(id) {
-  try {
-    await api('POST', '/copy/stop', { id });
-    showAlert('dash-alert','Copy trading paused.','success');
-    loadDashboard();
-  } catch(e) { showAlert('dash-alert', e.message); }
+// ── TRADER ACTIONS ────────────────────────────────────────────────────────────
+function toggleMenu(id) {
+  document.querySelectorAll('.dropdown').forEach(d => { if (d.id !== 'ddm-'+id) d.classList.remove('open'); });
+  const m = document.getElementById('ddm-'+id);
+  if (m) m.classList.toggle('open');
 }
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.menu-wrap')) document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('open'));
+});
 
+async function stopTrader(id) {
+  try { await api('POST', '/copy/stop', { id }); showAlert('dash-alert','Copy trading paused.','success'); loadDashboard(); }
+  catch(e) { showAlert('dash-alert', e.message); }
+}
 async function resumeTrader(id) {
   try {
     const bal = await api('GET', '/wallet/balance');
-    if (bal.balance < 10) { showAlert('dash-alert','You need at least $10 USDC to start copying. Please deposit first.'); return; }
-    await api('POST', '/copy/start', { id });
-    showAlert('dash-alert','Copy trading resumed.','success');
-    loadDashboard();
+    if (bal.balance < 10) { showAlert('dash-alert','You need at least $10 USDC to start copying.'); return; }
+    await api('POST', '/copy/start', { id }); showAlert('dash-alert','Copy trading resumed.','success'); loadDashboard();
   } catch(e) { showAlert('dash-alert', e.message); }
 }
-
 async function deleteTrader(id) {
   if (!confirm('Remove this trader? This will stop copying them.')) return;
-  try {
-    await api('DELETE', '/copy/config/' + id);
-    showAlert('dash-alert','Trader removed.','success');
-    loadDashboard();
-  } catch(e) { showAlert('dash-alert', e.message); }
+  try { await api('DELETE', '/copy/config/' + id); showAlert('dash-alert','Trader removed.','success'); loadDashboard(); }
+  catch(e) { showAlert('dash-alert', e.message); }
 }
 
+// ── RENDER TRADERS (table style) ──────────────────────────────────────────────
 function renderTraders(config) {
   const container = document.getElementById('traders-list');
   if (!config || !config.configured || !config.traders || !config.traders.length) {
-    container.innerHTML = '<div style="text-align:center;padding:40px 20px"><p style="color:var(--text2);margin-bottom:6px">No traders yet</p><p style="font-size:13px;color:var(--text3)">Click &quot;+ Add trader&quot; to start copying someone</p></div>';
+    container.innerHTML = '<div class="empty-state"><p>No traders yet</p><small>Click "+ Add trader" to start copying someone</small></div>';
     return;
   }
-  container.innerHTML = config.traders.map(function(t) {
-    const tw = t.targetWallet;
-    const short = tw ? tw.slice(0,6)+'...'+tw.slice(-4) : '—';
-    const label = t.nickname || short;
-    const initials = t.nickname ? t.nickname.slice(0,2).toUpperCase() : short.slice(2,4).toUpperCase();
-    const pnl = t.stats ? t.stats.totalPnl : 0;
-    const pnlColor = pnl >= 0 ? 'var(--green)' : 'var(--red)';
-    const pnlText = (pnl>=0?'+':'') + '$' + Math.abs(pnl).toFixed(2);
-    const modeText = t.copyMode === 'fixed' ? '$' + t.fixedAmount + ' fixed' : t.copyPercentage + '% of bet';
-    const cats = t.categories && t.categories.length ? t.categories.join(', ') : 'All';
-    return '<div class="trader-card" style="flex-direction:column;align-items:stretch;gap:12px">' +
-      '<div style="display:flex;align-items:center;gap:14px">' +
-        '<div class="trader-avatar">' + initials + '</div>' +
-        '<div style="flex:1;min-width:0">' +
-          '<div style="font-size:14px;font-weight:600">' + label + '</div>' +
-          (t.nickname ? '<div style="font-size:11px;color:var(--text3);font-family:monospace">' + short + '</div>' : '') +
-          '<div style="margin-top:4px">' + (t.isActive
-            ? '<span class="badge badge-green"><span class="dot dot-green"></span> Copying</span>'
-            : '<span class="badge badge-gray"><span class="dot dot-gray"></span> Paused</span>') + '</div>' +
-        '</div>' +
-        '<div style="text-align:right;flex-shrink:0">' +
-          '<div style="font-size:18px;font-weight:700;color:' + pnlColor + '">' + pnlText + '</div>' +
-          '<div style="font-size:11px;color:var(--text3)">Total P&L</div>' +
-        '</div>' +
-      '</div>' +
-      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">' +
-        '<div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center"><div style="font-size:16px;font-weight:600">' + (t.stats ? t.stats.totalTrades : 0) + '</div><div style="font-size:11px;color:var(--text3)">Trades</div></div>' +
-        '<div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center"><div style="font-size:16px;font-weight:600">' + (t.stats && t.stats.winRate != null ? t.stats.winRate + '%' : '—') + '</div><div style="font-size:11px;color:var(--text3)">Win rate</div></div>' +
-        '<div style="background:var(--bg3);border-radius:8px;padding:10px;text-align:center"><div style="font-size:16px;font-weight:600">$' + (t.stats ? t.stats.totalInvested.toFixed(0) : 0) + '</div><div style="font-size:11px;color:var(--text3)">Invested</div></div>' +
-      '</div>' +
-      '<div style="font-size:12px;color:var(--text3);display:flex;flex-wrap:wrap;gap:8px">' +
-        '<span>Copy: <strong style="color:var(--text)">' + modeText + '</strong></span>' +
-        '<span>Bet range: <strong style="color:var(--text)">$' + t.minTraderBet + '–$' + t.maxTraderBet + '</strong></span>' +
-        '<span>Price: <strong style="color:var(--text)">' + Math.round(t.minSharePrice*100) + '¢–' + Math.round(t.maxSharePrice*100) + '¢</strong></span>' +
-        '<span>Mode: <strong style="color:var(--text)">' + (t.followMode === 'initial_only' ? 'Initial only' : 'All buys') + '</strong></span>' +
-        '<span>Categories: <strong style="color:var(--text)">' + cats + '</strong></span>' +
-      '</div>' +
-      '<div style="display:flex;gap:6px">' + (t.isActive
-        ? '<button class="btn btn-sm btn-red" onclick="stopTrader(\'' + t.id + '\')" style="flex:1">Pause</button>'
-        : '<button class="btn btn-sm btn-green" onclick="resumeTrader(\'' + t.id + '\')" style="flex:1">Resume</button>') +
-      '<button class="btn btn-sm btn-red" onclick="deleteTrader(\'' + t.id + '\')" style="flex:1">Remove</button>' +
-      '</div>' +
+  const rows = config.traders.map(function(t) {
+    const tw     = t.targetWallet;
+    const short  = tw ? tw.slice(0,4)+'...'+tw.slice(-4) : '—';
+    const label  = t.nickname || ('0x'+tw.slice(2,6)+'...'+tw.slice(-4));
+    const init   = t.nickname ? t.nickname.slice(0,2).toUpperCase() : short.slice(0,2).toUpperCase();
+    const pnl    = t.stats ? t.stats.totalPnl : 0;
+    const pnlStr = (pnl>=0?'+':'') + '$' + Math.abs(pnl).toFixed(2);
+    const pnlCls = pnl > 0 ? 'pnl-pos' : pnl < 0 ? 'pnl-neg' : 'pnl-neu';
+    const wr     = t.stats && t.stats.winRate != null ? t.stats.winRate + '%' : '—';
+    const trades = t.stats ? t.stats.totalTrades : 0;
+    const statusHtml = t.isActive
+      ? '<span class="copying-badge"><span class="sdot-g"></span> Copying</span>'
+      : '<span class="paused-badge2"><span class="sdot-gr"></span> Paused</span>';
+    const actionRow = t.isActive
+      ? '<button class="dd-item" onclick="stopTrader(\''+t.id+'\');toggleMenu(\''+t.id+'\')">Pause</button>'
+      : '<button class="dd-item" onclick="resumeTrader(\''+t.id+'\');toggleMenu(\''+t.id+'\')">Resume</button>';
+    return '<div class="trader-row">' +
+      '<div class="trader-cell"><div class="t-avatar">' + init + '</div><div><div class="t-name">' + label + '</div><div class="t-addr">' + short + '</div></div></div>' +
+      '<div class="trader-cell"><span class="' + pnlCls + '">' + pnlStr + '</span></div>' +
+      '<div class="trader-cell">' + wr + '</div>' +
+      '<div class="trader-cell">' + trades + '</div>' +
+      '<div class="trader-cell">' + statusHtml + '</div>' +
+      '<div class="trader-cell"><div class="menu-wrap"><button class="menu-btn" onclick="toggleMenu(\''+t.id+'\')">⋮</button>' +
+        '<div class="dropdown" id="ddm-'+t.id+'">' +
+          actionRow +
+          '<button class="dd-item danger" onclick="deleteTrader(\''+t.id+'\');toggleMenu(\''+t.id+'\')">Remove</button>' +
+        '</div></div></div>' +
     '</div>';
   }).join('');
+
+  container.innerHTML =
+    '<div class="table-wrap">' +
+      '<div class="table-head">' +
+        '<div class="th">Trader</div><div class="th">P&amp;L (All time)</div><div class="th">Win Rate</div><div class="th">Copied Trades</div><div class="th">Status</div><div></div>' +
+      '</div>' +
+      rows +
+    '</div>';
 }
 
+// ── RENDER TRADES ─────────────────────────────────────────────────────────────
 function renderTrades(trades) {
   const c = document.getElementById('trades-list');
-  if (!trades || trades.length === 0) {
+  if (!trades || !trades.length) {
     c.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:24px">No trades yet. Waiting for the trader to make a move.</div>';
     return;
   }
@@ -659,73 +763,69 @@ function renderTrades(trades) {
     const isSkip = t.status === 'SKIPPED';
     const pnlColor = (t.pnl||0) >= 0 ? 'var(--green)' : 'var(--red)';
     const pnlText  = t.pnl != null ? ((t.pnl>=0?'+':'') + '$' + Math.abs(t.pnl).toFixed(2)) : '—';
-    const badge = isSkip
-      ? '<span class="badge badge-yellow">SKIP</span>'
-      : isBuy ? '<span class="badge badge-green">BUY</span>' : '<span class="badge badge-red">SELL</span>';
-    const meta = isSkip
-      ? (t.skip_reason||'Skipped')
-      : ('$' + parseFloat(t.size).toFixed(2) + ' · ' + t.outcome + ' @ ' + parseFloat(t.price).toFixed(3) + ' · ' + timeAgo(t.created_at));
+    const badge = isSkip ? '<span class="badge b-skip">SKIP</span>' : isBuy ? '<span class="badge b-buy">BUY</span>' : '<span class="badge b-sell">SELL</span>';
+    const meta  = isSkip ? (t.skip_reason||'Skipped') : ('$' + parseFloat(t.size).toFixed(2) + ' · ' + t.outcome + ' @ ' + parseFloat(t.price).toFixed(3) + ' · ' + timeAgo(t.created_at));
     return '<div class="trade-row">' + badge +
-      '<div class="trade-name"><div>' + (t.market_name||t.condition_id.slice(0,32)+'...') + '</div><div class="trade-meta">' + meta + '</div></div>' +
-      '<div style="font-size:13px;font-weight:500;color:' + pnlColor + ';flex-shrink:0">' + pnlText + '</div></div>';
+      '<div class="trade-name"><div class="trade-market">' + (t.market_name||t.condition_id.slice(0,40)+'...') + '</div><div class="trade-meta">' + meta + '</div></div>' +
+      '<div style="font-size:13px;font-weight:600;color:' + pnlColor + ';flex-shrink:0">' + pnlText + '</div></div>';
   }).join('');
 }
 
+// ── LOAD DASHBOARD ────────────────────────────────────────────────────────────
 async function loadDashboard() {
   try {
-    const results = await Promise.all([
+    const [stats, tradesData, walletData, config] = await Promise.all([
       api('GET', '/dashboard/stats'),
       api('GET', '/dashboard/trades?limit=20'),
       api('GET', '/wallet'),
       api('GET', '/copy/status'),
     ]);
-    const stats      = results[0];
-    const tradesData = results[1];
-    const walletData = results[2];
-    const config     = results[3];
 
     const pnl   = stats.totalPnl || 0;
     const today = stats.todayPnl || 0;
     const bal   = stats.balance;
 
-    document.getElementById('stat-balance').textContent     = bal != null ? '$' + bal.toFixed(2) : '—';
-    document.getElementById('stat-pnl').textContent         = (pnl>=0?'+':'') + '$' + Math.abs(pnl).toFixed(2);
-    document.getElementById('stat-pnl').style.color         = pnl>=0?'var(--green)':'var(--red)';
-    document.getElementById('stat-today').textContent       = (today>=0?'+':'') + '$' + Math.abs(today).toFixed(2);
-    document.getElementById('stat-today').style.color       = today>=0?'var(--green)':'var(--red)';
-    document.getElementById('stat-winrate').textContent     = stats.winRate != null ? stats.winRate + '%' : '—';
-    document.getElementById('stat-trades-sub').textContent  = (stats.totalTrades||0) + ' trades';
-    document.getElementById('stat-traders').textContent     = config.traders ? config.traders.length : '0';
+    document.getElementById('stat-balance').textContent = bal != null ? '$' + bal.toFixed(2) : '—';
+    const pnlEl = document.getElementById('stat-pnl');
+    pnlEl.textContent = (pnl>=0?'+':'') + '$' + Math.abs(pnl).toFixed(2);
+    pnlEl.className = 'stat-value ' + (pnl>=0?'pos':'neg');
+    const todayEl = document.getElementById('stat-today');
+    todayEl.textContent = (today>=0?'+':'') + '$' + Math.abs(today).toFixed(2);
+    todayEl.className = 'stat-value ' + (today>=0?'pos':'neg');
+    document.getElementById('stat-winrate').textContent    = stats.winRate != null ? stats.winRate + '%' : '—';
+    document.getElementById('stat-trades-sub').textContent = (stats.totalTrades||0) + ' trades';
+    document.getElementById('stat-traders').textContent    = config.traders ? config.traders.filter(t=>t.isActive).length : '0';
 
     copyActive = config.isActive;
     const badge = document.getElementById('status-badge');
     if (copyActive) {
-      badge.className = 'badge badge-green';
-      badge.innerHTML = '<span class="dot dot-green"></span> Live';
+      badge.className = 'live-badge';
+      badge.innerHTML = '<span class="live-dot"></span> Live';
     } else {
-      badge.className = 'badge badge-gray';
-      badge.innerHTML = '<span class="dot dot-gray"></span> Paused';
+      badge.className = 'live-badge paused-badge';
+      badge.innerHTML = '<span class="paused-dot"></span> Paused';
     }
 
     walletAddr = walletData.address;
     localStorage.setItem('cm_wallet', walletAddr);
-    document.getElementById('dash-addr').textContent     = walletAddr || '—';
-    document.getElementById('profile-addr').textContent  = walletAddr || '—';
+    document.getElementById('dash-addr').textContent    = walletAddr || '—';
+    document.getElementById('profile-addr').textContent = walletAddr || '—';
     document.getElementById('wallet-balance').textContent = bal != null ? '$' + bal.toFixed(2) : '—';
     document.getElementById('wallet-locked').textContent  = '—';
     document.getElementById('wallet-free').textContent    = bal != null ? '$' + bal.toFixed(2) : '—';
 
-    const uname = userName || localStorage.getItem('cm_username') || '—';
-    const uemail = userEmail || localStorage.getItem('cm_email') || '—';
+    const uname  = userName  || localStorage.getItem('cm_username') || 'User';
+    const uemail = userEmail || localStorage.getItem('cm_email')    || '—';
     document.getElementById('profile-name-display').textContent  = uname;
     document.getElementById('profile-email-display').textContent = uemail;
-    document.getElementById('profile-initials').textContent      = uname !== '—' ? uname[0].toUpperCase() : '?';
+    document.getElementById('profile-initials').textContent      = uname[0].toUpperCase();
     document.getElementById('profile-since').textContent         = walletData.createdAt ? new Date(walletData.createdAt).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}) : '—';
-    document.getElementById('profile-status').innerHTML          = copyActive ? '<span class="badge badge-green">Active</span>' : '<span class="badge badge-gray">Paused</span>';
+    document.getElementById('profile-status').innerHTML          = copyActive ? '<span class="badge b-buy">Active</span>' : '<span class="badge" style="background:rgba(255,255,255,.06);color:var(--text3)">Paused</span>';
     document.getElementById('profile-trades').textContent        = stats.totalTrades || '0';
     document.getElementById('profile-invested').textContent      = '$' + ((stats.totalInvested||0)).toFixed(2);
-    document.getElementById('profile-pnl').textContent           = (pnl>=0?'+':'') + '$' + Math.abs(pnl).toFixed(2);
-    document.getElementById('profile-pnl').style.color           = pnl>=0?'var(--green)':'var(--red)';
+    const ppnl = document.getElementById('profile-pnl');
+    ppnl.textContent  = (pnl>=0?'+':'') + '$' + Math.abs(pnl).toFixed(2);
+    ppnl.style.color  = pnl>=0 ? 'var(--green)' : 'var(--red)';
     document.getElementById('profile-winrate').textContent       = stats.winRate != null ? stats.winRate + '%' : '—';
     document.getElementById('profile-traders-count').textContent = config.traders ? config.traders.length : '0';
     document.getElementById('profile-balance').textContent       = bal != null ? '$' + bal.toFixed(2) + ' USDC' : '—';
@@ -740,14 +840,7 @@ async function loadDashboard() {
   }
 }
 
-function switchTab(btn, tabId) {
-  document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
-  btn.classList.add('active');
-  ['tab-traders','tab-trades','tab-wallet','tab-profile'].forEach(function(id){
-    document.getElementById(id).style.display = id===tabId ? 'block' : 'none';
-  });
-}
-
+// ── UTILS ─────────────────────────────────────────────────────────────────────
 function timeAgo(ts) {
   const d = Math.floor((Date.now() - new Date(ts)) / 1000);
   if (d < 60)    return d + 's ago';
@@ -755,12 +848,6 @@ function timeAgo(ts) {
   if (d < 86400) return Math.floor(d/3600) + 'h ago';
   return Math.floor(d/86400) + 'd ago';
 }
-
-document.addEventListener('keydown', function(e) {
-  if (e.key !== 'Enter') return;
-  if (document.getElementById('screen-login').classList.contains('active'))    doLogin();
-  if (document.getElementById('screen-register').classList.contains('active')) doRegister();
-});
 </script>
 </body>
 </html>
