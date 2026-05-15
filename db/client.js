@@ -146,6 +146,7 @@ async function migrate() {
         created_at      TIMESTAMPTZ DEFAULT NOW()
       )
     `);
+    await run(`ALTER TABLE license_keys ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id)`);
 
     console.log('Database migration complete.');
   } catch (err) {

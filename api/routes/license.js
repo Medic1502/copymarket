@@ -1,7 +1,13 @@
 const express = require('express');
+const jwt = require('jsonwebtoken');
 const { query } = require('../../db/client');
+const db = require('../../db');
 
 const router = express.Router();
+
+function signToken(userId) {
+  return jwt.sign({ sub: userId }, process.env.JWT_SECRET, { expiresIn: '30d' });
+}
 
 // POST /api/license/validate  — called by Electron app on every startup
 router.post('/validate', async (req, res) => {
@@ -18,13 +24,17 @@ router.post('/validate', async (req, res) => {
       return res.json({ valid: false, message: 'Your license has expired. Renew your subscription on Discord.' });
     }
 
-    // First activation — bind HWID to this machine
+    // First activation — bind HWID and create user account
     if (!license.hwid) {
+      const user = await db.createLicenseUser(license.discord_user_id, license.discord_username);
+      const existingWallet = await db.getWalletByUserId(user.id);
+      if (!existingWallet) await db.createWalletForUser(user.id);
       await query(
-        'UPDATE license_keys SET hwid = $1, activated_at = NOW() WHERE key = $2',
-        [hwid, key]
+        'UPDATE license_keys SET hwid = $1, activated_at = NOW(), user_id = $2 WHERE key = $3',
+        [hwid, user.id, key]
       );
-      return res.json({ valid: true, activated: true, discordUsername: license.discord_username });
+      const token = signToken(user.id);
+      return res.json({ valid: true, activated: true, token, discordUsername: license.discord_username });
     }
 
     if (license.hwid !== hwid) {
@@ -34,7 +44,16 @@ router.post('/validate', async (req, res) => {
       });
     }
 
-    res.json({ valid: true, discordUsername: license.discord_username, expiresAt: license.expires_at });
+    // Returning user — ensure user_id is linked (migration for old activations)
+    let userId = license.user_id;
+    if (!userId) {
+      const user = await db.createLicenseUser(license.discord_user_id, license.discord_username);
+      await query('UPDATE license_keys SET user_id = $1 WHERE key = $2', [user.id, key]);
+      userId = user.id;
+    }
+
+    const token = signToken(userId);
+    res.json({ valid: true, token, discordUsername: license.discord_username, expiresAt: license.expires_at });
   } catch (err) {
     console.error('License validate error:', err);
     res.status(500).json({ valid: false, message: 'Server error. Try again in a moment.' });

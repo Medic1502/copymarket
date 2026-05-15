@@ -214,8 +214,20 @@ async function getTodayLoss(userId) {
   return pnl < 0 ? Math.abs(pnl) : 0;
 }
 
+async function createLicenseUser(discordUserId, discordUsername) {
+  const internalEmail = `discord:${discordUserId}@jonin.internal`;
+  const existing = await query('SELECT id FROM users WHERE email = $1', [internalEmail]);
+  if (existing.rows.length > 0) return existing.rows[0];
+  const randomHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), SALT_ROUNDS);
+  const res = await query(
+    'INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, email, created_at',
+    [internalEmail, randomHash]
+  );
+  return res.rows[0];
+}
+
 module.exports = {
-  createUser, getUserByEmail, getUserById, verifyPassword,
+  createUser, createLicenseUser, getUserByEmail, getUserById, verifyPassword,
   createWalletForUser, getWalletByUserId, getUSDCBalance,
   saveCopyConfig, getCopyConfig, setActive, getAllActiveConfigs, deleteCopyConfig,
   saveTrade, getRecentTrades, getDashboardStats, getTodayLoss, getTraderStats,
