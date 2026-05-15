@@ -88,6 +88,64 @@ router.post('/generate', async (req, res) => {
   }
 });
 
+// POST /api/license/self-reset  — user resets their own HWID (moving to new machine)
+router.post('/self-reset', async (req, res) => {
+  try {
+    const { key } = req.body;
+    if (!key) return res.status(400).json({ error: 'key is required' });
+
+    const result = await query('SELECT * FROM license_keys WHERE key = $1', [key]);
+    const license = result.rows[0];
+
+    if (!license) return res.status(404).json({ error: 'Key not found' });
+    if (!license.active) return res.status(403).json({ error: 'Key is deactivated' });
+
+    await query('UPDATE license_keys SET hwid = NULL, activated_at = NULL WHERE key = $1', [key]);
+    res.json({ success: true, message: 'Device unlinked. You can now activate on a new machine.' });
+  } catch (err) {
+    console.error('self-reset error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/license/shuffle  — Discord bot generates new key for same user (invalidates old)
+router.post('/shuffle', async (req, res) => {
+  try {
+    const auth = req.headers['authorization'];
+    const secret = process.env.DISCORD_BOT_SECRET;
+    if (!secret || auth !== `Bearer ${secret}`) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { discordUserId } = req.body;
+    if (!discordUserId) return res.status(400).json({ error: 'discordUserId is required' });
+
+    const existing = await query('SELECT * FROM license_keys WHERE discord_user_id = $1', [discordUserId]);
+    if (!existing.rows[0]) return res.status(404).json({ error: 'No key found for this user' });
+
+    const old = existing.rows[0];
+
+    // Cooldown: max 1 shuffle per 24h
+    if (old.activated_at) {
+      const hoursSinceActivation = (Date.now() - new Date(old.activated_at).getTime()) / 3600000;
+      if (hoursSinceActivation < 24) {
+        const hoursLeft = Math.ceil(24 - hoursSinceActivation);
+        return res.json({ error: `Cooldown active. Try again in ${hoursLeft}h.`, cooldown: true });
+      }
+    }
+
+    // Deactivate old key, create new one preserving user_id
+    await query('UPDATE license_keys SET active = FALSE WHERE discord_user_id = $1', [discordUserId]);
+    const newKey = await query(
+      'INSERT INTO license_keys (discord_user_id, discord_username, user_id) VALUES ($1, $2, $3) RETURNING key',
+      [discordUserId, old.discord_username, old.user_id]
+    );
+
+    res.json({ key: newKey.rows[0].key });
+  } catch (err) {
+    console.error('shuffle error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST /api/license/revoke  — admin: deactivate a key
 router.post('/revoke', async (req, res) => {
   try {
