@@ -11,6 +11,8 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ChannelType,
+  PermissionsBitField,
 } = require('discord.js');
 const fetch = require('node-fetch');
 
@@ -31,6 +33,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
   ],
 });
 
@@ -211,6 +214,18 @@ function howToJoinEmbed() {
 const DOWNLOAD_VERSION = '1.1.0';
 const DOWNLOAD_LINK = 'https://github.com/Medic1502/copymarket/releases/download/v1.1.0/Jonin-CT-Setup-1.1.0.exe';
 
+function supportEmbed() {
+  return new EmbedBuilder()
+    .setColor(BLUE)
+    .setTitle('🎫 Jonin CT Support')
+    .setDescription('Need help? Our team is here for you.\n\nClick the button below to open a private support ticket. An admin will respond as soon as possible.')
+    .addFields(
+      { name: '📋 Before opening a ticket', value: '> Check <#how-it-works> and <#setup-guide> first\n> Make sure you have read the <#rules>\n> Include your license key and a description of the issue', inline: false },
+      { name: '⏱️ Response time', value: 'Usually within a few hours. Tickets are handled in order.', inline: false }
+    )
+    .setFooter({ text: 'Jonin CT Support — Copy. Track. Win.' });
+}
+
 function downloadEmbed() {
   return new EmbedBuilder()
     .setColor(GREEN)
@@ -275,6 +290,7 @@ async function registerCommands() {
             { name: 'Setup guide', value: 'setup' },
             { name: 'How to join (Premium CT)', value: 'howtojoin' },
             { name: 'Download app', value: 'download' },
+            { name: 'Support (ticket button)', value: 'support' },
             { name: 'Rules', value: 'rules' },
             { name: 'Get key info', value: 'getkey' },
             { name: 'Welcome', value: 'welcome' },
@@ -463,6 +479,12 @@ client.on('interactionCreate', async (interaction) => {
       if (type === 'setup'      || type === 'all') await ch.send({ embeds: [setupGuideEmbed()] });
       if (type === 'howtojoin'  || type === 'all') await ch.send({ embeds: [howToJoinEmbed()] });
       if (type === 'download'   || type === 'all') await ch.send({ embeds: [downloadEmbed()] });
+      if (type === 'support') {
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('open_ticket').setLabel('🎫 Open a Ticket').setStyle(ButtonStyle.Primary)
+        );
+        await ch.send({ embeds: [supportEmbed()], components: [row] });
+      }
       if (type === 'rules'      || type === 'all') await ch.send({ embeds: [getRulesEmbed()] });
       if (type === 'getkey'     || type === 'all') await ch.send({ embeds: [getKeyInfoEmbed()] });
       if (type === 'welcome')                       await ch.send({ embeds: [welcomeEmbed(interaction.member)] });
@@ -568,6 +590,83 @@ client.on('interactionCreate', async (interaction) => {
     } catch (err) {
       await interaction.editReply({ content: '❌ Failed to reset machine.' });
     }
+    return;
+  }
+});
+
+// ── TICKET BUTTONS ────────────────────────────────────────────────────────────
+client.on('interactionCreate', async (interaction) => {
+  if (!interaction.isButton()) return;
+
+  // Open ticket
+  if (interaction.customId === 'open_ticket') {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    // Check if user already has an open ticket
+    const existing = interaction.guild.channels.cache.find(
+      c => c.name === `ticket-${interaction.user.username.toLowerCase()}` && !c.archived
+    );
+    if (existing) {
+      return interaction.editReply({ content: `❌ You already have an open ticket: ${existing}` });
+    }
+
+    try {
+      // Create private channel for the ticket
+      const category = interaction.channel.parent;
+      const ticketChannel = await interaction.guild.channels.create({
+        name: `ticket-${interaction.user.username.toLowerCase()}`,
+        type: ChannelType.GuildText,
+        parent: category,
+        permissionOverwrites: [
+          { id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] },
+          { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ReadMessageHistory] },
+          { id: client.user.id,      allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels] },
+        ],
+      });
+
+      // Give admins access
+      const adminRoles = interaction.guild.roles.cache.filter(r => r.permissions.has(PermissionsBitField.Flags.Administrator));
+      for (const [, role] of adminRoles) {
+        await ticketChannel.permissionOverwrites.create(role, {
+          ViewChannel: true, SendMessages: true, ReadMessageHistory: true,
+        });
+      }
+
+      const closeRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('close_ticket').setLabel('🔒 Close Ticket').setStyle(ButtonStyle.Danger)
+      );
+
+      const ticketEmbed = new EmbedBuilder()
+        .setColor(BLUE)
+        .setTitle('🎫 Support Ticket')
+        .setDescription(`Hey ${interaction.user}! An admin will be with you shortly.\n\nPlease describe your issue in as much detail as possible:`)
+        .addFields(
+          { name: '📋 Helpful info to include', value: '> Your license key (first 8 characters)\n> What you were trying to do\n> Any error messages you saw', inline: false }
+        )
+        .setFooter({ text: 'Click "Close Ticket" when your issue is resolved.' });
+
+      await ticketChannel.send({ content: `${interaction.user}`, embeds: [ticketEmbed], components: [closeRow] });
+      await interaction.editReply({ content: `✅ Your ticket has been opened: ${ticketChannel}` });
+    } catch (err) {
+      console.error('Ticket open error:', err);
+      await interaction.editReply({ content: '❌ Failed to create ticket. Make sure I have Manage Channels permission.' });
+    }
+    return;
+  }
+
+  // Close ticket
+  if (interaction.customId === 'close_ticket') {
+    await interaction.deferReply();
+    const ch = interaction.channel;
+
+    const closeEmbed = new EmbedBuilder()
+      .setColor(RED)
+      .setTitle('🔒 Ticket Closed')
+      .setDescription(`Closed by ${interaction.user}. This channel will be deleted in 5 seconds.`)
+      .setTimestamp();
+
+    await interaction.editReply({ embeds: [closeEmbed] });
+    setTimeout(() => ch.delete().catch(() => {}), 5000);
     return;
   }
 });
