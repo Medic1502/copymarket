@@ -123,6 +123,96 @@ function getRulesEmbed() {
     .setFooter({ text: 'Breaking rules may result in a mute or ban.' });
 }
 
+function setupGuideEmbed() {
+  return new EmbedBuilder()
+    .setColor(BLUE)
+    .setTitle('🛠️ Setup Guide — Jonin CT')
+    .setDescription('Follow these steps to get Jonin CT running and your first trader copied.')
+    .addFields(
+      {
+        name: 'Step 1 — Get your license key',
+        value: 'Type `/getkey` in <#get-key>. The bot will DM you your personal license key. You need the **Premium CT** role to do this.',
+        inline: false
+      },
+      {
+        name: 'Step 2 — Download the app',
+        value: 'Go to <#downloads> and download the latest **Jonin CT Setup .exe**. Run the installer — it takes under 30 seconds.',
+        inline: false
+      },
+      {
+        name: 'Step 3 — Activate',
+        value: 'Open Jonin CT. Paste your license key from the DM and click **Activate**. The app connects to our servers and logs you in automatically.',
+        inline: false
+      },
+      {
+        name: 'Step 4 — Fund your wallet',
+        value: 'Go to the **Wallet** tab. Copy your deposit address and send **USDC on Polygon** to it.\n\n> Minimum to start copying: **$5 USDC**\n> Also works with Moonpay (buy by card directly)',
+        inline: false
+      },
+      {
+        name: 'Step 5 — Connect to Polymarket',
+        value: 'Go to **Wallet → Export private key**, import it into MetaMask, then visit [polymarket.com](https://polymarket.com) and accept their Terms of Service. This is a one-time step required by Polymarket.',
+        inline: false
+      },
+      {
+        name: 'Step 6 — Add a trader',
+        value: 'Go to **My Traders** → click **+ Add trader**. Paste the wallet address of a top Polymarket trader. Set your copy mode and click **Add trader**.',
+        inline: false
+      },
+      {
+        name: 'Step 7 — Start copying',
+        value: 'Click **Resume** next to the trader. Jonin CT will now copy every trade they make in real time. You can monitor everything from the dashboard.',
+        inline: false
+      },
+      {
+        name: '❓ Need help?',
+        value: 'Open a ticket in <#support> and an admin will assist you.',
+        inline: false
+      }
+    )
+    .setFooter({ text: 'Jonin CT — Copy. Track. Win.' });
+}
+
+function howToJoinEmbed() {
+  return new EmbedBuilder()
+    .setColor(GREEN)
+    .setTitle('💎 How to Get Premium CT')
+    .setDescription('Premium CT gives you full access to the Jonin CT copy trading platform. Here\'s how to get it.')
+    .addFields(
+      {
+        name: '1️⃣  Purchase a subscription',
+        value: 'Buy the **Premium CT** plan through our payment link. Once payment is confirmed you will be assigned the **Premium CT** role on this server automatically.',
+        inline: false
+      },
+      {
+        name: '2️⃣  Get your license key',
+        value: 'Once you have the role, type `/getkey` in <#get-key>. The bot sends your personal key via DM. Keep it private — it\'s tied to your machine.',
+        inline: false
+      },
+      {
+        name: '3️⃣  Download & activate',
+        value: 'Download the Jonin CT Desktop App from <#downloads>, paste your key and click **Activate**. Setup takes under 2 minutes.',
+        inline: false
+      },
+      {
+        name: '✅ What you get',
+        value: '> ⚡ Automated 24/7 copy trading\n> 📊 Real-time P&L dashboard\n> 🔍 Free wallet checker\n> 🛡️ Your own isolated wallet\n> 🔔 Trade notifications\n> 💬 Priority support',
+        inline: false
+      },
+      {
+        name: '🔄 Switching machines?',
+        value: 'Use `/shufflekey` to get a new key. Your old key is invalidated. One key per account, one machine at a time.',
+        inline: false
+      },
+      {
+        name: '❓ Questions?',
+        value: 'Ask in <#support> or DM an admin. We\'re here to help.',
+        inline: false
+      }
+    )
+    .setFooter({ text: 'Jonin CT — Copy. Track. Win.' });
+}
+
 function getKeyInfoEmbed() {
   return new EmbedBuilder()
     .setColor(GREEN)
@@ -163,10 +253,12 @@ async function registerCommands() {
           .setRequired(true)
           .addChoices(
             { name: 'How it works', value: 'howitworks' },
+            { name: 'Setup guide', value: 'setup' },
+            { name: 'How to join (Premium CT)', value: 'howtojoin' },
             { name: 'Rules', value: 'rules' },
             { name: 'Get key info', value: 'getkey' },
             { name: 'Welcome', value: 'welcome' },
-            { name: 'All (how it works + rules + get key)', value: 'all' },
+            { name: 'All', value: 'all' },
           )
       )
       .toJSON(),
@@ -339,6 +431,8 @@ client.on('interactionCreate', async (interaction) => {
 
     try {
       if (type === 'howitworks' || type === 'all') await ch.send({ embeds: [howItWorksEmbed()] });
+      if (type === 'setup'      || type === 'all') await ch.send({ embeds: [setupGuideEmbed()] });
+      if (type === 'howtojoin'  || type === 'all') await ch.send({ embeds: [howToJoinEmbed()] });
       if (type === 'rules'      || type === 'all') await ch.send({ embeds: [getRulesEmbed()] });
       if (type === 'getkey'     || type === 'all') await ch.send({ embeds: [getKeyInfoEmbed()] });
       if (type === 'welcome')                       await ch.send({ embeds: [welcomeEmbed(interaction.member)] });
