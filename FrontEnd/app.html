@@ -117,50 +117,12 @@ input[type=range]{width:100%;accent-color:var(--green)}
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="screen-login" class="screen active">
-<div class="page">
-  <div class="auth-logo">
-    <div class="logo"><img src="logo.png" style="height:36px;width:36px">Jonin CT</div>
-    <p>Welcome back</p>
-  </div>
-  <div class="card">
-    <div class="field"><label>Email</label><input type="email" id="login-email" placeholder="you@email.com"></div>
-    <div class="field"><label>Password</label><input type="password" id="login-pass" placeholder="Your password"></div>
-    <div id="login-alert"></div>
-    <button class="btn btn-green" id="login-btn" onclick="doLogin()" style="margin-top:8px">Sign in</button>
-  </div>
-  <div class="auth-switch">Don't have an account? <button onclick="showScreen('screen-register')">Sign up</button></div>
-</div>
-</div>
-
-<!-- REGISTER -->
-<div id="screen-register" class="screen">
-<div class="page">
-  <div class="auth-logo">
-    <div class="logo"><img src="logo.png" style="height:36px;width:36px">Jonin CT</div>
-    <p>Copy top Polymarket traders automatically</p>
-  </div>
-  <div class="card">
-    <div class="field"><label>Username</label><input type="text" id="reg-username" placeholder="Your display name"></div>
-    <div class="field"><label>Email</label><input type="email" id="reg-email" placeholder="you@email.com"></div>
-    <div class="field"><label>Password</label><input type="password" id="reg-pass" placeholder="At least 8 characters"></div>
-    <div class="field"><label>Confirm password</label><input type="password" id="reg-pass2" placeholder="Repeat password"></div>
-    <div id="reg-alert"></div>
-    <button class="btn btn-green" id="reg-btn" onclick="doRegister()" style="margin-top:8px">Create account</button>
-  </div>
-  <div class="alert alert-info" style="margin-top:12px">A Polygon wallet is automatically created for you. No MetaMask needed.</div>
-  <div class="auth-switch">Already have an account? <button onclick="showScreen('screen-login')">Sign in</button></div>
-</div>
-</div>
-
 <!-- DASHBOARD -->
-<div id="screen-dashboard" class="screen">
+<div id="screen-dashboard" class="screen active">
   <div class="topnav">
     <div class="logo"><img src="logo.png" style="height:36px;width:36px">Jonin CT</div>
     <div style="display:flex;align-items:center;gap:10px">
       <span class="badge badge-green" id="status-badge"><span class="dot dot-green"></span> Live</span>
-      <button class="btn btn-sm" onclick="doLogout()">Log out</button>
     </div>
   </div>
   <div class="page-wide">
@@ -376,7 +338,7 @@ let userEmail  = localStorage.getItem('cm_email') || null;
 let userName   = localStorage.getItem('cm_username') || null;
 let copyActive = false;
 
-if (token) { showScreen('screen-dashboard'); loadDashboard(); }
+loadDashboard();
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -407,59 +369,6 @@ async function api(method, path, body) {
   return data;
 }
 
-async function doLogin() {
-  clearAlert('login-alert');
-  const email = document.getElementById('login-email').value.trim();
-  const pass  = document.getElementById('login-pass').value;
-  if (!email || !pass) { showAlert('login-alert','Please fill in both fields.'); return; }
-  setLoading('login-btn', true);
-  try {
-    const data = await api('POST', '/auth/login', { email, password: pass });
-    token = data.token;
-    walletAddr = data.wallet && data.wallet.address;
-    userEmail = email;
-    localStorage.setItem('cm_token', token);
-    localStorage.setItem('cm_wallet', walletAddr);
-    localStorage.setItem('cm_email', email);
-    showScreen('screen-dashboard');
-    loadDashboard();
-  } catch(e) { showAlert('login-alert', e.message); }
-  finally { setLoading('login-btn', false, 'Sign in'); }
-}
-
-async function doRegister() {
-  clearAlert('reg-alert');
-  const username = document.getElementById('reg-username').value.trim();
-  const email    = document.getElementById('reg-email').value.trim();
-  const pass     = document.getElementById('reg-pass').value;
-  const pass2    = document.getElementById('reg-pass2').value;
-  if (!username) { showAlert('reg-alert','Please enter a username.'); return; }
-  if (!email)    { showAlert('reg-alert','Please enter your email.'); return; }
-  if (!pass)     { showAlert('reg-alert','Please enter a password.'); return; }
-  if (pass.length < 8) { showAlert('reg-alert','Password must be at least 8 characters.'); return; }
-  if (pass !== pass2)  { showAlert('reg-alert','Passwords do not match.'); return; }
-  setLoading('reg-btn', true);
-  try {
-    const data = await api('POST', '/auth/register', { email, username, password: pass });
-    token = data.token;
-    walletAddr = data.wallet && data.wallet.address;
-    userEmail = email;
-    userName = username;
-    localStorage.setItem('cm_token', token);
-    localStorage.setItem('cm_wallet', walletAddr);
-    localStorage.setItem('cm_email', email);
-    localStorage.setItem('cm_username', username);
-    showScreen('screen-dashboard');
-    loadDashboard();
-  } catch(e) { showAlert('reg-alert', e.message); }
-  finally { setLoading('reg-btn', false, 'Create account'); }
-}
-
-function doLogout() {
-  token = null; walletAddr = null; userEmail = null; userName = null;
-  localStorage.clear();
-  showScreen('screen-login');
-}
 
 function copyDashAddr() {
   navigator.clipboard && navigator.clipboard.writeText(document.getElementById('dash-addr').textContent);

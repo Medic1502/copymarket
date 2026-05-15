@@ -34,7 +34,8 @@ router.post('/validate', async (req, res) => {
         [hwid, user.id, key]
       );
       const token = signToken(user.id);
-      return res.json({ valid: true, activated: true, token, discordUsername: license.discord_username });
+      const newWallet = await db.getWalletByUserId(user.id);
+      return res.json({ valid: true, activated: true, token, walletAddress: newWallet?.address, discordUsername: license.discord_username });
     }
 
     if (license.hwid !== hwid) {
@@ -55,7 +56,8 @@ router.post('/validate', async (req, res) => {
     }
 
     const token = signToken(userId);
-    res.json({ valid: true, token, discordUsername: license.discord_username, expiresAt: license.expires_at });
+    const wallet = await db.getWalletByUserId(userId);
+    res.json({ valid: true, token, walletAddress: wallet?.address, discordUsername: license.discord_username, expiresAt: license.expires_at });
   } catch (err) {
     console.error('License validate error:', err);
     res.status(500).json({ valid: false, message: 'Server error. Try again in a moment.' });
