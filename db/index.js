@@ -99,6 +99,13 @@ async function setActive(userId, isActive, pausedReason = null) {
   );
 }
 
+async function setConfigActive(configId, userId, isActive, pausedReason = null) {
+  await query(
+    'UPDATE copy_configs SET is_active = $3, paused_reason = $4, updated_at = NOW() WHERE id = $1 AND user_id = $2',
+    [configId, userId, isActive, pausedReason]
+  );
+}
+
 async function getAllActiveConfigs() {
   const res = await query(`
     SELECT cc.*, w.address AS wallet_address, w.encrypted_private_key
@@ -228,6 +235,7 @@ async function createLicenseUser(discordUserId, discordUsername) {
 
 module.exports = {
   createUser, createLicenseUser, getUserByEmail, getUserById, verifyPassword,
+  setConfigActive,
   createWalletForUser, getWalletByUserId, getUSDCBalance,
   saveCopyConfig, getCopyConfig, setActive, getAllActiveConfigs, deleteCopyConfig,
   saveTrade, getRecentTrades, getDashboardStats, getTodayLoss, getTraderStats,

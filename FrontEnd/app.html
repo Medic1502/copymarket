@@ -745,14 +745,13 @@ async function addTrader() {
   setLoading('add-trader-btn', true);
   try {
     await api('POST', '/copy/config', { targetWallet: wallet, nickname: nickname||null, copyMode, copyPercentage: copyPct, fixedAmount: fixedAmt, minTraderBet: minBet, maxTraderBet: maxBet, categories, followMode, minSharePrice: minPrice, maxSharePrice: maxPrice });
-    await api('POST', '/copy/start');
     document.getElementById('add-trader-form').classList.remove('open');
     document.getElementById('new-trader-wallet').value = '';
     document.getElementById('new-trader-nickname').value = '';
-    showAlert('dash-alert','Trader added and copy trading started.','success');
+    showAlert('dash-alert', 'Trader added. Click <strong>Resume</strong> next to the trader to start copying.', 'info');
     loadDashboard();
   } catch(e) { showAlert('add-trader-alert', e.message); }
-  finally { setLoading('add-trader-btn', false, 'Start copying'); }
+  finally { setLoading('add-trader-btn', false, 'Add trader'); }
 }
 
 // ── TRADER ACTIONS ────────────────────────────────────────────────────────────
@@ -798,14 +797,14 @@ function filterTraders() {
 }
 
 async function stopTrader(id) {
-  try { await api('POST', '/copy/stop', { id }); showAlert('dash-alert','Copy trading paused.','success'); loadDashboard(); }
+  try { await api('POST', '/copy/stop', { id }); showAlert('dash-alert','Paused.','success'); loadDashboard(); }
   catch(e) { showAlert('dash-alert', e.message); }
 }
 async function resumeTrader(id) {
   try {
     const bal = await api('GET', '/wallet/balance');
-    if (bal.balance < 10) { showAlert('dash-alert','You need at least $10 USDC to start copying.'); return; }
-    await api('POST', '/copy/start', { id }); showAlert('dash-alert','Copy trading resumed.','success'); loadDashboard();
+    if (bal.balance < 5) { showAlert('dash-alert', 'You need at least $5 USDC in your wallet to start copying. Please deposit first.'); return; }
+    await api('POST', '/copy/start', { id }); showAlert('dash-alert','Copy trading started.','success'); loadDashboard();
   } catch(e) { showAlert('dash-alert', e.message); }
 }
 async function deleteTrader(id) {
@@ -825,7 +824,14 @@ function renderTraders(config) {
   renderTradersHtml(_allTraders);
 }
 
+function getOpenPanels() {
+  const open = new Set();
+  document.querySelectorAll('.expand-panel:not(.closed)').forEach(p => open.add(p.id.replace('exp-','')));
+  return open;
+}
+
 function renderTradersHtml(traders) {
+  const openPanels = getOpenPanels();
   const container = document.getElementById('traders-list');
   if (!traders.length) {
     const pnl   = parseFloat(document.getElementById('stat-pnl').textContent.replace(/[^0-9.-]/g,'')) || 0;
@@ -909,6 +915,17 @@ function renderTradersHtml(traders) {
         '<div class="th">Trader</div><div class="th">P&amp;L (All time)</div><div class="th">Win Rate</div><div class="th">Copied Trades</div><div class="th">Status</div><div></div>' +
       '</div>' + rows +
     '</div>';
+
+  // Restore which panels were open — all start closed unless previously open
+  traders.forEach(t => {
+    const panel = document.getElementById('exp-'+t.id);
+    const row   = document.getElementById('row-'+t.id);
+    if (panel && !openPanels.has(t.id)) {
+      panel.classList.add('closed');
+    } else if (row && openPanels.has(t.id)) {
+      row.classList.add('expanded');
+    }
+  });
 }
 
 // ── RENDER TRADES ─────────────────────────────────────────────────────────────

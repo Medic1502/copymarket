@@ -38,7 +38,7 @@ const ORDER_TYPES = {
 // sharedPolls[targetWallet] = { interval, users: Map<userId, userConfig>, lock: bool }
 const sharedPolls = {};
 const snapshots   = {}; // targetWallet -> Map<snapshotKey, position>
-const activeEngines = {}; // userId -> targetWallet (to know which poll to leave on stop)
+const activeEngines = {}; // configId -> targetWallet
 const userBought  = {}; // userId -> Map<key, { usdc, shares }>
 
 const logger = {
@@ -348,12 +348,12 @@ async function processSignalForUser(user, wallet, signal, side) {
 }
 
 async function startCopyEngine(user, targetWallet) {
-  if (activeEngines[user.id]) {
-    logger.warn('Engine already running', { userId: user.id });
+  if (activeEngines[user.configId]) {
+    logger.warn('Engine already running', { configId: user.configId });
     return;
   }
 
-  logger.info('Starting engine', { userId: user.id, targetWallet });
+  logger.info('Starting engine', { userId: user.id, configId: user.configId, targetWallet });
 
   // Load user's persisted positions from DB (isolated per user)
   userBought[user.id] = new Map();
@@ -374,8 +374,8 @@ async function startCopyEngine(user, targetWallet) {
   const wallet = new ethers.Wallet(privateKey);
   await ensureApprovals(wallet);
 
-  // Register user in the shared poll for this target wallet
-  activeEngines[user.id] = targetWallet;
+  // Register config in the shared poll for this target wallet
+  activeEngines[user.configId] = targetWallet;
   if (!sharedPolls[targetWallet]) {
     // First user to watch this trader - initialize snapshot and start shared poll
     try {
@@ -421,30 +421,29 @@ async function startCopyEngine(user, targetWallet) {
     };
   }
 
-  sharedPolls[targetWallet].users.set(user.id, { user, wallet });
-  logger.info('User joined shared poll', { userId: user.id, targetWallet, totalWatchers: sharedPolls[targetWallet].users.size });
+  sharedPolls[targetWallet].users.set(user.configId, { user, wallet });
+  logger.info('Config joined shared poll', { userId: user.id, configId: user.configId, targetWallet, totalWatchers: sharedPolls[targetWallet].users.size });
 }
 
-function stopCopyEngine(userId) {
-  const targetWallet = activeEngines[userId];
+function stopCopyEngine(configId) {
+  const targetWallet = activeEngines[configId];
   if (!targetWallet) return;
 
   const poll = sharedPolls[targetWallet];
   if (poll) {
-    poll.users.delete(userId);
+    poll.users.delete(configId);
     if (poll.users.size === 0) {
       clearInterval(poll.interval);
       delete sharedPolls[targetWallet];
       delete snapshots[targetWallet];
       logger.info('Shared poll stopped - no more watchers', { targetWallet });
     } else {
-      logger.info('User left shared poll', { userId, targetWallet, remaining: poll.users.size });
+      logger.info('Config left shared poll', { configId, targetWallet, remaining: poll.users.size });
     }
   }
 
-  delete activeEngines[userId];
-  delete userBought[userId];
-  logger.info('Engine stopped', { userId });
+  delete activeEngines[configId];
+  logger.info('Engine stopped', { configId });
 }
 
 module.exports = { startCopyEngine, stopCopyEngine };

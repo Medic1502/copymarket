@@ -33,9 +33,13 @@ router.post('/config',
 
 router.post('/start', async (req, res, next) => {
   try {
+    const { id: configId } = req.body;
     const configs = await db.getCopyConfig(req.userId);
     if (!configs.length) throw new Error('NO_CONFIG');
-    const config = configs[configs.length - 1];
+    const config = configId
+      ? configs.find(c => c.id === configId)
+      : configs[configs.length - 1];
+    if (!config) return res.status(404).json({ error: 'Config not found.' });
     const wallet = await db.getWalletByUserId(req.userId);
 
     await startCopyEngine({
@@ -53,22 +57,24 @@ router.post('/start', async (req, res, next) => {
       encryptedPrivateKey: wallet.encrypted_private_key,
       walletAddress:       wallet.address,
     }, config.target_wallet);
-    await db.setActive(req.userId, true);
+    await db.setConfigActive(config.id, req.userId, true);
     res.json({ status: 'active', message: 'Copy trading started.' });
   } catch (err) { next(err); }
 });
 
 router.post('/stop', async (req, res, next) => {
   try {
-    stopCopyEngine(req.userId);
-    await db.setActive(req.userId, false, req.body.reason ?? null);
+    const { id: configId } = req.body;
+    if (!configId) return res.status(400).json({ error: 'configId required' });
+    stopCopyEngine(configId);
+    await db.setConfigActive(configId, req.userId, false, req.body.reason ?? null);
     res.json({ status: 'paused', message: 'Copy trading paused.' });
   } catch (err) { next(err); }
 });
 
 router.delete('/config/:id', async (req, res, next) => {
   try {
-    stopCopyEngine(req.userId);
+    stopCopyEngine(req.params.id); // stop by configId
     await db.deleteCopyConfig(req.params.id, req.userId);
     res.json({ message: 'Trader removed.' });
   } catch (err) { next(err); }
