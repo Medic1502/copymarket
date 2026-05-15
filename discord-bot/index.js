@@ -65,20 +65,45 @@ function welcomeEmbed(member) {
 function howItWorksEmbed() {
   return new EmbedBuilder()
     .setColor(BLUE)
-    .setTitle('⚡ How Jonin CT Works')
-    .setDescription('Jonin CT mirrors the trades of top Polymarket traders directly to your wallet — automatically, 24/7.')
+    .setTitle('⚙️ How Jonin CT Works')
+    .setDescription('Jonin CT runs on our servers 24/7 and monitors Polymarket in real time. Here\'s exactly what happens under the hood.')
     .addFields(
-      { name: '1️⃣  Get your license', value: 'Purchase a Premium CT subscription to unlock access. Use `/getkey` in <#get-key> to receive your personal license key via DM.', inline: false },
-      { name: '2️⃣  Download & activate', value: 'Download the **Jonin CT Desktop App** from <#downloads>. Open it, paste your license key and click Activate.', inline: false },
-      { name: '3️⃣  Fund your wallet', value: 'A Polygon wallet is created automatically for you. Deposit **USDC** to start trading. No MetaMask or crypto experience needed.', inline: false },
-      { name: '4️⃣  Choose a trader', value: 'Paste any top trader\'s wallet address from the [Polymarket leaderboard](https://polymarket.com). Set your copy settings and click **Resume** to start.', inline: false },
-      { name: '5️⃣  Sit back & track', value: 'Every trade they make is mirrored to your wallet proportionally. Monitor your P&L, win rate and active positions in real time from the dashboard.', inline: false }
+      {
+        name: '📡 Real-time position monitoring',
+        value: 'The bot continuously polls the Polymarket CLOB API every **15 seconds**, watching the open positions of every trader you follow. It detects the moment a trader opens or closes a position.',
+        inline: false
+      },
+      {
+        name: '⚡ Instant trade execution',
+        value: 'The moment a signal is detected, the bot places an order on your behalf directly through the **Polymarket CLOB (Central Limit Order Book)**. Your order is signed with your private key and submitted on-chain on Polygon.',
+        inline: false
+      },
+      {
+        name: '📊 Proportional sizing',
+        value: 'If a trader bets 10% of their portfolio, Jonin CT bets the same % of yours. You set the percentage or a fixed amount — the bot scales every trade accordingly. You never over-expose yourself.',
+        inline: false
+      },
+      {
+        name: '🔒 Fully isolated wallets',
+        value: 'Every user has their own **dedicated Polygon wallet** generated and encrypted on our servers. Your funds never mix with other users. Your key, your wallet, your trades.',
+        inline: false
+      },
+      {
+        name: '🤝 Shared polling — efficient by design',
+        value: 'If 100 users follow the same trader, Jonin CT makes **one API call** to Polymarket instead of 100. This keeps the system fast, avoids rate limits, and scales to hundreds of users without slowdown.',
+        inline: false
+      },
+      {
+        name: '🛡️ Filters & safety controls',
+        value: 'You can filter by: minimum/maximum bet size, share price range, market category, and follow mode (all buys vs first entry only). The bot only copies trades that match your exact settings.',
+        inline: false
+      },
+      {
+        name: '⚠️ Risk notice',
+        value: 'Prediction market trading involves risk of capital loss. Past performance of any trader does not guarantee future results. Only trade with funds you can afford to lose.',
+        inline: false
+      }
     )
-    .addFields({
-      name: '⚠️ Risk notice',
-      value: 'Trading prediction markets involves risk of capital loss. Past performance of any trader does not guarantee future results. Only trade with funds you can afford to lose.',
-      inline: false
-    })
     .setFooter({ text: 'Jonin CT — Copy. Track. Win.' });
 }
 
