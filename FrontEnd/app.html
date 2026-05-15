@@ -137,6 +137,12 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
 .dd-item.danger{color:var(--red)}
 .dd-item.danger:hover{background:var(--red-dim)}
 
+/* ── TOOLTIP INFO ICON ────────────────────────────── */
+.info-icon{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:rgba(255,255,255,.08);color:var(--text3);font-size:10px;font-weight:700;cursor:help;position:relative;margin-left:6px;vertical-align:middle;flex-shrink:0}
+.info-icon:hover{background:rgba(255,255,255,.15);color:var(--text2)}
+.info-icon::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border2);color:var(--text2);font-size:12px;font-weight:400;padding:9px 12px;border-radius:8px;width:240px;white-space:normal;line-height:1.55;pointer-events:none;opacity:0;transition:opacity .15s;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.5);text-align:left}
+.info-icon:hover::after{opacity:1}
+
 /* ── SEARCH ───────────────────────────────────────── */
 .search-wrap{position:relative;margin-bottom:12px}
 input.search-input{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 13px 9px 40px;color:var(--text);font-size:13.5px;font-family:'Inter',sans-serif;outline:none;transition:border .15s}
@@ -298,14 +304,14 @@ div.expand-panel.closed{display:none !important}
           <div class="field" style="margin-bottom:0"><label>Trader wallet address</label><input type="text" id="new-trader-wallet" placeholder="0x..."></div>
         </div>
 
-        <div class="form-section-label" style="margin-bottom:8px">Copy mode</div>
+        <div class="form-section-label" style="margin-bottom:8px">Copy mode <span class="info-icon" data-tip="% of their bet: copies a percentage of what the trader bets. If they bet $100 and you set 10%, you bet $10. Fixed amount: always bets the same fixed dollar amount regardless of the trader's bet size.">i</span></div>
         <div style="display:flex;gap:8px;margin-bottom:14px">
           <button class="btn btn-sm mode-btn selected" id="mode-pct-btn" onclick="setCopyMode('percentage')">% of their bet</button>
           <button class="btn btn-sm mode-btn" id="mode-fix-btn" onclick="setCopyMode('fixed')">Fixed amount</button>
         </div>
         <input type="hidden" id="new-copy-mode" value="percentage">
         <div id="mode-pct-section" style="margin-bottom:14px">
-          <div class="slider-row"><label style="margin:0;text-transform:none;font-size:13px;color:var(--text2)">Copy percentage</label><span class="slider-val" id="lbl-pct">10%</span></div>
+          <div class="slider-row"><label style="margin:0;text-transform:none;font-size:13px;color:var(--text2)">Copy percentage <span class="info-icon" data-tip="What % of the trader's bet size to copy. Example: trader bets $200, you set 15% → you bet $30. Recommended: 5–20% to manage risk.">i</span></label><span class="slider-val" id="lbl-pct">10%</span></div>
           <input type="range" min="1" max="100" value="10" id="sl-pct" oninput="document.getElementById('lbl-pct').textContent=this.value+'%'">
         </div>
         <div id="mode-fix-section" style="display:none;margin-bottom:14px">
@@ -314,7 +320,7 @@ div.expand-panel.closed{display:none !important}
 
         <div class="two-col" style="margin-bottom:14px">
           <div>
-            <div class="form-section-label" style="margin-bottom:8px">Trader bet range ($)</div>
+            <div class="form-section-label" style="margin-bottom:8px">Trader bet range ($) <span class="info-icon" data-tip="Only copy trades where the trader bets between these amounts. Example: min $5, max $500 — trades below $5 or above $500 are skipped. Helps filter out very small or very large bets.">i</span></div>
             <div class="three-col">
               <input type="number" id="new-min-bet" value="5" min="0" placeholder="Min">
               <span class="col-sep">–</span>
@@ -322,7 +328,7 @@ div.expand-panel.closed{display:none !important}
             </div>
           </div>
           <div>
-            <div class="form-section-label" style="margin-bottom:8px">Share price range (¢)</div>
+            <div class="form-section-label" style="margin-bottom:8px">Share price range (¢) <span class="info-icon" data-tip="Only copy trades where the share (outcome) price is within this range. Price is in cents: 2¢ = very unlikely, 98¢ = near certain. Skipping extremes reduces risk on very lopsided markets.">i</span></div>
             <div class="three-col">
               <input type="number" id="new-min-price" value="2" min="1" max="99" placeholder="Min">
               <span class="col-sep">–</span>
@@ -331,14 +337,14 @@ div.expand-panel.closed{display:none !important}
           </div>
         </div>
 
-        <div class="form-section-label" style="margin-bottom:8px">When trader adds to same position</div>
+        <div class="form-section-label" style="margin-bottom:8px">When trader adds to same position <span class="info-icon" data-tip="Follow all buys: copies every time the trader buys more of the same market (averaging up). Initial buy only: only copies the first entry into a market, ignores add-ons.">i</span></div>
         <div style="display:flex;gap:8px;margin-bottom:14px">
           <button class="btn btn-sm mode-btn selected" id="follow-all-btn" onclick="setFollowMode('all')">Follow all buys</button>
           <button class="btn btn-sm mode-btn" id="follow-init-btn" onclick="setFollowMode('initial_only')">Initial buy only</button>
         </div>
         <input type="hidden" id="new-follow-mode" value="all">
 
-        <div class="form-section-label" style="margin-bottom:8px">Categories <span style="color:var(--text3);font-weight:400">(empty = all)</span></div>
+        <div class="form-section-label" style="margin-bottom:8px">Categories <span style="color:var(--text3);font-weight:400">(empty = all)</span> <span class="info-icon" data-tip="Only copy trades from selected market categories. Leave empty to copy trades from all categories. Useful if you only want to follow a trader's crypto or politics bets, for example.">i</span></div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px" id="category-chips"></div>
 
         <div id="add-trader-alert"></div>
