@@ -33,7 +33,6 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
   ],
 });
 
@@ -226,6 +225,36 @@ function supportEmbed() {
     .setFooter({ text: 'Jonin CT Support — Copy. Track. Win.' });
 }
 
+function walletCheckerEmbed() {
+  return new EmbedBuilder()
+    .setColor(BLUE)
+    .setTitle('🔍 Free Polymarket Wallet Checker')
+    .setDescription('Check the performance of **any Polymarket trader** for free — no account needed.\n\nUse our **Jonin Wallet Checker** bot in <#wallet-checker> to instantly see their stats.')
+    .addFields(
+      {
+        name: '📊 What you get',
+        value: '> 💰 Total P&L (profit/loss)\n> 📊 Win rate\n> 🔄 Number of trades\n> 💵 Total volume traded\n> 📌 Open positions\n> ⚡ Recent activity',
+        inline: false
+      },
+      {
+        name: '▶️ How to use',
+        value: '1. Go to <#wallet-checker>\n2. Type `/check wallet:0x...` with any Polymarket wallet address\n3. Get instant stats — only you can see the result',
+        inline: false
+      },
+      {
+        name: '🏆 Where to find top traders',
+        value: 'Visit the [Polymarket Leaderboard](https://polymarket.com/leaderboard) to find wallet addresses of top performers.',
+        inline: false
+      },
+      {
+        name: '⚡ Found a good trader?',
+        value: 'Copy their trades automatically with **Premium CT**. Get your license key with `/getkey` and start copying in minutes.',
+        inline: false
+      }
+    )
+    .setFooter({ text: 'Jonin CT — Copy. Track. Win.' });
+}
+
 function downloadEmbed() {
   return new EmbedBuilder()
     .setColor(GREEN)
@@ -290,6 +319,7 @@ async function registerCommands() {
             { name: 'Setup guide', value: 'setup' },
             { name: 'How to join (Premium CT)', value: 'howtojoin' },
             { name: 'Download app', value: 'download' },
+            { name: 'Wallet Checker guide', value: 'walletchecker' },
             { name: 'Support (ticket button)', value: 'support' },
             { name: 'Rules', value: 'rules' },
             { name: 'Get key info', value: 'getkey' },
@@ -470,27 +500,38 @@ client.on('interactionCreate', async (interaction) => {
 
   // ── /setup ────────────────────────────────────────────────────────────────
   if (interaction.commandName === 'setup') {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const type = interaction.options.getString('type');
-    const ch   = interaction.channel;
 
     try {
+      await interaction.reply({ content: '⏳ Posting...', flags: MessageFlags.Ephemeral });
+      const ch = await interaction.guild.channels.fetch(interaction.channelId);
+
       if (type === 'howitworks' || type === 'all') await ch.send({ embeds: [howItWorksEmbed()] });
       if (type === 'setup'      || type === 'all') await ch.send({ embeds: [setupGuideEmbed()] });
       if (type === 'howtojoin'  || type === 'all') await ch.send({ embeds: [howToJoinEmbed()] });
-      if (type === 'download'   || type === 'all') await ch.send({ embeds: [downloadEmbed()] });
-      if (type === 'support') {
-        const row = new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId('open_ticket').setLabel('🎫 Open a Ticket').setStyle(ButtonStyle.Primary)
-        );
-        await ch.send({ embeds: [supportEmbed()], components: [row] });
+      if (type === 'walletchecker' || type === 'all') await ch.send({ embeds: [walletCheckerEmbed()] });
+      if (type === 'download' || type === 'all') {
+        const e = downloadEmbed();
+        await ch.send({ embeds: [e] });
       }
-      if (type === 'rules'      || type === 'all') await ch.send({ embeds: [getRulesEmbed()] });
-      if (type === 'getkey'     || type === 'all') await ch.send({ embeds: [getKeyInfoEmbed()] });
-      if (type === 'welcome')                       await ch.send({ embeds: [welcomeEmbed(interaction.member)] });
-      await interaction.editReply({ content: `✅ Posted to ${ch}.` });
+      if (type === 'support') {
+        console.log('Sending support embed...');
+        const openBtn = new ButtonBuilder()
+          .setCustomId('open_ticket')
+          .setLabel('🎫 Open a Ticket')
+          .setStyle(1);
+        const row = new ActionRowBuilder().addComponents(openBtn);
+        await ch.send({ embeds: [supportEmbed()], components: [row] });
+        console.log('Support sent!');
+      }
+      if (type === 'rules'  || type === 'all') await ch.send({ embeds: [getRulesEmbed()] });
+      if (type === 'getkey' || type === 'all') await ch.send({ embeds: [getKeyInfoEmbed()] });
+      if (type === 'welcome')                   await ch.send({ embeds: [welcomeEmbed(interaction.member)] });
+
+      await interaction.editReply({ content: '✅ Done!' });
     } catch (err) {
-      await interaction.editReply({ content: `❌ Failed: ${err.message}` });
+      console.error('Setup error:', err.message);
+      try { await interaction.editReply({ content: `❌ Error: ${err.message}` }); } catch {}
     }
     return;
   }

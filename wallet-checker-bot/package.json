@@ -1,0 +1,14 @@
+{
+  "name": "jonin-wallet-checker",
+  "version": "1.0.0",
+  "description": "Jonin Polymarket Wallet Checker Discord Bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.18.0",
+    "dotenv": "^17.4.2",
+    "node-fetch": "^2.7.0"
+  }
+}
