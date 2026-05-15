@@ -150,17 +150,12 @@ function setupGuideEmbed() {
         inline: false
       },
       {
-        name: 'Step 5 — Connect to Polymarket',
-        value: 'Go to **Wallet → Export private key**, import it into MetaMask, then visit [polymarket.com](https://polymarket.com) and accept their Terms of Service. This is a one-time step required by Polymarket.',
-        inline: false
-      },
-      {
-        name: 'Step 6 — Add a trader',
+        name: 'Step 5 — Add a trader',
         value: 'Go to **My Traders** → click **+ Add trader**. Paste the wallet address of a top Polymarket trader. Set your copy mode and click **Add trader**.',
         inline: false
       },
       {
-        name: 'Step 7 — Start copying',
+        name: 'Step 6 — Start copying',
         value: 'Click **Resume** next to the trader. Jonin CT will now copy every trade they make in real time. You can monitor everything from the dashboard.',
         inline: false
       },
