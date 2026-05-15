@@ -840,15 +840,9 @@ function renderTradersHtml(traders) {
         '<div class="table-head">' +
           '<div class="th">Trader</div><div class="th">P&amp;L (All time)</div><div class="th">Win Rate</div><div class="th">Copied Trades</div><div class="th">Status</div><div></div>' +
         '</div>' +
-        '<div style="padding:20px 16px;border-bottom:1px solid var(--border)">' +
+        '<div style="padding:20px 16px">' +
           '<p style="color:var(--text2);font-size:14px;font-weight:500;margin-bottom:4px">No traders yet</p>' +
           '<p style="color:var(--text3);font-size:13px">Click "+ Add trader" to start copying someone</p>' +
-        '</div>' +
-        '<div class="expand-grid" style="padding:16px;background:rgba(255,255,255,.02);border-top:1px solid var(--border)">' +
-          '<div class="expand-stat"><div class="expand-stat-label">Total P&amp;L</div><div class="expand-stat-val">' + document.getElementById('stat-pnl').textContent + '</div></div>' +
-          '<div class="expand-stat"><div class="expand-stat-label">Today P&amp;L</div><div class="expand-stat-val">' + today + '</div></div>' +
-          '<div class="expand-stat"><div class="expand-stat-label">Win Rate</div><div class="expand-stat-val">' + wr + '</div></div>' +
-          '<div class="expand-stat"><div class="expand-stat-label">Balance</div><div class="expand-stat-val">' + bal + '</div></div>' +
         '</div>' +
       '</div>';
     return;
