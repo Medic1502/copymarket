@@ -40,10 +40,23 @@ function welcomeEmbed(member) {
   return new EmbedBuilder()
     .setColor(BLUE)
     .setTitle('👋 Welcome to Jonin CT!')
-    .setDescription(`Hey ${member}, glad to have you here!\n\nJonin CT is an **automated copy trading bot** for Polymarket — the world's largest prediction market. Copy top traders automatically, track your P&L in real time, and stay ahead of the market.`)
+    .setDescription(`Hey ${member}, glad to have you here!\n\nJonin CT is a **Polymarket trading suite** — check any trader's stats for free, or go premium and copy their trades automatically.`)
     .addFields(
-      { name: '📌 Get started', value: '1. Purchase a **Premium CT** subscription\n2. Type `/getkey` to receive your license key\n3. Download the app from <#downloads>\n4. Activate and start copying', inline: false },
-      { name: '🔗 Useful links', value: '📥 [Download app](https://discord.gg/SxumcmKcEm) · 💬 [Support](https://discord.gg/SxumcmKcEm)', inline: false }
+      {
+        name: '🆓 Free — Wallet Checker',
+        value: 'Paste any Polymarket wallet address and instantly see their **P&L, win rate, trade history and open positions**. No account needed.',
+        inline: false
+      },
+      {
+        name: '⚡ Premium CT — Copy Trading',
+        value: 'Found a trader worth following? Let Jonin CT **automatically copy every trade they make** — proportional to your budget, 24/7, hands-free.',
+        inline: false
+      },
+      {
+        name: '📌 Get started',
+        value: '> 🔍 Use the free wallet checker in <#wallet-checker>\n> 💎 Get **Premium CT** to unlock copy trading\n> 🔑 Type `/getkey` to receive your license key\n> 📥 Download the app from <#downloads>',
+        inline: false
+      }
     )
     .setFooter({ text: 'Jonin CT — Copy. Track. Win.' })
     .setTimestamp();
