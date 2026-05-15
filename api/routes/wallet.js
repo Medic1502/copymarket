@@ -23,13 +23,20 @@ router.get('/balance', async (req, res, next) => {
 
 router.post('/export-key', async (req, res, next) => {
   try {
-    const { password } = req.body;
-    if (!password) return res.status(400).json({ error: 'Password required.' });
     const user = await db.getUserById(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found.' });
-    const valid = await db.verifyPassword(user, password);
-    if (!valid) return res.status(401).json({ error: 'Incorrect password.' });
+
+    // License users (no password) — JWT is sufficient authentication
+    const isLicenseUser = user.email && user.email.endsWith('@jonin.internal');
+    if (!isLicenseUser) {
+      const { password } = req.body;
+      if (!password) return res.status(400).json({ error: 'Password required.' });
+      const valid = await db.verifyPassword(user, password);
+      if (!valid) return res.status(401).json({ error: 'Incorrect password.' });
+    }
+
     const wallet = await db.getWalletByUserId(req.userId);
+    if (!wallet) return res.status(404).json({ error: 'Wallet not found.' });
     const privateKey = db.decryptPrivateKey(wallet.encrypted_private_key);
     const mnemonic   = wallet.encrypted_mnemonic ? db.decryptPrivateKey(wallet.encrypted_mnemonic) : null;
     res.json({ privateKey, mnemonic, address: wallet.address });
