@@ -55,8 +55,11 @@ router.post('/validate', async (req, res) => {
       userId = user.id;
     }
 
+    // Always ensure wallet exists (handles any intermediate broken state)
+    let wallet = await db.getWalletByUserId(userId);
+    if (!wallet) wallet = await db.createWalletForUser(userId);
+
     const token = signToken(userId);
-    const wallet = await db.getWalletByUserId(userId);
     res.json({ valid: true, token, walletAddress: wallet?.address, discordUsername: license.discord_username, expiresAt: license.expires_at });
   } catch (err) {
     console.error('License validate error:', err);
