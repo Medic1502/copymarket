@@ -139,15 +139,15 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
 
 /* ── SEARCH ───────────────────────────────────────── */
 .search-wrap{position:relative;margin-bottom:12px}
-.search-input{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 13px 9px 36px;color:var(--text);font-size:13.5px;font-family:'Inter',sans-serif;outline:none;transition:border .15s}
+.search-input{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 13px 9px 38px;color:var(--text);font-size:13.5px;font-family:'Inter',sans-serif;outline:none;transition:border .15s}
 .search-input:focus{border-color:var(--blue)}
 .search-input::placeholder{color:var(--text3)}
-.search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none;width:15px;height:15px}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none;width:14px;height:14px}
 
 /* ── EXPANDED TRADER ROW ──────────────────────────── */
 .trader-row{cursor:pointer}
-.expand-panel{display:none;padding:14px 16px 16px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.015)}
-.expand-panel.open{display:block}
+.expand-panel{display:block;padding:14px 16px 16px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.015)}
+.expand-panel.closed{display:none}
 .expand-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
 .expand-stat{background:var(--bg3);border-radius:8px;padding:10px 12px}
 .expand-stat-label{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
@@ -202,6 +202,17 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
 .text-warn{color:var(--yellow);font-size:11px;margin-top:4px}
 #dash-alert:empty{display:none}
 #dash-alert:not(:empty){margin-bottom:16px}
+/* ── LIGHT THEME ──────────────────────────────────── */
+[data-theme=light]{
+  --bg:#F1F5F9;--bg2:#FFFFFF;--bg3:#E2E8F0;
+  --border:rgba(0,0,0,.08);--border2:rgba(0,0,0,.15);
+  --text:#0F172A;--text2:#475569;--text3:#94A3B8;
+}
+[data-theme=light] .main{background:#F8FAFC}
+[data-theme=light] .expand-panel{background:rgba(0,0,0,.02)}
+[data-theme=light] .table-wrap{background:#fff}
+[data-theme=light] .table-head{background:rgba(0,0,0,.03)}
+[data-theme=light] ::-webkit-scrollbar-track{background:var(--bg)}
 /* scrollbar */
 ::-webkit-scrollbar{width:6px}
 ::-webkit-scrollbar-track{background:var(--bg)}
@@ -394,11 +405,11 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
         <p style="font-size:12px;color:var(--text3);margin-bottom:12px">Export your private key to import into MetaMask, then accept ToS on polymarket.com to enable trading.</p>
         <button class="btn btn-yellow btn-sm" onclick="toggleExportKey()">Export private key</button>
         <div id="export-key-form" style="display:none;margin-top:14px">
-          <div class="alert alert-error" style="margin-bottom:12px">⚠️ <strong>Never share your private key or seed phrase with anyone.</strong> Do not show it on stream or screenshots. Anyone with this key has full access to your wallet and funds.</div>
-          <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin-bottom:0;text-transform:none;font-size:13px;color:var(--text2);font-weight:400">
-            <input type="checkbox" id="export-confirm" style="width:auto;margin-top:2px;accent-color:var(--blue);flex-shrink:0">
-            I understand the risks. I will not share this key with anyone and will not show it on stream.
-          </label>
+          <div class="alert alert-error" style="margin-bottom:12px;display:block;line-height:1.6">⚠️ Never share your private key or seed phrase with anyone. Do not show it on stream or in screenshots — anyone with this key has full access to your wallet and funds.</div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-yellow btn-sm" id="export-confirm-btn" onclick="confirmExportKey()" style="flex:1">I understand — show my key</button>
+            <button class="btn btn-sm" onclick="toggleExportKey()">Cancel</button>
+          </div>
           <div id="export-key-result" style="display:none;margin-bottom:10px">
             <div id="export-mnemonic-section">
               <label style="font-size:13px;text-transform:none;color:var(--text)">Seed phrase (12 words)</label>
@@ -420,10 +431,6 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
             </div>
           </div>
           <div id="export-key-alert"></div>
-          <div style="display:flex;gap:8px;margin-top:8px">
-            <button class="btn btn-yellow btn-sm" style="flex:1" onclick="doExportKey()">Reveal key</button>
-            <button class="btn btn-sm" onclick="toggleExportKey()">Cancel</button>
-          </div>
         </div>
       </div>
     </div>
@@ -465,6 +472,17 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
     <div id="tab-settings" class="tab-panel">
 
       <div class="card">
+        <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">Appearance</div>
+        <div class="info-row" style="border-bottom:none">
+          <span class="info-label">Theme</span>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm mode-btn" id="theme-dark" onclick="setTheme('dark')" style="width:auto">Dark</button>
+            <button class="btn btn-sm mode-btn" id="theme-light" onclick="setTheme('light')" style="width:auto">Light</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
         <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">Dashboard</div>
         <div class="info-row">
           <span class="info-label">Auto-refresh interval</span>
@@ -475,70 +493,20 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
             <option value="300000">5 minutes</option>
           </select>
         </div>
-        <div class="info-row">
-          <span class="info-label">Show P&amp;L in</span>
-          <select id="setting-currency" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:5px 10px;color:var(--text);font-size:13px;font-family:'Inter',sans-serif;outline:none">
-            <option value="usd" selected>USD ($)</option>
-            <option value="usdc">USDC</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="card">
-        <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">Trading Defaults</div>
-        <div class="info-row">
-          <span class="info-label">Default copy mode</span>
-          <select id="setting-copy-mode" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:5px 10px;color:var(--text);font-size:13px;font-family:'Inter',sans-serif;outline:none">
-            <option value="percentage" selected>% of their bet</option>
-            <option value="fixed">Fixed amount</option>
-          </select>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Default follow mode</span>
-          <select id="setting-follow-mode" style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:5px 10px;color:var(--text);font-size:13px;font-family:'Inter',sans-serif;outline:none">
-            <option value="all" selected>Follow all buys</option>
-            <option value="initial_only">Initial buy only</option>
-          </select>
-        </div>
         <div class="info-row" style="border-bottom:none">
-          <span class="info-label">Skip markets below liquidity</span>
-          <span class="info-val" style="color:var(--text3);font-size:12px">Managed automatically</span>
-        </div>
-      </div>
-
-      <div class="card">
-        <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">Notifications</div>
-        <div class="info-row">
-          <span class="info-label">Trade executed</span>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;text-transform:none;font-size:13px;color:var(--text2)">
-            <input type="checkbox" id="notif-trade" checked style="width:auto;accent-color:var(--blue)"> Enabled
-          </label>
-        </div>
-        <div class="info-row">
-          <span class="info-label">Copy paused (limit hit)</span>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;text-transform:none;font-size:13px;color:var(--text2)">
-            <input type="checkbox" id="notif-pause" checked style="width:auto;accent-color:var(--blue)"> Enabled
-          </label>
-        </div>
-        <div class="info-row" style="border-bottom:none">
-          <span class="info-label">Trader makes a move</span>
-          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin:0;text-transform:none;font-size:13px;color:var(--text2)">
-            <input type="checkbox" id="notif-move" style="width:auto;accent-color:var(--blue)"> Enabled
-          </label>
+          <span class="info-label">Dashboard language</span>
+          <select style="background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:5px 10px;color:var(--text);font-size:13px;font-family:'Inter',sans-serif;outline:none">
+            <option selected>English</option>
+          </select>
         </div>
       </div>
 
       <div class="card">
         <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">License</div>
         <div class="info-row"><span class="info-label">Status</span><span class="info-val"><span class="badge b-buy">Premium CT Active</span></span></div>
-        <div class="info-row"><span class="info-label">Acquired via</span><span class="info-val">Discord — Premium CT</span></div>
-        <div class="info-row" style="border-bottom:none">
-          <span class="info-label">Transfer to new machine</span>
-          <span style="font-size:12px;color:var(--text3)">Use <strong style="color:var(--blue-light)">/shufflekey</strong> in Discord to get a new key, then deactivate below</span>
-        </div>
-        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
-          <p style="font-size:12px;color:var(--text3);margin-bottom:10px">Deactivating removes this app from your machine. Your account and trades remain safe.</p>
-          <button class="btn btn-red btn-sm" onclick="deactivateFromSettings()">Deactivate on this device</button>
+        <div class="info-row"><span class="info-label">Transfer to new machine</span><span style="font-size:12px;color:var(--text3)">Use <strong style="color:var(--blue-light)">/shufflekey</strong> in Discord</span></div>
+        <div class="info-row" style="border-bottom:none"><span class="info-label">Deactivate on this device</span>
+          <button class="btn btn-red btn-sm" onclick="deactivateFromSettings()">Deactivate</button>
         </div>
       </div>
 
@@ -546,8 +514,7 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
         <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">About</div>
         <div class="info-row"><span class="info-label">App</span><span class="info-val">Jonin CT Desktop</span></div>
         <div class="info-row"><span class="info-label">Version</span><span class="info-val" id="settings-version">—</span></div>
-        <div class="info-row"><span class="info-label">Backend</span><span class="info-val" style="font-family:monospace;font-size:12px">copymarket-production.up.railway.app</span></div>
-        <div class="info-row" style="border-bottom:none"><span class="info-label">Support</span><span class="info-val"><a href="https://discord.gg/SxumcmKcEm" target="_blank" style="color:var(--blue-light);text-decoration:none">Discord Server</a></span></div>
+        <div class="info-row" style="border-bottom:none"><span class="info-label">Support</span><span class="info-val"><a href="https://discord.gg/SxumcmKcEm" target="_blank" style="color:var(--blue-light);text-decoration:none">Discord Server ↗</a></span></div>
       </div>
 
     </div>
@@ -633,15 +600,14 @@ function toggleExportKey() {
   const f = document.getElementById('export-key-form');
   f.style.display = f.style.display === 'none' ? 'block' : 'none';
   document.getElementById('export-key-result').style.display = 'none';
-  document.getElementById('export-confirm').checked = false;
   clearAlert('export-key-alert');
 }
 
 let _exportedMnemonic = '';
 
+function confirmExportKey() { doExportKey(); }
+
 async function doExportKey() {
-  const confirmed = document.getElementById('export-confirm').checked;
-  if (!confirmed) { showAlert('export-key-alert', 'Please confirm you understand the risks first.'); return; }
   try {
     const data = await api('POST', '/wallet/export-key', {});
     document.getElementById('export-key-value').textContent = data.privateKey;
@@ -770,6 +736,9 @@ async function addTrader() {
   const categories = Array.from(document.querySelectorAll('.cat-chip.selected')).map(el => el.dataset.cat);
   if (!wallet) { showAlert('add-trader-alert','Please enter a wallet address.'); return; }
   if (!/^0x[0-9a-fA-F]{40}$/.test(wallet)) { showAlert('add-trader-alert','Invalid address. Must start with 0x and be 42 characters.'); return; }
+  if (_allTraders.some(t => t.targetWallet && t.targetWallet.toLowerCase() === wallet.toLowerCase())) {
+    showAlert('add-trader-alert', 'You are already copying this wallet address.'); return;
+  }
   setLoading('add-trader-btn', true);
   try {
     await api('POST', '/copy/config', { targetWallet: wallet, nickname: nickname||null, copyMode, copyPercentage: copyPct, fixedAmount: fixedAmt, minTraderBet: minBet, maxTraderBet: maxBet, categories, followMode, minSharePrice: minPrice, maxSharePrice: maxPrice });
@@ -804,11 +773,14 @@ function toggleExpand(id) {
   const row   = document.getElementById('row-'+id);
   const panel = document.getElementById('exp-'+id);
   if (!row || !panel) return;
-  const isOpen = panel.classList.contains('open');
-  // close all others
-  document.querySelectorAll('.expand-panel.open').forEach(p => p.classList.remove('open'));
-  document.querySelectorAll('.trader-row.expanded').forEach(r => r.classList.remove('expanded'));
-  if (!isOpen) { panel.classList.add('open'); row.classList.add('expanded'); }
+  const isClosed = panel.classList.contains('closed');
+  if (isClosed) {
+    panel.classList.remove('closed');
+    row.classList.add('expanded');
+  } else {
+    panel.classList.add('closed');
+    row.classList.remove('expanded');
+  }
 }
 
 let _allTraders = [];
@@ -1014,6 +986,23 @@ async function loadDashboard() {
 
 // ── SETTINGS ─────────────────────────────────────────────────────────────────
 let _refreshInterval = 60000;
+
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('cm_theme', t);
+  document.getElementById('theme-dark').classList.toggle('selected', t === 'dark');
+  document.getElementById('theme-light').classList.toggle('selected', t === 'light');
+}
+(function(){
+  const saved = localStorage.getItem('cm_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  window.addEventListener('DOMContentLoaded', function() {
+    const d = document.getElementById('theme-dark');
+    const l = document.getElementById('theme-light');
+    if (d) d.classList.toggle('selected', saved === 'dark');
+    if (l) l.classList.toggle('selected', saved === 'light');
+  });
+})();
 
 function applyRefreshInterval() {
   _refreshInterval = parseInt(document.getElementById('setting-refresh').value);
