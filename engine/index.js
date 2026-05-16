@@ -37,9 +37,10 @@ const ORDER_TYPES = {
 // Shared polling: one Polymarket API call per unique target wallet regardless of how many users copy it
 // sharedPolls[targetWallet] = { interval, users: Map<userId, userConfig>, lock: bool }
 const sharedPolls = {};
-const snapshots   = {}; // targetWallet -> Map<snapshotKey, position>
+const snapshots     = {}; // targetWallet -> Map<snapshotKey, position>
 const activeEngines = {}; // configId -> targetWallet
-const userBought  = {}; // userId -> Map<key, { usdc, shares }>
+const userBought    = {}; // userId -> Map<key, { usdc, shares }>
+const approvedWallets = new Set(); // walletAddress -> approved
 
 const logger = {
   info:  (msg, data = {}) => console.log(JSON.stringify({ level: 'INFO',  msg, ...data, ts: new Date().toISOString() })),
@@ -131,6 +132,7 @@ async function ensureApprovals(wallet) {
   ];
   const threshold = ethers.parseUnits('1000', 6);
 
+  let allApproved = true;
   for (const tokenAddr of [USDC_ADDRESS, USDC_E_ADDRESS]) {
     const usdc = new ethers.Contract(tokenAddr, abi, walletWithProvider);
     for (const exchange of CTF_EXCHANGES) {
@@ -145,10 +147,12 @@ async function ensureApprovals(wallet) {
           logger.info('USDC already approved', { token: tokenAddr, exchange });
         }
       } catch (err) {
+        allApproved = false;
         logger.warn('Approval failed (may lack MATIC for gas)', { token: tokenAddr, exchange, error: err.message });
       }
     }
   }
+  if (allApproved) approvedWallets.add(wallet.address);
 }
 
 function calcTradeSize(user, signal) {
@@ -410,6 +414,7 @@ async function startCopyEngine(user, targetWallet) {
 
           // Process signals for EACH user independently - fully isolated
           for (const [, { user: u, wallet: w }] of poll.users) {
+            if (!approvedWallets.has(w.address)) await ensureApprovals(w);
             for (const signal of opened) {
               await processSignalForUser(u, w, signal, 'BUY');
             }
