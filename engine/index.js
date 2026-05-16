@@ -69,13 +69,13 @@ async function apiFetch(url, opts = {}) {
 
 // Returns normalized positions: [{ conditionId, outcome, size, tokenId }]
 async function getPositions(walletAddress) {
-  const data = await apiFetch(`${CLOB_BASE}/positions?user=${walletAddress}`);
+  const data = await apiFetch(`https://data-api.polymarket.com/positions?user=${walletAddress}&sizeThreshold=.01&limit=500`);
   const items = Array.isArray(data) ? data : (data.positions || data.data || []);
   return items.map(p => ({
-    conditionId: p.conditionId || p.condition_id || p.market,
+    conditionId: p.conditionId || p.questionId || p.condition_id || p.market,
     outcome:     p.outcome     || 'Yes',
     size:        parseFloat(p.size || p.quantity || 0),
-    tokenId:     p.asset_id   || p.token_id || p.tokenId || null,
+    tokenId:     p.asset       || p.asset_id || p.token_id || p.tokenId || null,
   }));
 }
 
