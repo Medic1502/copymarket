@@ -305,7 +305,9 @@ async function processSignalForUser(user, wallet, signal, side) {
       const marketName = market?.question || market?.title || market?.market_slug || signal.conditionId;
 
       if (user.categories?.length > 0) {
-        const cat = market?.category || market?.market_type || '';
+        const gamma = await apiFetch(`https://gamma-api.polymarket.com/markets?conditionIds=${signal.conditionId}`).catch(() => null);
+        const gm = Array.isArray(gamma) ? gamma[0] : null;
+        const cat = gm?.category || gm?.tags?.join(' ') || market?.category || market?.market_type || '';
         if (!user.categories.some(c => cat.toLowerCase().includes(c.toLowerCase()))) {
           logger.warn('Skip: category mismatch', { userId: user.id, marketCat: cat, userCats: user.categories });
           return;
