@@ -37,10 +37,10 @@ const ORDER_TYPES = {
 // Shared polling: one Polymarket API call per unique target wallet regardless of how many users copy it
 // sharedPolls[targetWallet] = { interval, users: Map<userId, userConfig>, lock: bool }
 const sharedPolls = {};
-const snapshots     = {}; // targetWallet -> Map<snapshotKey, position>
-const activeEngines = {}; // configId -> targetWallet
-const userBought    = {}; // userId -> Map<key, { usdc, shares }>
+const activeEngines   = {}; // configId -> targetWallet
+const userBought      = {}; // userId -> Map<key, { usdc, shares }>
 const approvedWallets = new Set(); // walletAddress -> approved
+const lastActivityTs  = {}; // targetWallet -> unix timestamp of last processed activity
 
 const logger = {
   info:  (msg, data = {}) => console.log(JSON.stringify({ level: 'INFO',  msg, ...data, ts: new Date().toISOString() })),
@@ -68,16 +68,18 @@ async function apiFetch(url, opts = {}) {
   return res.json();
 }
 
-// Returns normalized positions: [{ conditionId, outcome, size, tokenId }]
-async function getPositions(walletAddress) {
-  const data = await apiFetch(`https://data-api.polymarket.com/positions?user=${walletAddress}&sizeThreshold=.01&limit=500`);
-  const items = Array.isArray(data) ? data : (data.positions || data.data || []);
-  return items.map(p => ({
-    conditionId: p.conditionId || p.questionId || p.condition_id || p.market,
-    outcome:     p.outcome     || 'Yes',
-    size:        parseFloat(p.size || p.quantity || 0),
-    tokenId:     p.asset       || p.asset_id || p.token_id || p.tokenId || null,
-  }));
+// Returns recent trade activity sorted newest-first
+async function getRecentActivity(walletAddress) {
+  const data = await apiFetch(`https://data-api.polymarket.com/activity?user=${walletAddress}&limit=20`);
+  const items = Array.isArray(data) ? data : (data.data || data.activity || []);
+  return items.map(a => ({
+    conditionId: a.conditionId || a.condition_id || a.market,
+    outcome:     a.outcome     || 'Yes',
+    size:        parseFloat(a.usdcSize || a.usdc_size || a.cashSize || a.amount || 0),
+    tokenId:     a.asset       || a.asset_id || a.tokenId || null,
+    side:        (a.side || a.type || '').toUpperCase(),
+    timestamp:   parseInt(a.timestamp || a.createdAt || a.created_at || 0),
+  })).filter(a => a.conditionId && (a.side === 'BUY' || a.side === 'SELL'));
 }
 
 // Fetches token ID for a specific outcome from the market endpoint
@@ -386,15 +388,9 @@ async function startCopyEngine(user, targetWallet) {
   // Register config in the shared poll for this target wallet
   activeEngines[user.configId] = targetWallet;
   if (!sharedPolls[targetWallet]) {
-    // First user to watch this trader - initialize snapshot and start shared poll
-    try {
-      const initial = await getPositions(targetWallet);
-      snapshots[targetWallet] = new Map(initial.map(p => [snapshotKey(p), p]));
-      logger.info('Shared snapshot created', { targetWallet, positions: initial.length });
-    } catch (err) {
-      snapshots[targetWallet] = new Map();
-      logger.warn('Snapshot failed', { targetWallet, error: err.message });
-    }
+    // Initialize timestamp cursor to now — only copy trades that happen after this point
+    lastActivityTs[targetWallet] = Math.floor(Date.now() / 1000);
+    logger.info('Activity cursor initialized', { targetWallet, fromTs: lastActivityTs[targetWallet] });
 
     sharedPolls[targetWallet] = {
       users: new Map(),
@@ -407,16 +403,22 @@ async function startCopyEngine(user, targetWallet) {
         poll.lock = true;
         poll.pollCount = (poll.pollCount || 0) + 1;
         try {
-          const positions = await getPositions(targetWallet);
-          const prev = snapshots[targetWallet] ?? new Map();
-          const { opened, closed } = diffPositions(prev, positions);
-          snapshots[targetWallet] = new Map(positions.map(p => [snapshotKey(p), p]));
+          const activities = await getRecentActivity(targetWallet);
+          const lastTs = lastActivityTs[targetWallet] || 0;
+          const fresh = activities.filter(a => a.timestamp > lastTs);
 
           if (poll.pollCount % 20 === 0) {
-            logger.info('Poll heartbeat', { targetWallet: targetWallet.slice(0,10), polls: poll.pollCount, positions: positions.length, opened: opened.length, closed: closed.length });
+            logger.info('Poll heartbeat', { targetWallet: targetWallet.slice(0, 10), polls: poll.pollCount, lastTs, freshActivities: fresh.length });
           }
 
-          if (opened.length === 0 && closed.length === 0) return;
+          if (fresh.length === 0) return;
+
+          lastActivityTs[targetWallet] = Math.max(...fresh.map(a => a.timestamp));
+
+          const opened = fresh.filter(a => a.side === 'BUY');
+          const closed = fresh.filter(a => a.side === 'SELL');
+
+          logger.info('New activity detected', { targetWallet: targetWallet.slice(0, 10), buys: opened.length, sells: closed.length });
 
           // Process signals for EACH user independently - fully isolated
           for (const [, { user: u, wallet: w }] of poll.users) {
@@ -451,7 +453,7 @@ function stopCopyEngine(configId) {
     if (poll.users.size === 0) {
       clearInterval(poll.interval);
       delete sharedPolls[targetWallet];
-      delete snapshots[targetWallet];
+      delete lastActivityTs[targetWallet];
       logger.info('Shared poll stopped - no more watchers', { targetWallet });
     } else {
       logger.info('Config left shared poll', { configId, targetWallet, remaining: poll.users.size });
