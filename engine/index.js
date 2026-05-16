@@ -78,7 +78,7 @@ async function getRecentActivity(walletAddress) {
     size:        parseFloat(a.usdcSize || a.usdc_size || a.cashSize || a.amount || 0),
     tokenId:     a.asset       || a.asset_id || a.tokenId || null,
     side:        (a.side || a.type || '').toUpperCase(),
-    timestamp:   parseInt(a.timestamp || a.createdAt || a.created_at || 0),
+    timestamp:   (() => { const t = parseInt(a.timestamp || a.createdAt || a.created_at || 0); return t < 1e11 ? t * 1000 : t; })(),
   })).filter(a => a.conditionId && (a.side === 'BUY' || a.side === 'SELL'));
 }
 
