@@ -388,8 +388,8 @@ async function startCopyEngine(user, targetWallet) {
   // Register config in the shared poll for this target wallet
   activeEngines[user.configId] = targetWallet;
   if (!sharedPolls[targetWallet]) {
-    // Initialize timestamp cursor to now — only copy trades that happen after this point
-    lastActivityTs[targetWallet] = Math.floor(Date.now() / 1000);
+    // Initialize timestamp cursor to now in ms — only copy trades after this point
+    lastActivityTs[targetWallet] = Date.now();
     logger.info('Activity cursor initialized', { targetWallet, fromTs: lastActivityTs[targetWallet] });
 
     sharedPolls[targetWallet] = {
