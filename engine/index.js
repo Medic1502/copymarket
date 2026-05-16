@@ -399,16 +399,22 @@ async function startCopyEngine(user, targetWallet) {
     sharedPolls[targetWallet] = {
       users: new Map(),
       lock: false,
+      pollCount: 0,
       interval: setInterval(async () => {
         const poll = sharedPolls[targetWallet];
         if (!poll || poll.users.size === 0) return;
         if (poll.lock) return;
         poll.lock = true;
+        poll.pollCount = (poll.pollCount || 0) + 1;
         try {
           const positions = await getPositions(targetWallet);
           const prev = snapshots[targetWallet] ?? new Map();
           const { opened, closed } = diffPositions(prev, positions);
           snapshots[targetWallet] = new Map(positions.map(p => [snapshotKey(p), p]));
+
+          if (poll.pollCount % 20 === 0) {
+            logger.info('Poll heartbeat', { targetWallet: targetWallet.slice(0,10), polls: poll.pollCount, positions: positions.length, opened: opened.length, closed: closed.length });
+          }
 
           if (opened.length === 0 && closed.length === 0) return;
 
