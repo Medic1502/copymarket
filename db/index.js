@@ -218,6 +218,18 @@ async function deleteCopyConfig(id, userId) {
   await query('DELETE FROM copy_configs WHERE id = $1 AND user_id = $2', [id, userId]);
 }
 
+async function updateCopyConfig(id, userId, { nickname, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice }) {
+  const res = await query(
+    `UPDATE copy_configs SET nickname=$3, copy_mode=$4, copy_percentage=$5, fixed_amount=$6,
+     min_trader_bet=$7, max_trader_bet=$8, categories=$9, follow_mode=$10,
+     min_share_price=$11, max_share_price=$12, updated_at=NOW()
+     WHERE id=$1 AND user_id=$2 RETURNING *`,
+    [id, userId, nickname||null, copyMode||'percentage', copyPercentage||10, fixedAmount||10,
+     minTraderBet||5, maxTraderBet||100000, categories||[], followMode||'all', minSharePrice||0.02, maxSharePrice||0.98]
+  );
+  return res.rows[0];
+}
+
 async function getTodayLoss(userId) {
   const res = await query('SELECT COALESCE(SUM(pnl), 0) AS pnl FROM daily_pnl WHERE user_id = $1 AND date = CURRENT_DATE', [userId]);
   const pnl = parseFloat(res.rows[0].pnl);
@@ -240,7 +252,7 @@ module.exports = {
   createUser, createLicenseUser, getUserByEmail, getUserById, verifyPassword,
   setConfigActive,
   createWalletForUser, getWalletByUserId, getUSDCBalance,
-  saveCopyConfig, getCopyConfig, setActive, getAllActiveConfigs, deleteCopyConfig,
+  saveCopyConfig, updateCopyConfig, getCopyConfig, setActive, getAllActiveConfigs, deleteCopyConfig,
   saveTrade, getRecentTrades, getDashboardStats, getTodayLoss, getTraderStats,
   upsertBotPosition, deleteBotPosition, getBotPositions,
   encryptPrivateKey, decryptPrivateKey,

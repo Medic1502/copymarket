@@ -195,15 +195,17 @@ function diffPositions(prev, curr) {
 }
 
 // L1 auth headers that Polymarket CLOB requires for order submission
+// Message must be timestamp + nonce concatenated (per py-clob-client spec)
 async function getAuthHeaders(wallet) {
   const timestamp = Math.floor(Date.now() / 1000).toString();
-  const signature = await wallet.signMessage(timestamp);
+  const nonce     = '0';
+  const signature = await wallet.signMessage(timestamp + nonce);
   return {
     'Content-Type':   'application/json',
     'POLY_ADDRESS':   wallet.address,
     'POLY_SIGNATURE': signature,
     'POLY_TIMESTAMP': timestamp,
-    'POLY_NONCE':     '0',
+    'POLY_NONCE':     nonce,
   };
 }
 

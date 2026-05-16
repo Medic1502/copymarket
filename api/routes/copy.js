@@ -72,6 +72,37 @@ router.post('/stop', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.put('/config/:id', async (req, res, next) => {
+  try {
+    const { nickname, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice } = req.body;
+    const config = await db.updateCopyConfig(req.params.id, req.userId, {
+      nickname, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice
+    });
+    if (!config) return res.status(404).json({ error: 'Config not found.' });
+    // restart engine with new settings if active
+    const { startCopyEngine, stopCopyEngine } = require('../../engine');
+    if (config.is_active) {
+      stopCopyEngine(config.id);
+      const wallet = await db.getWalletByUserId(req.userId);
+      await startCopyEngine({
+        id: req.userId, configId: config.id,
+        copyMode: config.copy_mode || 'percentage',
+        copyPercentage: parseFloat(config.copy_percentage)||10,
+        fixedAmount: parseFloat(config.fixed_amount)||10,
+        minTraderBet: parseFloat(config.min_trader_bet)||5,
+        maxTraderBet: parseFloat(config.max_trader_bet)||100000,
+        categories: config.categories || [],
+        followMode: config.follow_mode || 'all',
+        minSharePrice: parseFloat(config.min_share_price)||0.02,
+        maxSharePrice: parseFloat(config.max_share_price)||0.98,
+        encryptedPrivateKey: wallet.encrypted_private_key,
+        walletAddress: wallet.address,
+      }, config.target_wallet);
+    }
+    res.json({ config, message: 'Settings updated.' });
+  } catch (err) { next(err); }
+});
+
 router.delete('/config/:id', async (req, res, next) => {
   try {
     stopCopyEngine(req.params.id); // stop by configId

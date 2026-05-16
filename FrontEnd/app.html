@@ -299,6 +299,7 @@ div.expand-panel.closed{display:none !important}
 
       <!-- ADD FORM -->
       <div class="add-form" id="add-trader-form">
+        <div style="font-size:14px;font-weight:600;margin-bottom:14px" id="add-form-title">Add new trader</div>
         <div class="two-col" style="margin-bottom:14px">
           <div class="field" style="margin-bottom:0"><label>Nickname (optional)</label><input type="text" id="new-trader-nickname" placeholder="e.g. Whale #1"></div>
           <div class="field" style="margin-bottom:0"><label>Trader wallet address</label><input type="text" id="new-trader-wallet" placeholder="0x..."></div>
@@ -703,6 +704,8 @@ function setFollowMode(mode) {
 }
 
 // ── ADD FORM ─────────────────────────────────────────────────────────────────
+let _editingConfigId = null;
+
 function toggleAdvanced() {
   const panel   = document.getElementById('adv-settings');
   const chevron = document.getElementById('adv-chevron');
@@ -711,17 +714,106 @@ function toggleAdvanced() {
   chevron.style.transform = open ? 'rotate(90deg)' : 'rotate(0deg)';
 }
 
+function resetAddForm() {
+  _editingConfigId = null;
+  document.getElementById('new-trader-wallet').value = '';
+  document.getElementById('new-trader-wallet').disabled = false;
+  document.getElementById('new-trader-nickname').value = '';
+  document.getElementById('sl-pct').value = 10;
+  document.getElementById('lbl-pct').textContent = '10%';
+  document.getElementById('new-fixed-amount').value = 10;
+  document.getElementById('new-min-bet').value = 5;
+  document.getElementById('new-max-bet').value = 100000;
+  document.getElementById('new-min-price').value = 2;
+  document.getElementById('new-max-price').value = 98;
+  setCopyMode('percentage');
+  setFollowMode('all');
+  initCategoryChips();
+  document.getElementById('adv-settings').style.display = 'none';
+  document.getElementById('adv-chevron').style.transform = 'rotate(0deg)';
+  document.getElementById('add-trader-btn').textContent = 'Start copying';
+  document.getElementById('add-trader-btn').onclick = addTrader;
+  clearAlert('add-trader-alert');
+  const hdr = document.getElementById('add-form-title');
+  if (hdr) hdr.textContent = 'Add new trader';
+}
+
 function toggleAddForm() {
   const form = document.getElementById('add-trader-form');
-  form.classList.toggle('open');
-  if (form.classList.contains('open')) {
-    initCategoryChips();
-    // reset advanced
-    const adv = document.getElementById('adv-settings');
-    const chev = document.getElementById('adv-chevron');
-    if (adv) adv.style.display = 'none';
-    if (chev) chev.style.transform = 'rotate(0deg)';
+  const willOpen = !form.classList.contains('open');
+  if (willOpen) {
+    resetAddForm();
+    form.classList.add('open');
+  } else {
+    form.classList.remove('open');
+    resetAddForm();
   }
+}
+
+function editTrader(t) {
+  document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('open'));
+  _editingConfigId = t.id;
+  const form = document.getElementById('add-trader-form');
+  form.classList.add('open');
+  form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  document.getElementById('new-trader-wallet').value = t.targetWallet;
+  document.getElementById('new-trader-wallet').disabled = true;
+  document.getElementById('new-trader-nickname').value = t.nickname || '';
+  setCopyMode(t.copyMode || 'percentage');
+  if (t.copyMode === 'fixed') {
+    document.getElementById('new-fixed-amount').value = t.fixedAmount || 10;
+  } else {
+    const pct = t.copyPercentage || 10;
+    document.getElementById('sl-pct').value = pct;
+    document.getElementById('lbl-pct').textContent = pct + '%';
+  }
+  setFollowMode(t.followMode || 'all');
+  document.getElementById('new-min-bet').value = t.minTraderBet || 5;
+  document.getElementById('new-max-bet').value = t.maxTraderBet || 100000;
+  document.getElementById('new-min-price').value = Math.round((t.minSharePrice || 0.02) * 100);
+  document.getElementById('new-max-price').value = Math.round((t.maxSharePrice || 0.98) * 100);
+
+  initCategoryChips();
+  if (t.categories && t.categories.length) {
+    document.querySelectorAll('.cat-chip').forEach(el => {
+      if (t.categories.includes(el.dataset.cat)) {
+        el.classList.add('selected');
+        el.style.background = 'var(--blue)'; el.style.color = '#fff'; el.style.borderColor = 'var(--blue)';
+      }
+    });
+  }
+
+  document.getElementById('adv-settings').style.display = 'block';
+  document.getElementById('adv-chevron').style.transform = 'rotate(90deg)';
+  const hdr = document.getElementById('add-form-title');
+  if (hdr) hdr.textContent = 'Edit trader settings';
+  const btn = document.getElementById('add-trader-btn');
+  btn.textContent = 'Save changes';
+  btn.onclick = saveEditTrader;
+}
+
+async function saveEditTrader() {
+  clearAlert('add-trader-alert');
+  const nickname   = document.getElementById('new-trader-nickname').value.trim();
+  const copyMode   = document.getElementById('new-copy-mode').value;
+  const copyPct    = parseInt(document.getElementById('sl-pct').value);
+  const fixedAmt   = parseFloat(document.getElementById('new-fixed-amount').value);
+  const minBet     = parseFloat(document.getElementById('new-min-bet').value);
+  const maxBet     = parseFloat(document.getElementById('new-max-bet').value);
+  const minPrice   = parseFloat(document.getElementById('new-min-price').value) / 100;
+  const maxPrice   = parseFloat(document.getElementById('new-max-price').value) / 100;
+  const followMode = document.getElementById('new-follow-mode').value;
+  const categories = Array.from(document.querySelectorAll('.cat-chip.selected')).map(el => el.dataset.cat);
+  setLoading('add-trader-btn', true);
+  try {
+    await api('PUT', '/copy/config/' + _editingConfigId, { nickname: nickname||null, copyMode, copyPercentage: copyPct, fixedAmount: fixedAmt, minTraderBet: minBet, maxTraderBet: maxBet, categories, followMode, minSharePrice: minPrice, maxSharePrice: maxPrice });
+    document.getElementById('add-trader-form').classList.remove('open');
+    resetAddForm();
+    showAlert('dash-alert', 'Settings updated.', 'success');
+    loadDashboard();
+  } catch(e) { showAlert('add-trader-alert', e.message); }
+  finally { setLoading('add-trader-btn', false, 'Save changes'); }
 }
 
 async function addTrader() {
@@ -904,6 +996,7 @@ function renderTradersHtml(traders) {
         '<div class="trader-cell" onclick="event.stopPropagation()"><div class="menu-wrap"><button class="menu-btn" onclick="toggleMenu(\''+t.id+'\',this)">⋮</button>' +
           '<div class="dropdown" id="ddm-'+t.id+'">' +
             actionRow +
+            '<button class="dd-item" onclick="editTrader('+JSON.stringify(t).replace(/</g,'\\u003c')+');toggleMenu(\''+t.id+'\',null)">Edit settings</button>' +
             '<button class="dd-item danger" onclick="deleteTrader(\''+t.id+'\')">Remove</button>' +
           '</div></div></div>' +
       '</div>' + expandPanel;
