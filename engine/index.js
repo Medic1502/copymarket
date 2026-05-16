@@ -72,6 +72,12 @@ async function apiFetch(url, opts = {}) {
 async function getRecentActivity(walletAddress) {
   const data = await apiFetch(`https://data-api.polymarket.com/activity?user=${walletAddress}&limit=20`);
   const items = Array.isArray(data) ? data : (data.data || data.activity || []);
+  if (items.length > 0) {
+    const sample = items[0];
+    logger.info('Activity API sample', { wallet: walletAddress.slice(0,10), count: items.length, keys: Object.keys(sample).join(','), ts: sample.timestamp || sample.createdAt || sample.created_at });
+  } else {
+    logger.warn('Activity API returned empty', { wallet: walletAddress.slice(0,10) });
+  }
   return items.map(a => ({
     conditionId: a.conditionId || a.condition_id || a.market,
     outcome:     a.outcome     || 'Yes',
