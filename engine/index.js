@@ -288,11 +288,17 @@ async function placeOrder(wallet, tokenId, side, price, amount, isShares = false
 async function processSignalForUser(user, wallet, signal, side) {
   try {
     if (side === 'BUY') {
-      if (signal.size < user.minTraderBet || signal.size > user.maxTraderBet) return;
+      if (signal.size < user.minTraderBet || signal.size > user.maxTraderBet) {
+        logger.warn('Skip: bet size out of range', { userId: user.id, size: signal.size, min: user.minTraderBet, max: user.maxTraderBet });
+        return;
+      }
       if (user.followMode === 'initial_only' && signal.type === 'INCREASED') return;
 
       const tokenId = signal.tokenId || await getTokenId(signal.conditionId, signal.outcome);
-      if (!tokenId) return;
+      if (!tokenId) {
+        logger.warn('Skip: tokenId not found', { userId: user.id, conditionId: signal.conditionId });
+        return;
+      }
 
       // Fetch market info once for name + category
       const market = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
@@ -300,12 +306,21 @@ async function processSignalForUser(user, wallet, signal, side) {
 
       if (user.categories?.length > 0) {
         const cat = market?.category || market?.market_type || '';
-        if (!user.categories.some(c => cat.toLowerCase().includes(c.toLowerCase()))) return;
+        if (!user.categories.some(c => cat.toLowerCase().includes(c.toLowerCase()))) {
+          logger.warn('Skip: category mismatch', { userId: user.id, marketCat: cat, userCats: user.categories });
+          return;
+        }
       }
 
       const price = await getBestPrice(tokenId, 0);
-      if (!price || price <= 0 || price >= 1) return;
-      if (price < user.minSharePrice || price > user.maxSharePrice) return;
+      if (!price || price <= 0 || price >= 1) {
+        logger.warn('Skip: invalid price', { userId: user.id, price });
+        return;
+      }
+      if (price < user.minSharePrice || price > user.maxSharePrice) {
+        logger.warn('Skip: price out of range', { userId: user.id, price, min: user.minSharePrice, max: user.maxSharePrice });
+        return;
+      }
 
       const size = calcTradeSize(user, signal);
 
