@@ -69,12 +69,15 @@ async function getWalletByUserId(userId) {
 }
 
 async function getUSDCBalance(address) {
-  const USDC = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
+  const USDC_E  = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'; // USDC.e (bridged)
+  const USDC    = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';  // native USDC
   const provider = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
   const abi = ['function balanceOf(address) view returns (uint256)'];
-  const contract = new ethers.Contract(USDC, abi, provider);
-  const raw = await contract.balanceOf(address);
-  return parseFloat(ethers.formatUnits(raw, 6));
+  const [rawE, rawN] = await Promise.all([
+    new ethers.Contract(USDC_E, abi, provider).balanceOf(address),
+    new ethers.Contract(USDC,   abi, provider).balanceOf(address),
+  ]);
+  return parseFloat(ethers.formatUnits(rawE + rawN, 6));
 }
 
 // COPY CONFIGS
