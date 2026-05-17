@@ -812,11 +812,12 @@ async function saveEditTrader() {
   const categories = Array.from(document.querySelectorAll('.cat-chip.selected')).map(el => el.dataset.cat);
   setLoading('add-trader-btn', true);
   try {
+    if (!_editingConfigId) throw new Error('No trader selected.');
     await api('PUT', '/copy/config/' + _editingConfigId, { nickname: nickname||null, copyMode, copyPercentage: copyPct, fixedAmount: fixedAmt, minTraderBet: minBet, maxTraderBet: maxBet, categories, followMode, minSharePrice: minPrice, maxSharePrice: maxPrice });
     document.getElementById('add-trader-form').classList.remove('open');
     resetAddForm();
     showAlert('dash-alert', 'Settings updated.', 'success');
-    loadDashboard();
+    await loadDashboard();
   } catch(e) { showAlert('add-trader-alert', e.message); }
   finally { setLoading('add-trader-btn', false, 'Save changes'); }
 }
