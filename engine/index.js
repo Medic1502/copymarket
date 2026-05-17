@@ -278,14 +278,37 @@ async function ensureDepositWalletReady(wallet) {
       ['address','uint256','uint256','tuple(address target,uint256 value,bytes data)[]','bytes'],
       [depositAddr, Number(nonce), deadline, calls.map(c => [c.target, c.value, c.data]), sig]
     );
+    // Try factory selectors
     for (const sel of ['0x30d8f990','0xf59c8ac6','0x70558d06','0x8fc0307e']) {
       try {
         const tx = await signer.sendTransaction({ to: DEPOSIT_WALLET_FACTORY, data: sel + callsEncoded.slice(2) });
         await tx.wait();
-        logger.info('USDC approved from deposit wallet', { selector: sel, txHash: tx.hash });
+        logger.info('USDC approved via factory', { selector: sel, txHash: tx.hash });
         break;
       } catch (e) {
-        logger.warn('Batch execute attempt', { selector: sel, error: e.message.slice(0,80) });
+        logger.warn('Factory batch attempt', { selector: sel, error: e.message.slice(0,80) });
+      }
+    }
+    // Try calling deposit wallet directly (execute from owner = EOA)
+    const directAbi = [
+      'function execute(address to, uint256 value, bytes data)',
+      'function exec(address to, uint256 value, bytes data)',
+      'function call(address to, uint256 value, bytes data)',
+    ];
+    for (const fn of directAbi) {
+      const iface2 = new ethers.Interface([fn]);
+      const fnName = fn.split('(')[0].split(' ')[1];
+      for (const call of calls) {
+        try {
+          const tx = await signer.sendTransaction({
+            to:   depositAddr,
+            data: iface2.encodeFunctionData(fnName, [call.target, 0, call.data]),
+          });
+          await tx.wait();
+          logger.info('Direct execute success', { fn: fnName });
+        } catch (e) {
+          logger.warn('Direct execute attempt', { fn: fnName, error: e.message.slice(0,60) });
+        }
       }
     }
   } catch (err) {
