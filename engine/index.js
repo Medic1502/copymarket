@@ -198,9 +198,16 @@ async function getClobClient(wallet) {
   // v2 uses viem WalletClient — ethers wallet exposes privateKey directly
   const viemSigner = await makeViemSigner(wallet.privateKey);
 
-  // Create client without creds first to derive API key
+  // Derive first (forum recommendation: derive-then-create, not create-then-derive)
   const clientL1 = new ClobClient({ host: CLOB_BASE, chain: CHAIN_ID, signer: viemSigner });
-  const creds = await clientL1.createOrDeriveApiKey();
+  let creds;
+  try {
+    creds = await clientL1.deriveApiKey();
+    logger.info('API key derived', { wallet: wallet.address.slice(0, 10) });
+  } catch {
+    creds = await clientL1.createApiKey();
+    logger.info('API key created', { wallet: wallet.address.slice(0, 10) });
+  }
 
   // Create full client with creds (EOA signatureType = 0)
   const client = new ClobClient({
