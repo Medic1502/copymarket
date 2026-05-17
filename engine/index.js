@@ -220,34 +220,54 @@ function diffPositions(prev, curr) {
 // ── POLYMARKET CLOB CLIENT ───────────────────────────────────────────────────
 const clobClients = {}; // walletAddress -> ClobClient (initialized with creds)
 
-async function ensureDepositWalletDeployed(wallet) {
+async function ensureDepositWalletReady(wallet) {
   const depositAddr = await getDepositWalletAddressCached(wallet.address);
-  const provider = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
+  const provider    = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
+  const signer      = new ethers.Wallet(wallet.privateKey, provider);
+  const usdcAbi     = [
+    'function balanceOf(address) view returns (uint256)',
+    'function transfer(address,uint256) returns (bool)',
+    'function approve(address,uint256) returns (bool)',
+    'function allowance(address,address) view returns (uint256)',
+  ];
+
+  // 1. Deploy deposit wallet if not deployed
   const code = await provider.getCode(depositAddr);
-  if (code && code !== '0x') {
-    logger.info('Deposit wallet deployed', { depositAddr: depositAddr.slice(0,10) });
-    return depositAddr;
-  }
-  logger.info('Deploying deposit wallet via factory...', { depositAddr: depositAddr.slice(0,10) });
-  const signer = new ethers.Wallet(wallet.privateKey, provider);
-  try {
-    const iface = new ethers.Interface(['function create(address owner)']);
-    const tx = await signer.sendTransaction({
-      to:   DEPOSIT_WALLET_FACTORY,
-      data: iface.encodeFunctionData('create', [wallet.address]),
-    });
-    await tx.wait();
-    logger.info('Deposit wallet deployed', { txHash: tx.hash });
-  } catch (err) {
-    logger.warn('Factory deploy failed, trying no-data call', { error: err.message.slice(0,80) });
+  if (!code || code === '0x') {
+    logger.info('Deploying deposit wallet...', { depositAddr: depositAddr.slice(0,10) });
     try {
-      const tx = await signer.sendTransaction({ to: DEPOSIT_WALLET_FACTORY });
+      const iface = new ethers.Interface(['function create(address owner)']);
+      const tx = await signer.sendTransaction({ to: DEPOSIT_WALLET_FACTORY, data: iface.encodeFunctionData('create', [wallet.address]) });
       await tx.wait();
-      logger.info('Deposit wallet deployed (fallback)', { txHash: tx.hash });
-    } catch (e2) {
-      logger.warn('Deposit wallet deploy failed', { error: e2.message.slice(0,80) });
+      logger.info('Deposit wallet deployed', { txHash: tx.hash });
+    } catch (err) {
+      logger.warn('Deploy via create() failed, trying fallback', { error: err.message.slice(0,80) });
+      try {
+        const tx = await signer.sendTransaction({ to: DEPOSIT_WALLET_FACTORY });
+        await tx.wait();
+        logger.info('Deposit wallet deployed (fallback)', { txHash: tx.hash });
+      } catch (e2) {
+        logger.warn('Deposit wallet deploy failed', { error: e2.message.slice(0,80) });
+      }
     }
   }
+
+  // 2. Move all USDC from EOA to deposit wallet automatically
+  for (const tokenAddr of [USDC_ADDRESS, USDC_E_ADDRESS]) {
+    try {
+      const usdc = new ethers.Contract(tokenAddr, usdcAbi, signer);
+      const bal  = await usdc.balanceOf(wallet.address);
+      if (bal > 0n) {
+        logger.info('Moving USDC to deposit wallet', { amount: ethers.formatUnits(bal, 6), token: tokenAddr.slice(0,10) });
+        const tx = await usdc.transfer(depositAddr, bal);
+        await tx.wait();
+        logger.info('USDC moved to deposit wallet', { txHash: tx.hash });
+      }
+    } catch (err) {
+      logger.warn('USDC transfer failed', { token: tokenAddr.slice(0,10), error: err.message.slice(0,80) });
+    }
+  }
+
   return depositAddr;
 }
 
@@ -257,8 +277,8 @@ async function getClobClient(wallet) {
 
   const viemSigner = await makeViemSigner(wallet.privateKey);
 
-  // Deploy deposit wallet if needed, then set approvals
-  const depositAddr = await ensureDepositWalletDeployed(wallet);
+  // Deploy deposit wallet + move USDC there automatically
+  const depositAddr = await ensureDepositWalletReady(wallet);
 
   // Derive API key first, create only if missing
   const clientL1 = new ClobClient({ host: CLOB_BASE, chain: CHAIN_ID, signer: viemSigner });
