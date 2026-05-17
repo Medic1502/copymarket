@@ -415,7 +415,13 @@ async function placeOrder(wallet, tokenId, side, price, amount) {
 async function processSignalForUser(user, wallet, signal, side) {
   try {
     if (side === 'BUY') {
-      // Use tokenId from activity feed directly (most accurate)
+      // Skip if we already have this position open
+      const posKey = snapshotKey(signal);
+      if (userBought[user.id]?.has(posKey)) {
+        logger.info('Skip: already in position', { conditionId: signal.conditionId?.slice(0,10), outcome: signal.outcome });
+        return;
+      }
+
       const tokenId = signal.tokenId || await getTokenId(signal.conditionId, signal.outcome);
       logger.info('Token debug', { signalTokenId: signal.tokenId, resolved: tokenId, outcome: signal.outcome, conditionId: signal.conditionId?.slice(0,10) });
       if (!tokenId) {
@@ -553,10 +559,24 @@ async function startCopyEngine(user, targetWallet) {
 
           logger.info('New activity detected', { targetWallet: targetWallet.slice(0, 10), buys: opened.length, sells: closed.length });
 
+          // Deduplicate signals by conditionId+outcome — skip if already copied in this poll
+          const seenKeys = new Set();
+          const deduped = opened.filter(s => {
+            const k = `${s.conditionId}_${s.outcome}`;
+            if (seenKeys.has(k)) return false;
+            seenKeys.add(k); return true;
+          });
+
           // Process signals for EACH user independently - fully isolated
           for (const [, { user: u, wallet: w }] of poll.users) {
             if (!approvedWallets.has(w.address)) ensureApprovals(w).catch(() => {});
-            for (const signal of opened) {
+            // Check balance before processing — skip all if too low
+            const bal = await getWalletBalance(u.walletAddress);
+            if (bal < u.fixedAmount) {
+              logger.warn('Skip all: insufficient balance', { userId: u.id, balance: bal, needed: u.fixedAmount });
+              continue;
+            }
+            for (const signal of deduped) {
               await processSignalForUser(u, w, signal, 'BUY');
             }
             for (const signal of closed) {
