@@ -206,12 +206,12 @@ async function placeOrder(wallet, tokenId, side, price, amount) {
   let negRisk = false;
   try { negRisk = await client.getNegRisk(tokenId); } catch {}
 
-  const order = await client.createOrder(
-    { tokenID: tokenId, price, side: isBuy ? Side.BUY : Side.SELL, size },
+  const order = await client.createMarketOrder(
+    { tokenID: tokenId, price, side: isBuy ? Side.BUY : Side.SELL, amount: isBuy ? amount : amount * price },
     { tickSize, negRisk }
   );
 
-  const result = await client.postOrder(order, OrderType.GTC);
+  const result = await client.postOrder(order, OrderType.FOK);
   if (result.errorMsg) throw new Error(`CLOB rejected: ${result.errorMsg}`);
   return result;
 }
@@ -247,7 +247,7 @@ async function processSignalForUser(user, wallet, signal, side) {
       }
 
       const price = await getBestPrice(tokenId, 0);
-      if (!price || price <= 0 || price >= 1) {
+      if (!price || price <= 0 || price >= 0.9) {
         logger.warn('Skip: invalid price', { userId: user.id, price });
         return;
       }
