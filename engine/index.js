@@ -174,6 +174,10 @@ const clobClients = {}; // walletAddress -> ClobClient (initialized with creds)
 async function getClobClient(wallet) {
   if (clobClients[wallet.address]) return clobClients[wallet.address];
   const { ClobClient } = await getClobLib();
+  // @polymarket/clob-client checks for ethers v5 _signTypedData — add shim for ethers v6
+  if (!wallet._signTypedData) {
+    wallet._signTypedData = (domain, types, value) => wallet.signTypedData(domain, types, value);
+  }
   const client = new ClobClient(CLOB_BASE, CHAIN_ID, wallet);
   try {
     const creds = await client.createOrDeriveApiKey();
