@@ -71,6 +71,7 @@ async function getWalletByUserId(userId) {
 async function getUSDCBalance(eoaAddress) {
   const USDC_E  = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174';
   const USDC    = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';
+  const PUSD    = '0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB'; // Polymarket v2 collateral
   const FACTORY = '0x00000000000Fb5C9ADea0298D729A0CB3823Cc07';
   const IMPL    = '0x58CA52ebe0DadfdF531Cde7062e76746de4Db1eB';
   const provider = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
@@ -85,11 +86,10 @@ async function getUSDCBalance(eoaAddress) {
   const addresses = [eoaAddress, depositAddress];
   let total = 0n;
   for (const addr of addresses) {
-    const [rawE, rawN] = await Promise.all([
-      new ethers.Contract(USDC_E, abi, provider).balanceOf(addr),
-      new ethers.Contract(USDC,   abi, provider).balanceOf(addr),
-    ]);
-    total += rawE + rawN;
+    const bals = await Promise.all(
+      [PUSD, USDC, USDC_E].map(t => new ethers.Contract(t, abi, provider).balanceOf(addr).catch(() => 0n))
+    );
+    total += bals.reduce((a, b) => a + b, 0n);
   }
   return parseFloat(ethers.formatUnits(total, 6));
 }

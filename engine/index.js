@@ -106,12 +106,15 @@ async function getBestPrice(tokenId, side) {
     : parseFloat(book.bids?.[0]?.price ?? 0);
 }
 
-const USDC_E_ADDRESS = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'; // USDC.e (bridged)
+const USDC_E_ADDRESS = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'; // USDC.e (legacy)
 const USDC_ADDRESS   = '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359';   // native USDC
-// Both exchange contracts need approval (standard + neg-risk markets)
+const PUSD_ADDRESS   = '0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB';   // pUSD — Polymarket v2 collateral
+// V2 exchange contracts (use pUSD as collateral)
 const CTF_EXCHANGES = [
-  process.env.CTF_EXCHANGE_ADDRESS       || '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E',
-  process.env.CTF_NEG_RISK_ADDRESS       || '0xC5d563A36AE78145C45a50134d48A1215220f80a',
+  '0xE111180000d2663C0091e4f400237545B87B996B',  // exchangeV2
+  '0xe2222d279d744050d28e00520010520000310F59',   // negRiskExchangeV2
+  '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E',  // exchange (legacy)
+  '0xC5d563A36AE78145C45a50134d48A1215220f80a',   // negRiskExchange (legacy)
 ];
 
 const DEPOSIT_WALLET_FACTORY = '0x00000000000Fb5C9ADea0298D729A0CB3823Cc07';
@@ -140,15 +143,15 @@ async function getWalletBalance(eoaAddress) {
   const provider = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
   const abi = ['function balanceOf(address) view returns (uint256)'];
   const depositAddr = await getDepositWalletAddressCached(eoaAddress);
-  // Check both EOA and deposit wallet — USDC could be in either
   const addresses = [eoaAddress, depositAddr];
   let total = 0n;
   for (const addr of addresses) {
-    const [rawE, rawN] = await Promise.all([
-      new ethers.Contract(USDC_E_ADDRESS, abi, provider).balanceOf(addr),
-      new ethers.Contract(USDC_ADDRESS,   abi, provider).balanceOf(addr),
-    ]);
-    total += rawE + rawN;
+    const bals = await Promise.all(
+      [PUSD_ADDRESS, USDC_ADDRESS, USDC_E_ADDRESS].map(t =>
+        new ethers.Contract(t, abi, provider).balanceOf(addr).catch(() => 0n)
+      )
+    );
+    total += bals.reduce((a, b) => a + b, 0n);
   }
   return parseFloat(ethers.formatUnits(total, 6));
 }
@@ -258,14 +261,12 @@ async function ensureDepositWalletReady(wallet) {
     const nonce    = await depositContract.nonce();
     const deadline = Math.floor(Date.now() / 1000) + 3600;
     const approveIface = new ethers.Interface(['function approve(address,uint256) returns (bool)']);
-    const approveData  = approveIface.encodeFunctionData('approve', [CTF_EXCHANGES[0], ethers.MaxUint256]);
-    const approveData2 = approveIface.encodeFunctionData('approve', [CTF_EXCHANGES[1], ethers.MaxUint256]);
-    const calls = [
-      { target: USDC_ADDRESS,   value: 0n, data: approveData  },
-      { target: USDC_E_ADDRESS, value: 0n, data: approveData  },
-      { target: USDC_ADDRESS,   value: 0n, data: approveData2 },
-      { target: USDC_E_ADDRESS, value: 0n, data: approveData2 },
-    ];
+    const calls = CTF_EXCHANGES.flatMap(exchange =>
+      [PUSD_ADDRESS, USDC_ADDRESS, USDC_E_ADDRESS].map(token => ({
+        target: token, value: 0n,
+        data: approveIface.encodeFunctionData('approve', [exchange, ethers.MaxUint256]),
+      }))
+    );
     const domain = { name: 'DepositWallet', version: '1', chainId: CHAIN_ID, verifyingContract: depositAddr };
     const types  = {
       Call:  [{ name: 'target', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'data', type: 'bytes' }],
@@ -315,8 +316,8 @@ async function ensureDepositWalletReady(wallet) {
     logger.warn('Deposit wallet approval failed', { error: err.message.slice(0,100) });
   }
 
-  // 3. Move all USDC from EOA to deposit wallet automatically
-  for (const tokenAddr of [USDC_ADDRESS, USDC_E_ADDRESS]) {
+  // 3. Move all stablecoins (pUSD, USDC, USDC.e) from EOA to deposit wallet
+  for (const tokenAddr of [PUSD_ADDRESS, USDC_ADDRESS, USDC_E_ADDRESS]) {
     try {
       const usdc = new ethers.Contract(tokenAddr, usdcAbi, signer);
       const bal  = await usdc.balanceOf(wallet.address);
