@@ -191,14 +191,22 @@ function diffPositions(prev, curr) {
 // ── POLYMARKET CLOB CLIENT ───────────────────────────────────────────────────
 const clobClients = {}; // walletAddress -> ClobClient (initialized with creds)
 
+async function getDepositWalletAddress(eoaAddress) {
+  const { deriveDepositWallet } = await import('@polymarket/builder-relayer-client');
+  const FACTORY    = '0x00000000000Fb5C9ADea0298D729A0CB3823Cc07';
+  const IMPL       = '0x58CA52ebe0DadfdF531Cde7062e76746de4Db1eB';
+  return deriveDepositWallet(eoaAddress, FACTORY, IMPL);
+}
+
 async function getClobClient(wallet) {
   if (clobClients[wallet.address]) return clobClients[wallet.address];
   const { ClobClient } = await getClobLib();
 
-  // v2 uses viem WalletClient — ethers wallet exposes privateKey directly
   const viemSigner = await makeViemSigner(wallet.privateKey);
+  const depositWallet = await getDepositWalletAddress(wallet.address);
+  logger.info('Deposit wallet', { eoa: wallet.address.slice(0,10), depositWallet });
 
-  // Derive first (forum recommendation: derive-then-create, not create-then-derive)
+  // Derive API key first, create only if missing
   const clientL1 = new ClobClient({ host: CLOB_BASE, chain: CHAIN_ID, signer: viemSigner });
   let creds;
   try {
@@ -209,17 +217,18 @@ async function getClobClient(wallet) {
     logger.info('API key created', { wallet: wallet.address.slice(0, 10) });
   }
 
-  // Create full client with creds (EOA signatureType = 0)
+  // POLY_1271 (signatureType: 3) — deposit wallet flow for new API users
   const client = new ClobClient({
     host:          CLOB_BASE,
     chain:         CHAIN_ID,
     signer:        viemSigner,
     creds,
-    signatureType: 0, // EOA
+    signatureType: 3,
+    funderAddress: depositWallet,
   });
 
   clobClients[wallet.address] = client;
-  logger.info('ClobClient v2 ready', { wallet: wallet.address.slice(0, 10) });
+  logger.info('ClobClient ready (POLY_1271)', { wallet: wallet.address.slice(0,10), depositWallet });
   return client;
 }
 

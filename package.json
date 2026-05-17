@@ -15,6 +15,7 @@
   },
   "type": "commonjs",
   "dependencies": {
+    "@polymarket/builder-relayer-client": "^0.0.9",
     "@polymarket/clob-client": "^5.8.1",
     "@polymarket/clob-client-v2": "^1.0.6",
     "bcrypt": "^6.0.0",
