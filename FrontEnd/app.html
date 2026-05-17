@@ -997,11 +997,18 @@ function renderTrades(trades) {
     const isBuy  = t.side === 'BUY';
     const isSkip = t.status === 'SKIPPED';
     const pnlColor = (t.pnl||0) >= 0 ? 'var(--green)' : 'var(--red)';
-    const pnlText  = t.pnl != null ? ((t.pnl>=0?'+':'') + '$' + Math.abs(t.pnl).toFixed(2)) : '—';
-    const badge = isSkip ? '<span class="badge b-skip">SKIP</span>' : isBuy ? '<span class="badge b-buy">BUY</span>' : '<span class="badge b-sell">SELL</span>';
-    const meta  = isSkip ? (t.skip_reason||'Skipped') : ('$' + parseFloat(t.size).toFixed(2) + ' · ' + t.outcome + ' @ ' + parseFloat(t.price).toFixed(3) + ' · ' + timeAgo(t.created_at));
+    const pnlText    = t.pnl != null ? ((t.pnl>=0?'+':'') + '$' + Math.abs(t.pnl).toFixed(2)) : '—';
+    const badge      = isSkip ? '<span class="badge b-skip">SKIP</span>' : isBuy ? '<span class="badge b-buy">BUY</span>' : '<span class="badge b-sell">SELL</span>';
+    const entryPrice = !isSkip && t.price ? (parseFloat(t.price)*100).toFixed(1) + '¢' : null;
+    const spent      = !isSkip && t.size  ? '$' + parseFloat(t.size).toFixed(2) : null;
+    const polyLink   = t.condition_id ? 'https://polymarket.com/event/' + t.condition_id : null;
+    const meta       = isSkip
+      ? (t.skip_reason||'Skipped')
+      : [spent, t.outcome, entryPrice ? 'entry: ' + entryPrice : null, timeAgo(t.created_at)].filter(Boolean).join(' · ');
+    const mktName    = (t.market_name && t.market_name !== t.condition_id) ? t.market_name : (t.condition_id ? t.condition_id.slice(0,18)+'...' : '—');
+    const linkIcon   = polyLink ? ' <a href="' + polyLink + '" target="_blank" style="color:var(--blue-light);font-size:11px;vertical-align:middle" onclick="event.stopPropagation()">↗</a>' : '';
     return '<div class="trade-row">' + badge +
-      '<div class="trade-name"><div class="trade-market">' + (t.market_name||t.condition_id.slice(0,40)+'...') + '</div><div class="trade-meta">' + meta + '</div></div>' +
+      '<div class="trade-name"><div class="trade-market">' + mktName + linkIcon + '</div><div class="trade-meta">' + meta + '</div></div>' +
       '<div style="font-size:13px;font-weight:600;color:' + pnlColor + ';flex-shrink:0">' + pnlText + '</div></div>';
   }).join('');
 }
