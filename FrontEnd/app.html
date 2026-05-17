@@ -976,6 +976,7 @@ function renderTradersHtml(traders) {
           '<div class="expand-stat"><div class="expand-stat-label">Win Rate</div><div class="expand-stat-val">' + wr + '</div></div>' +
           '<div class="expand-stat"><div class="expand-stat-label">Total Invested</div><div class="expand-stat-val">' + invested + '</div></div>' +
         '</div>' +
+        '<div id="pos-'+t.id+'" style="margin-bottom:12px"></div>' +
         '<div class="expand-settings">' +
           '<span>Copy mode: <strong>' + modeText + '</strong></span>' +
           '<span>Bet range: <strong>$'+t.minTraderBet+'–$'+t.maxTraderBet+'</strong></span>' +
@@ -1024,6 +1025,34 @@ function renderTradersHtml(traders) {
       row.classList.add('expanded');
     }
   });
+
+  // Load open positions for each trader
+  loadOpenPositions(traders);
+}
+
+async function loadOpenPositions(traders) {
+  try {
+    const { positions } = await api('GET', '/dashboard/positions');
+    traders.forEach(t => {
+      const el = document.getElementById('pos-' + t.id);
+      if (!el) return;
+      const tPos = positions.filter(p => p.config_id === t.id && parseFloat(p.shares) > 0);
+      if (!tPos.length) { el.innerHTML = ''; return; }
+      el.innerHTML =
+        '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Open Positions (' + tPos.length + ')</div>' +
+        '<div style="display:flex;flex-direction:column;gap:4px">' +
+        tPos.map(p => {
+          const usdc = parseFloat(p.usdc_spent).toFixed(2);
+          const shares = parseFloat(p.shares).toFixed(2);
+          const cid = (p.condition_id||'').slice(0,10) + '...';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:6px;padding:6px 10px;font-size:12px">' +
+            '<span style="color:var(--text2)">' + cid + ' <strong style="color:var(--text)">' + (p.outcome||'Yes') + '</strong></span>' +
+            '<span style="color:var(--green);font-weight:600">$' + usdc + ' · ' + shares + ' shares</span>' +
+            '</div>';
+        }).join('') +
+        '</div>';
+    });
+  } catch {}
 }
 
 // ── RENDER TRADES ─────────────────────────────────────────────────────────────
@@ -1109,7 +1138,7 @@ async function loadDashboard() {
     renderTrades(tradesData.trades);
 
     clearTimeout(window._dashTimer);
-    window._dashTimer = setTimeout(loadDashboard, 60000);
+    window._dashTimer = setTimeout(loadDashboard, 20000);
   } catch(e) {
     showAlert('dash-alert', 'Could not load dashboard: ' + e.message);
   }

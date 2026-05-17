@@ -29,4 +29,11 @@ router.get('/trades', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/positions', async (req, res, next) => {
+  try {
+    const positions = await db.getBotPositions(req.userId);
+    res.json({ positions });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;
