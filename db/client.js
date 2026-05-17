@@ -147,6 +147,7 @@ async function migrate() {
       )
     `);
     await run(`ALTER TABLE license_keys ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id)`);
+    await run(`UPDATE copy_configs SET min_trader_bet=0, max_share_price=0.88, categories='{}' WHERE min_trader_bet > 0`);
 
     console.log('Database migration complete.');
   } catch (err) {

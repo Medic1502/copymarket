@@ -220,10 +220,6 @@ async function placeOrder(wallet, tokenId, side, price, amount) {
 async function processSignalForUser(user, wallet, signal, side) {
   try {
     if (side === 'BUY') {
-      if (signal.size < user.minTraderBet || signal.size > user.maxTraderBet) {
-        logger.warn('Skip: bet size out of range', { userId: user.id, size: signal.size, min: user.minTraderBet, max: user.maxTraderBet });
-        return;
-      }
       if (user.followMode === 'initial_only' && signal.type === 'INCREASED') return;
 
       const tokenId = signal.tokenId || await getTokenId(signal.conditionId, signal.outcome);
