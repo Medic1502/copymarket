@@ -199,7 +199,9 @@ async function fetchRaw(url, opts = {}) {
 async function l1Headers(wallet, nonce) {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const n = nonce.toString();
-  const sig = await wallet.signMessage(timestamp + n);
+  // Polymarket TS client: sign keccak256(packed(timestamp, nonce)), not the raw string
+  const msgHash = ethers.solidityPackedKeccak256(['string', 'string'], [timestamp, n]);
+  const sig = await wallet.signMessage(ethers.getBytes(msgHash));
   const signature = sig.startsWith('0x') ? sig.slice(2) : sig;
   return {
     'Content-Type':   'application/json',
