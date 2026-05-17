@@ -7,8 +7,17 @@ const db = require('../db');
 
 let _clobLib = null;
 async function getClobLib() {
-  if (!_clobLib) _clobLib = await import('@polymarket/clob-client');
+  if (!_clobLib) _clobLib = await import('@polymarket/clob-client-v2');
   return _clobLib;
+}
+
+async function makeViemSigner(privateKey) {
+  const { privateKeyToAccount } = await import('viem/accounts');
+  const { createWalletClient, http } = await import('viem');
+  const { polygon } = await import('viem/chains');
+  const pk = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
+  const account = privateKeyToAccount(pk);
+  return createWalletClient({ account, chain: polygon, transport: http() });
 }
 
 const ALGORITHM = 'aes-256-gcm';
@@ -185,19 +194,25 @@ const clobClients = {}; // walletAddress -> ClobClient (initialized with creds)
 async function getClobClient(wallet) {
   if (clobClients[wallet.address]) return clobClients[wallet.address];
   const { ClobClient } = await getClobLib();
-  // @polymarket/clob-client checks for ethers v5 _signTypedData — add shim for ethers v6
-  if (!wallet._signTypedData) {
-    wallet._signTypedData = (domain, types, value) => wallet.signTypedData(domain, types, value);
-  }
-  const client = new ClobClient(CLOB_BASE, CHAIN_ID, wallet);
-  try {
-    const creds = await client.createOrDeriveApiKey();
-    client.creds = creds;
-    clobClients[wallet.address] = client;
-    logger.info('ClobClient ready', { wallet: wallet.address.slice(0, 10) });
-  } catch (err) {
-    throw new Error(`ClobClient init failed: ${err.message}`);
-  }
+
+  // v2 uses viem WalletClient — ethers wallet exposes privateKey directly
+  const viemSigner = await makeViemSigner(wallet.privateKey);
+
+  // Create client without creds first to derive API key
+  const clientL1 = new ClobClient({ host: CLOB_BASE, chain: CHAIN_ID, signer: viemSigner });
+  const creds = await clientL1.createOrDeriveApiKey();
+
+  // Create full client with creds (EOA signatureType = 0)
+  const client = new ClobClient({
+    host:          CLOB_BASE,
+    chain:         CHAIN_ID,
+    signer:        viemSigner,
+    creds,
+    signatureType: 0, // EOA
+  });
+
+  clobClients[wallet.address] = client;
+  logger.info('ClobClient v2 ready', { wallet: wallet.address.slice(0, 10) });
   return client;
 }
 
