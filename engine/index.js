@@ -54,14 +54,23 @@ async function apiFetch(url, opts = {}) {
 async function getRecentActivity(walletAddress) {
   const data = await apiFetch(`https://data-api.polymarket.com/activity?user=${walletAddress}&limit=20`);
   const items = Array.isArray(data) ? data : (data.data || data.activity || []);
-  return items.map(a => ({
-    conditionId: a.conditionId || a.condition_id || a.market,
-    outcome:     a.outcome     || 'Yes',
-    size:        parseFloat(a.usdcSize || a.usdc_size || a.cashSize || a.amount || 0),
-    tokenId:     a.asset       || a.asset_id || a.tokenId || null,
-    side:        (a.side || a.type || '').toUpperCase(),
-    timestamp:   (() => { const t = parseInt(a.timestamp || a.createdAt || a.created_at || 0); return t < 1e11 ? t * 1000 : t; })(),
-  })).filter(a => a.conditionId && (a.side === 'BUY' || a.side === 'SELL'));
+  return items.map(a => {
+    const usdcSize = parseFloat(a.usdcSize || a.usdc_size || a.cashSize || a.amount || 0);
+    const shares   = parseFloat(a.size || a.shares || 0);
+    // Derive price from usdcSize/shares if not directly available
+    const price    = parseFloat(a.price || a.outcome_price || (shares > 0 ? usdcSize / shares : 0));
+    const ts = parseInt(a.timestamp || a.createdAt || a.created_at || 0);
+    return {
+      conditionId: a.conditionId || a.condition_id || a.market,
+      outcome:     a.outcome     || 'Yes',
+      usdcSize,
+      shares,
+      price,
+      tokenId:     a.asset       || a.asset_id || a.tokenId || null,
+      side:        (a.side || a.type || '').toUpperCase(),
+      timestamp:   ts < 1e11 ? ts * 1000 : ts,
+    };
+  }).filter(a => a.conditionId && (a.side === 'BUY' || a.side === 'SELL'));
 }
 
 // Fetches token ID for a specific outcome from the market endpoint
@@ -206,12 +215,14 @@ async function placeOrder(wallet, tokenId, side, price, amount) {
   let negRisk = false;
   try { negRisk = await client.getNegRisk(tokenId); } catch {}
 
-  const order = await client.createMarketOrder(
-    { tokenID: tokenId, price, side: isBuy ? Side.BUY : Side.SELL, amount: isBuy ? amount : amount * price },
+  const sharesSize = isBuy ? amount / price : amount;
+
+  const order = await client.createOrder(
+    { tokenID: tokenId, price, side: isBuy ? Side.BUY : Side.SELL, size: sharesSize },
     { tickSize, negRisk }
   );
 
-  const result = await client.postOrder(order, OrderType.FOK);
+  const result = await client.postOrder(order, OrderType.GTC);
   if (result.errorMsg) throw new Error(`CLOB rejected: ${result.errorMsg}`);
   return result;
 }
@@ -220,45 +231,38 @@ async function placeOrder(wallet, tokenId, side, price, amount) {
 async function processSignalForUser(user, wallet, signal, side) {
   try {
     if (side === 'BUY') {
+      // Use tokenId from activity feed directly (most accurate)
       const tokenId = signal.tokenId || await getTokenId(signal.conditionId, signal.outcome);
       if (!tokenId) {
-        logger.warn('Skip: tokenId not found', { userId: user.id, conditionId: signal.conditionId });
+        logger.warn('Skip: token not found', { conditionId: signal.conditionId, outcome: signal.outcome });
         return;
       }
 
-      const size = calcTradeSize(user, signal);
-
-      const balance = await getWalletBalance(user.walletAddress);
-      if (balance < size) {
-        logger.warn('Skip: low balance', { userId: user.id, balance, needed: size });
-        return;
-      }
-
-      // Get current best ask price — use it for the order
-      const price = await getBestPrice(tokenId, 0);
+      // Use trader's price — copy exact same price they paid
+      const price = signal.price > 0 ? signal.price : await getBestPrice(tokenId, 0);
       if (!price || price <= 0) {
-        logger.warn('Skip: no liquidity', { userId: user.id, tokenId });
+        logger.warn('Skip: no price', { tokenId, signalPrice: signal.price });
         return;
       }
 
-      const marketName = signal.conditionId;
-      logger.trade('Placing BUY', { userId: user.id, conditionId: signal.conditionId, size, price });
-      const result = await placeOrder(wallet, tokenId, 'BUY', price, size);
+      const usdcToSpend = user.fixedAmount;
+      const balance = await getWalletBalance(user.walletAddress);
+      if (balance < usdcToSpend) {
+        logger.warn('Skip: low balance', { userId: user.id, balance, needed: usdcToSpend });
+        return;
+      }
+
+      logger.trade('Placing BUY', { userId: user.id, conditionId: signal.conditionId.slice(0,10), price, usdc: usdcToSpend });
+      const result = await placeOrder(wallet, tokenId, 'BUY', price, usdcToSpend);
       logger.trade('BUY result', { userId: user.id, status: result.status, orderId: result.orderID });
 
-      const filled = result.isMatched || result.matched || result.status === 'matched' || result.status === 'MATCHED';
-      if (!filled) {
-        logger.warn('BUY not filled', { userId: user.id, status: result.status });
-        return;
-      }
-
-      logger.trade('BUY filled', { userId: user.id, orderId: result.orderID });
+      logger.trade('BUY placed', { userId: user.id, orderId: result.orderID });
       const key = snapshotKey(signal);
       const prev = userBought[user.id]?.get(key) || { usdc: 0, shares: 0 };
-      const newShares = size / price;
-      userBought[user.id].set(key, { usdc: prev.usdc + size, shares: prev.shares + newShares });
-      await db.upsertBotPosition(user.id, user.configId, signal.conditionId, signal.outcome, size, newShares).catch(() => {});
-      await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName, outcome: signal.outcome, side: 'BUY', size, price, orderId: result.orderID || null, filledSize: null, status: 'FILLED', skipReason: null, pnl: null, configId: user.configId });
+      const newShares = usdcToSpend / price;
+      userBought[user.id].set(key, { usdc: prev.usdc + usdcToSpend, shares: prev.shares + newShares });
+      await db.upsertBotPosition(user.id, user.configId, signal.conditionId, signal.outcome, usdcToSpend, newShares).catch(() => {});
+      await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName: signal.conditionId, outcome: signal.outcome, side: 'BUY', size: usdcToSpend, price, orderId: result.orderID || null, filledSize: null, status: result.status || 'OPEN', skipReason: null, pnl: null, configId: user.configId });
 
     } else { // SELL
       const key = snapshotKey(signal);

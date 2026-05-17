@@ -16,6 +16,7 @@
   "type": "commonjs",
   "dependencies": {
     "@polymarket/clob-client": "^5.8.1",
+    "@polymarket/clob-client-v2": "^1.0.6",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -26,6 +27,7 @@
     "jsonwebtoken": "^9.0.3",
     "node-fetch": "^3.3.2",
     "pg": "^8.20.0",
-    "postgres": "^3.4.9"
+    "postgres": "^3.4.9",
+    "viem": "^2.49.3"
   }
 }
