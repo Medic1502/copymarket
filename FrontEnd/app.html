@@ -356,8 +356,15 @@ div.expand-panel.closed{display:none !important}
           <button class="btn btn-sm btn-primary" style="flex:1" onclick="openMoonpay()">Buy USDC</button>
           <button class="btn btn-sm btn-red" style="flex:1" onclick="toggleWithdraw()">Withdraw</button>
         </div>
-        <div style="margin-top:8px">
-          <button class="btn btn-sm btn-yellow btn-block" onclick="recoverDepositWallet()">Recover funds from deposit wallet</button>
+        <div style="margin-top:8px" id="recover-section">
+          <button class="btn btn-sm btn-yellow btn-block" onclick="toggleRecover()">Recover funds from deposit wallet</button>
+          <div id="recover-form" style="display:none;margin-top:8px">
+            <div class="field" style="margin-bottom:6px"><label>Send to address</label><input type="text" id="recover-addr" placeholder="0x... (your Binance/Phantom address)"></div>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-sm btn-yellow" style="flex:1" onclick="recoverDepositWallet()">Confirm recovery</button>
+              <button class="btn btn-sm" onclick="toggleRecover()">Cancel</button>
+            </div>
+          </div>
           <div id="recover-alert" style="margin-top:6px"></div>
         </div>
 
@@ -814,16 +821,20 @@ async function deleteTrader(id) {
   try { await api('DELETE', '/copy/config/' + id); showAlert('dash-alert','Trader removed.','success'); loadDashboard(); }
   catch(e) { showAlert('dash-alert', e.message); }
 }
+function toggleRecover() {
+  const f = document.getElementById('recover-form');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
 async function recoverDepositWallet() {
-  const to = prompt('Enter address to send recovered funds to (your Binance/Phantom address):');
-  if (!to || !/^0x[0-9a-fA-F]{40}$/.test(to)) { showAlert('recover-alert','Invalid address.'); return; }
+  const to = document.getElementById('recover-addr').value.trim();
+  if (!to || !/^0x[0-9a-fA-F]{40}$/.test(to)) { showAlert('recover-alert','Enter a valid 0x address.'); return; }
   try {
     showAlert('recover-alert','Attempting recovery...','info');
     const r = await api('POST', '/wallet/recover-deposit-wallet', { toAddress: to });
-    const success = r.results?.filter(x => x.txHash).map(x => `${x.amount} USDC: ${x.txHash.slice(0,10)}...`).join(', ');
-    const failed  = r.results?.filter(x => x.error).map(x => x.token.slice(0,10)).join(', ');
+    const success = r.results?.filter(x => x.txHash).map(x => '$' + x.amount + ' → ' + x.txHash.slice(0,10) + '...').join(', ');
+    const failed  = r.results?.filter(x => x.error).length;
     if (success) showAlert('recover-alert', 'Recovered: ' + success, 'success');
-    else showAlert('recover-alert', 'Recovery failed' + (failed ? ': ' + failed : '') + '. Deposit wallet execute function not found.', 'error');
+    else showAlert('recover-alert', 'Recovery failed (' + failed + ' tokens). Contact support.', 'error');
   } catch(e) { showAlert('recover-alert', e.message); }
 }
 
