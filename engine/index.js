@@ -194,18 +194,58 @@ function diffPositions(prev, curr) {
   return { opened, closed };
 }
 
-// L1 auth headers that Polymarket CLOB requires for order submission
-// Message must be timestamp + nonce concatenated (per py-clob-client spec)
-async function getAuthHeaders(wallet) {
+// ── POLYMARKET L2 AUTH ────────────────────────────────────────────────────────
+// Flow: L1 signature → create API key → HMAC-sign each request with that key
+const apiKeyCache = {}; // walletAddress -> { apiKey, secret, passphrase }
+
+async function getOrCreateApiKey(wallet) {
+  if (apiKeyCache[wallet.address]) return apiKeyCache[wallet.address];
+
   const timestamp = Math.floor(Date.now() / 1000).toString();
-  const nonce     = '0';
+  const nonce = '0';
   const signature = await wallet.signMessage(timestamp + nonce);
+  const { default: fetch } = await import('node-fetch');
+  const res = await fetch(`${CLOB_BASE}/auth/api-key`, {
+    method: 'POST',
+    headers: {
+      'Content-Type':   'application/json',
+      'POLY_ADDRESS':   wallet.address,
+      'POLY_SIGNATURE': signature,
+      'POLY_TIMESTAMP': timestamp,
+      'POLY_NONCE':     nonce,
+    },
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`API key creation failed: ${JSON.stringify(data)}`);
+  apiKeyCache[wallet.address] = data;
+  logger.info('API key created', { wallet: wallet.address.slice(0, 10) });
+  return data;
+}
+
+function hmacSign(secret, timestamp, method, path, body = '') {
+  const message = `${timestamp}${method}${path}${body}`;
+  const key = Buffer.from(secret, 'base64');
+  return crypto.createHmac('sha256', key).update(message).digest('base64');
+}
+
+async function getAuthHeaders(wallet, method = 'POST', path = '/order', body = '') {
+  let creds;
+  try {
+    creds = await getOrCreateApiKey(wallet);
+  } catch (err) {
+    logger.warn('API key fetch failed, retrying fresh', { error: err.message });
+    delete apiKeyCache[wallet.address];
+    creds = await getOrCreateApiKey(wallet);
+  }
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const sig = hmacSign(creds.secret, timestamp, method, path, body);
   return {
-    'Content-Type':   'application/json',
-    'POLY_ADDRESS':   wallet.address,
-    'POLY_SIGNATURE': signature,
-    'POLY_TIMESTAMP': timestamp,
-    'POLY_NONCE':     nonce,
+    'Content-Type':    'application/json',
+    'POLY_ADDRESS':    wallet.address,
+    'POLY_SIGNATURE':  sig,
+    'POLY_TIMESTAMP':  timestamp,
+    'POLY_API_KEY':    creds.apiKey,
+    'POLY_PASSPHRASE': creds.passphrase,
   };
 }
 
@@ -271,11 +311,12 @@ async function placeOrder(wallet, tokenId, side, price, amount, isShares = false
     orderType: 'GTC',
   };
 
-  const headers = await getAuthHeaders(wallet);
+  const bodyStr = JSON.stringify(body);
+  const headers = await getAuthHeaders(wallet, 'POST', '/order', bodyStr);
   const res = await fetch(`${CLOB_BASE}/order`, {
     method:  'POST',
     headers,
-    body:    JSON.stringify(body),
+    body:    bodyStr,
   });
 
   if (!res.ok) {
