@@ -252,6 +252,7 @@ async function processSignalForUser(user, wallet, signal, side) {
     if (side === 'BUY') {
       // Use tokenId from activity feed directly (most accurate)
       const tokenId = signal.tokenId || await getTokenId(signal.conditionId, signal.outcome);
+      logger.info('Token debug', { signalTokenId: signal.tokenId, resolved: tokenId, outcome: signal.outcome, conditionId: signal.conditionId?.slice(0,10) });
       if (!tokenId) {
         logger.warn('Skip: token not found', { conditionId: signal.conditionId, outcome: signal.outcome });
         return;
