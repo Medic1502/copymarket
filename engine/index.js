@@ -252,29 +252,31 @@ async function ensureDepositWalletReady(wallet) {
     }
   }
 
-  // 2. Set USDC approvals from deposit wallet via factory batch execution
+  // 2. Set USDC approvals from deposit wallet via EIP-712 batch (ethers.js signing)
   try {
     const depositContract = new ethers.Contract(depositAddr, ['function nonce() view returns (uint256)'], provider);
     const nonce    = await depositContract.nonce();
     const deadline = Math.floor(Date.now() / 1000) + 3600;
-    const { buildDepositWalletBatchRequest } = await import('@polymarket/builder-relayer-client');
-    const viemSigner = await makeViemSigner(wallet.privateKey);
     const approveIface = new ethers.Interface(['function approve(address,uint256) returns (bool)']);
-    const calls = CTF_EXCHANGES.flatMap(exchange => [USDC_ADDRESS, USDC_E_ADDRESS].map(token => ({
-      target: token, value: '0',
-      data: approveIface.encodeFunctionData('approve', [exchange, ethers.MaxUint256.toString()]),
-    })));
-    const config = { DepositWalletFactory: DEPOSIT_WALLET_FACTORY, DepositWalletImplementation: DEPOSIT_WALLET_IMPL };
-    const req = await buildDepositWalletBatchRequest(viemSigner, {
-      from: wallet.address, chainId: CHAIN_ID,
-      walletAddress: depositAddr, nonce: Number(nonce), deadline, calls,
-    }, config);
+    const approveData  = approveIface.encodeFunctionData('approve', [CTF_EXCHANGES[0], ethers.MaxUint256]);
+    const approveData2 = approveIface.encodeFunctionData('approve', [CTF_EXCHANGES[1], ethers.MaxUint256]);
+    const calls = [
+      { target: USDC_ADDRESS,   value: 0n, data: approveData  },
+      { target: USDC_E_ADDRESS, value: 0n, data: approveData  },
+      { target: USDC_ADDRESS,   value: 0n, data: approveData2 },
+      { target: USDC_E_ADDRESS, value: 0n, data: approveData2 },
+    ];
+    const domain = { name: 'DepositWallet', version: '1', chainId: CHAIN_ID, verifyingContract: depositAddr };
+    const types  = {
+      Call:  [{ name: 'target', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'data', type: 'bytes' }],
+      Batch: [{ name: 'wallet', type: 'address' }, { name: 'nonce', type: 'uint256' }, { name: 'deadline', type: 'uint256' }, { name: 'calls', type: 'Call[]' }],
+    };
+    const message  = { wallet: depositAddr, nonce: Number(nonce), deadline, calls };
+    const sig      = await signer.signTypedData(domain, types, message);
 
-    // Try known factory execute function selectors
-    const { AbiCoder } = ethers;
-    const callsEncoded = AbiCoder.defaultAbiCoder().encode(
+    const callsEncoded = ethers.AbiCoder.defaultAbiCoder().encode(
       ['address','uint256','uint256','tuple(address target,uint256 value,bytes data)[]','bytes'],
-      [depositAddr, Number(nonce), deadline, calls.map(c => [c.target, 0, c.data]), req.signature]
+      [depositAddr, Number(nonce), deadline, calls.map(c => [c.target, c.value, c.data]), sig]
     );
     for (const sel of ['0x30d8f990','0xf59c8ac6','0x70558d06','0x8fc0307e']) {
       try {
@@ -283,11 +285,11 @@ async function ensureDepositWalletReady(wallet) {
         logger.info('USDC approved from deposit wallet', { selector: sel, txHash: tx.hash });
         break;
       } catch (e) {
-        logger.warn('Batch execute attempt failed', { selector: sel, error: e.message.slice(0,60) });
+        logger.warn('Batch execute attempt', { selector: sel, error: e.message.slice(0,80) });
       }
     }
   } catch (err) {
-    logger.warn('Deposit wallet approval setup failed', { error: err.message.slice(0,100) });
+    logger.warn('Deposit wallet approval failed', { error: err.message.slice(0,100) });
   }
 
   // 3. Move all USDC from EOA to deposit wallet automatically
