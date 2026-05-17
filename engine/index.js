@@ -114,14 +114,33 @@ const CTF_EXCHANGES = [
   process.env.CTF_NEG_RISK_ADDRESS       || '0xC5d563A36AE78145C45a50134d48A1215220f80a',
 ];
 
-async function getWalletBalance(walletAddress) {
+const DEPOSIT_WALLET_FACTORY = '0x00000000000Fb5C9ADea0298D729A0CB3823Cc07';
+const DEPOSIT_WALLET_IMPL    = '0x58CA52ebe0DadfdF531Cde7062e76746de4Db1eB';
+
+const _depositWalletCache = {}; // eoaAddress -> depositWalletAddress
+
+async function getDepositWalletAddressCached(eoaAddress) {
+  if (_depositWalletCache[eoaAddress]) return _depositWalletCache[eoaAddress];
+  const { deriveDepositWallet } = await import('@polymarket/builder-relayer-client');
+  _depositWalletCache[eoaAddress] = deriveDepositWallet(eoaAddress, DEPOSIT_WALLET_FACTORY, DEPOSIT_WALLET_IMPL);
+  return _depositWalletCache[eoaAddress];
+}
+
+async function getWalletBalance(eoaAddress) {
   const provider = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
   const abi = ['function balanceOf(address) view returns (uint256)'];
-  const [rawE, rawN] = await Promise.all([
-    new ethers.Contract(USDC_E_ADDRESS, abi, provider).balanceOf(walletAddress),
-    new ethers.Contract(USDC_ADDRESS,   abi, provider).balanceOf(walletAddress),
-  ]);
-  return parseFloat(ethers.formatUnits(rawE + rawN, 6));
+  const depositAddr = await getDepositWalletAddressCached(eoaAddress);
+  // Check both EOA and deposit wallet — USDC could be in either
+  const addresses = [eoaAddress, depositAddr];
+  let total = 0n;
+  for (const addr of addresses) {
+    const [rawE, rawN] = await Promise.all([
+      new ethers.Contract(USDC_E_ADDRESS, abi, provider).balanceOf(addr),
+      new ethers.Contract(USDC_ADDRESS,   abi, provider).balanceOf(addr),
+    ]);
+    total += rawE + rawN;
+  }
+  return parseFloat(ethers.formatUnits(total, 6));
 }
 
 // Approve CTF Exchange contracts to spend USDC - called once when engine starts
@@ -191,19 +210,12 @@ function diffPositions(prev, curr) {
 // ── POLYMARKET CLOB CLIENT ───────────────────────────────────────────────────
 const clobClients = {}; // walletAddress -> ClobClient (initialized with creds)
 
-async function getDepositWalletAddress(eoaAddress) {
-  const { deriveDepositWallet } = await import('@polymarket/builder-relayer-client');
-  const FACTORY    = '0x00000000000Fb5C9ADea0298D729A0CB3823Cc07';
-  const IMPL       = '0x58CA52ebe0DadfdF531Cde7062e76746de4Db1eB';
-  return deriveDepositWallet(eoaAddress, FACTORY, IMPL);
-}
-
 async function getClobClient(wallet) {
   if (clobClients[wallet.address]) return clobClients[wallet.address];
   const { ClobClient } = await getClobLib();
 
   const viemSigner = await makeViemSigner(wallet.privateKey);
-  const depositWallet = await getDepositWalletAddress(wallet.address);
+  const depositWallet = await getDepositWalletAddressCached(wallet.address);
   logger.info('Deposit wallet', { eoa: wallet.address.slice(0,10), depositWallet });
 
   // Derive API key first, create only if missing
