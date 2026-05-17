@@ -1,38 +1,13 @@
 require('dotenv').config();
 const crypto = require('crypto');
 const { ethers } = require('ethers');
+const { ClobClient, Side, OrderType } = require('@polymarket/clob-client');
 const db = require('../db');
 
 const ALGORITHM = 'aes-256-gcm';
 const CLOB_BASE = 'https://clob.polymarket.com';
 const POLL_INTERVAL_MS = 15000;
-
-// Polymarket CTF Exchange on Polygon Mainnet
-const CTF_EXCHANGE = process.env.CTF_EXCHANGE_ADDRESS || '0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E';
-
-const DOMAIN = {
-  name: 'CTFExchange',
-  version: '1',
-  chainId: 137,
-  verifyingContract: CTF_EXCHANGE,
-};
-
-const ORDER_TYPES = {
-  Order: [
-    { name: 'salt',          type: 'uint256' },
-    { name: 'maker',         type: 'address' },
-    { name: 'signer',        type: 'address' },
-    { name: 'taker',         type: 'address' },
-    { name: 'tokenId',       type: 'uint256' },
-    { name: 'makerAmount',   type: 'uint256' },
-    { name: 'takerAmount',   type: 'uint256' },
-    { name: 'expiration',    type: 'uint256' },
-    { name: 'nonce',         type: 'uint256' },
-    { name: 'feeRateBps',    type: 'uint256' },
-    { name: 'side',          type: 'uint8'   },
-    { name: 'signatureType', type: 'uint8'   },
-  ],
-};
+const CHAIN_ID = 137;
 
 // Shared polling: one Polymarket API call per unique target wallet regardless of how many users copy it
 // sharedPolls[targetWallet] = { interval, users: Map<userId, userConfig>, lock: bool }
@@ -188,184 +163,44 @@ function diffPositions(prev, curr) {
   return { opened, closed };
 }
 
-// ── POLYMARKET L2 AUTH ────────────────────────────────────────────────────────
-// Source: @polymarket/clob-client dist/headers/index.js + dist/signing/
-const CLOB_AUTH_DOMAIN = { name: 'ClobAuthDomain', version: '1', chainId: 137 };
-const CLOB_AUTH_TYPES  = {
-  ClobAuth: [
-    { name: 'address',   type: 'address' },
-    { name: 'timestamp', type: 'string'  },
-    { name: 'nonce',     type: 'uint256' },
-    { name: 'message',   type: 'string'  },
-  ],
-};
-const CLOB_AUTH_MSG = 'This message attests that I control the given wallet';
+// ── POLYMARKET CLOB CLIENT ───────────────────────────────────────────────────
+const clobClients = {}; // walletAddress -> ClobClient (initialized with creds)
 
-const apiKeyCache = {}; // walletAddress -> { key, secret, passphrase }
-
-async function fetchRaw(url, opts = {}) {
-  const { default: fetch } = await import('node-fetch');
-  return fetch(url, opts);
-}
-
-async function buildL1Headers(wallet, nonce = 0) {
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  const sig = await wallet.signTypedData(CLOB_AUTH_DOMAIN, CLOB_AUTH_TYPES, {
-    address:   wallet.address,
-    timestamp,
-    nonce,
-    message:   CLOB_AUTH_MSG,
-  });
-  return {
-    'Content-Type':   'application/json',
-    'POLY_ADDRESS':   wallet.address,
-    'POLY_SIGNATURE': sig,
-    'POLY_TIMESTAMP': timestamp,
-    'POLY_NONCE':     `${nonce}`,
-  };
-}
-
-function buildHmac(secret, timestamp, method, path, body = '') {
-  const message = `${timestamp}${method}${path}${body}`;
-  // URL-safe base64 (Polymarket spec: + → -, / → _)
-  return crypto.createHmac('sha256', Buffer.from(secret, 'base64'))
-    .update(message).digest('base64')
-    .replace(/\+/g, '-').replace(/\//g, '_');
-}
-
-async function getOrCreateApiKey(wallet) {
-  if (apiKeyCache[wallet.address]) return apiKeyCache[wallet.address];
-
-  // Try derive (GET existing key) first
+async function getClobClient(wallet) {
+  if (clobClients[wallet.address]) return clobClients[wallet.address];
+  const client = new ClobClient(CLOB_BASE, CHAIN_ID, wallet);
   try {
-    const r = await fetchRaw(`${CLOB_BASE}/auth/derive-api-key`, {
-      headers: await buildL1Headers(wallet, 0),
-    });
-    if (r.ok) {
-      const d = await r.json();
-      if (d.apiKey && d.secret) {
-        const creds = { key: d.apiKey, secret: d.secret, passphrase: d.passphrase };
-        apiKeyCache[wallet.address] = creds;
-        logger.info('API key derived', { wallet: wallet.address.slice(0, 10) });
-        return creds;
-      }
-    }
-  } catch (e) {
-    logger.warn('derive-api-key failed', { error: e.message });
+    const creds = await client.createOrDeriveApiKey();
+    client.creds = creds;
+    clobClients[wallet.address] = client;
+    logger.info('ClobClient ready', { wallet: wallet.address.slice(0, 10) });
+  } catch (err) {
+    throw new Error(`ClobClient init failed: ${err.message}`);
   }
-
-  // Create new key, try nonces 0..2
-  for (let n = 0; n <= 2; n++) {
-    try {
-      const r = await fetchRaw(`${CLOB_BASE}/auth/api-key`, {
-        method:  'POST',
-        headers: await buildL1Headers(wallet, n),
-      });
-      const d = await r.json();
-      if (r.ok && d.apiKey && d.secret) {
-        const creds = { key: d.apiKey, secret: d.secret, passphrase: d.passphrase };
-        apiKeyCache[wallet.address] = creds;
-        logger.info('API key created', { wallet: wallet.address.slice(0, 10), nonce: n });
-        return creds;
-      }
-      logger.warn('API key attempt failed', { nonce: n, error: JSON.stringify(d).slice(0, 120) });
-    } catch (e) {
-      logger.warn('API key error', { nonce: n, error: e.message });
-    }
-  }
-  throw new Error('Could not obtain Polymarket API key');
+  return client;
 }
 
-async function getAuthHeaders(wallet, method = 'POST', path = '/order', body = '') {
-  const creds = await getOrCreateApiKey(wallet);
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  return {
-    'Content-Type':    'application/json',
-    'POLY_ADDRESS':    wallet.address,
-    'POLY_SIGNATURE':  buildHmac(creds.secret, timestamp, method, path, body),
-    'POLY_TIMESTAMP':  timestamp,
-    'POLY_API_KEY':    creds.key,
-    'POLY_PASSPHRASE': creds.passphrase,
-  };
-}
+// side: 'BUY' | 'SELL'
+// amount: USDC to spend (BUY), shares to sell (SELL)
+async function placeOrder(wallet, tokenId, side, price, amount) {
+  const client = await getClobClient(wallet);
+  const isBuy = side === 'BUY';
+  const size = isBuy ? amount / price : amount;  // shares
 
-// FIX 2 + placeOrder update:
-// side: 0 = BUY, 1 = SELL
-// amount: USDC to spend (BUY), shares to sell (SELL with isShares=true), or USDC value (SELL fallback)
-// isShares: when true and side=SELL, amount is treated as number of shares
-async function placeOrder(wallet, tokenId, side, price, amount, isShares = false) {
-  const { default: fetch } = await import('node-fetch');
+  let tickSize = '0.01';
+  try { tickSize = await client.getTickSize(tokenId); } catch {}
 
-  const salt = BigInt(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER));
-  const isBuy = side === 0;
+  let negRisk = false;
+  try { negRisk = await client.getNegRisk(tokenId); } catch {}
 
-  let makerAmount, takerAmount;
-  if (isBuy) {
-    // amount = USDC to spend
-    makerAmount = BigInt(Math.round(amount * 1e6));
-    takerAmount = BigInt(Math.round((amount / price) * 1e6));
-  } else if (isShares) {
-    // SELL: maker gives shares, taker gives USDC
-    makerAmount = BigInt(Math.round(amount * 1e6));       // shares to sell (6 dec)
-    takerAmount = BigInt(Math.round(amount * price * 1e6)); // USDC to receive
-  } else {
-    // SELL by USDC value fallback
-    makerAmount = BigInt(Math.round((amount / price) * 1e6));
-    takerAmount = BigInt(Math.round(amount * 1e6));
-  }
+  const order = await client.createOrder(
+    { tokenID: tokenId, price, side: isBuy ? Side.BUY : Side.SELL, size },
+    { tickSize, negRisk }
+  );
 
-  const orderData = {
-    salt,
-    maker:         wallet.address,
-    signer:        wallet.address,
-    taker:         '0x0000000000000000000000000000000000000000',
-    tokenId:       BigInt(tokenId),
-    makerAmount,
-    takerAmount,
-    expiration:    0n,
-    nonce:         0n,
-    feeRateBps:    0n,
-    side,
-    signatureType: 0,
-  };
-
-  const signature = await wallet.signTypedData(DOMAIN, ORDER_TYPES, orderData);
-
-  const body = {
-    order: {
-      salt:          salt.toString(),
-      maker:         wallet.address,
-      signer:        wallet.address,
-      taker:         '0x0000000000000000000000000000000000000000',
-      tokenId:       tokenId.toString(),
-      makerAmount:   makerAmount.toString(),
-      takerAmount:   takerAmount.toString(),
-      expiration:    '0',
-      nonce:         '0',
-      feeRateBps:    '0',
-      side,
-      signatureType: 0,
-    },
-    signature,
-    owner:     wallet.address,
-    orderType: 'GTC',
-  };
-
-  const bodyStr = JSON.stringify(body);
-  const headers = await getAuthHeaders(wallet, 'POST', '/order', bodyStr);
-  const res = await fetch(`${CLOB_BASE}/order`, {
-    method:  'POST',
-    headers,
-    body:    bodyStr,
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    if (res.status === 401) delete apiKeyCache[wallet.address]; // force re-auth on next attempt
-    throw new Error(`CLOB rejected: ${res.status} ${text.slice(0, 300)}`);
-  }
-
-  return res.json();
+  const result = await client.postOrder(order, OrderType.GTC);
+  if (result.errorMsg) throw new Error(`CLOB rejected: ${result.errorMsg}`);
+  return result;
 }
 
 // Process one signal for one user - completely isolated per user
@@ -417,7 +252,7 @@ async function processSignalForUser(user, wallet, signal, side) {
       }
 
       logger.trade('Placing BUY', { userId: user.id, conditionId: signal.conditionId, size, price });
-      const result = await placeOrder(wallet, tokenId, 0, price, size);
+      const result = await placeOrder(wallet, tokenId, 'BUY', price, size);
       logger.trade('BUY placed', { userId: user.id, orderId: result.orderID });
 
       const key = snapshotKey(signal);
@@ -445,7 +280,7 @@ async function processSignalForUser(user, wallet, signal, side) {
       const expectedUsdc = sharesToSell * price;
 
       logger.trade('Placing SELL', { userId: user.id, conditionId: signal.conditionId, sharesToSell, price });
-      const result = await placeOrder(wallet, tokenId, 1, price, sharesToSell, true);
+      const result = await placeOrder(wallet, tokenId, 'SELL', price, sharesToSell);
       logger.trade('SELL placed', { userId: user.id, orderId: result.orderID });
 
       if (signal.type === 'CLOSED') {
