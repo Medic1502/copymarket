@@ -64,6 +64,73 @@ router.post('/export-key', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.post('/recover-deposit-wallet', async (req, res, next) => {
+  try {
+    const { toAddress } = req.body;
+    if (!toAddress || !/^0x[0-9a-fA-F]{40}$/.test(toAddress)) return res.status(400).json({ error: 'Invalid address.' });
+
+    const wallet = await db.getWalletByUserId(req.userId);
+    if (!wallet) return res.status(404).json({ error: 'Wallet not found.' });
+
+    const privateKey = db.decryptPrivateKey(wallet.encrypted_private_key);
+    const provider   = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
+    const signer     = new ethers.Wallet(privateKey, provider);
+
+    const { deriveDepositWallet } = await import('@polymarket/builder-relayer-client');
+    const depositAddr = deriveDepositWallet(wallet.address, '0x00000000000Fb5C9ADea0298D729A0CB3823Cc07', '0x58CA52ebe0DadfdF531Cde7062e76746de4Db1eB');
+
+    const tokens = [
+      '0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB', // pUSD
+      '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',  // native USDC
+      '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',  // USDC.e
+    ];
+    const erc20Abi = ['function balanceOf(address) view returns (uint256)', 'function transfer(address,uint256) returns (bool)'];
+    const transferIface = new ethers.Interface(['function transfer(address to, uint256 amount) returns (bool)']);
+
+    // Try to call deposit wallet execute function directly with signed batch
+    const depositWalletAbi = ['function nonce() view returns (uint256)'];
+    const depositContract  = new ethers.Contract(depositAddr, depositWalletAbi, provider);
+    const nonce    = await depositContract.nonce().catch(() => 0n);
+    const deadline = Math.floor(Date.now() / 1000) + 3600;
+
+    const results = [];
+    for (const tokenAddr of tokens) {
+      const token = new ethers.Contract(tokenAddr, erc20Abi, provider);
+      const bal   = await token.balanceOf(depositAddr).catch(() => 0n);
+      if (bal === 0n) continue;
+
+      const transferData = transferIface.encodeFunctionData('transfer', [toAddress, bal]);
+      const calls = [{ target: tokenAddr, value: 0n, data: transferData }];
+
+      const domain = { name: 'DepositWallet', version: '1', chainId: 137, verifyingContract: depositAddr };
+      const types  = {
+        Call:  [{ name: 'target', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'data', type: 'bytes' }],
+        Batch: [{ name: 'wallet', type: 'address' }, { name: 'nonce', type: 'uint256' }, { name: 'deadline', type: 'uint256' }, { name: 'calls', type: 'Call[]' }],
+      };
+      const message = { wallet: depositAddr, nonce: Number(nonce), deadline, calls };
+      const sig     = await signer.signTypedData(domain, types, message);
+
+      const callsAbi = ethers.AbiCoder.defaultAbiCoder().encode(
+        ['uint256','uint256','tuple(address,uint256,bytes)[]','bytes'],
+        [Number(nonce), deadline, calls.map(c => [c.target, c.value, c.data]), sig]
+      );
+
+      let txHash = null;
+      for (const sel of ['0xe2ca8866','0xe7274679','0xf59c8ac6']) {
+        try {
+          const tx = await signer.sendTransaction({ to: depositAddr, data: sel + callsAbi.slice(2) });
+          await tx.wait();
+          txHash = tx.hash;
+          results.push({ token: tokenAddr, amount: ethers.formatUnits(bal, 6), txHash });
+          break;
+        } catch {}
+      }
+      if (!txHash) results.push({ token: tokenAddr, amount: ethers.formatUnits(bal, 6), error: 'Execute failed' });
+    }
+    res.json({ depositWallet: depositAddr, results });
+  } catch (err) { next(err); }
+});
+
 router.post('/withdraw', async (req, res, next) => {
   try {
     const { toAddress, amount } = req.body;

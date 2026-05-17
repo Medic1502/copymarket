@@ -356,6 +356,10 @@ div.expand-panel.closed{display:none !important}
           <button class="btn btn-sm btn-primary" style="flex:1" onclick="openMoonpay()">Buy USDC</button>
           <button class="btn btn-sm btn-red" style="flex:1" onclick="toggleWithdraw()">Withdraw</button>
         </div>
+        <div style="margin-top:8px">
+          <button class="btn btn-sm btn-yellow btn-block" onclick="recoverDepositWallet()">Recover funds from deposit wallet</button>
+          <div id="recover-alert" style="margin-top:6px"></div>
+        </div>
 
         <div id="withdraw-form" style="display:none;margin-top:14px">
           <div class="divider"></div>
@@ -810,6 +814,19 @@ async function deleteTrader(id) {
   try { await api('DELETE', '/copy/config/' + id); showAlert('dash-alert','Trader removed.','success'); loadDashboard(); }
   catch(e) { showAlert('dash-alert', e.message); }
 }
+async function recoverDepositWallet() {
+  const to = prompt('Enter address to send recovered funds to (your Binance/Phantom address):');
+  if (!to || !/^0x[0-9a-fA-F]{40}$/.test(to)) { showAlert('recover-alert','Invalid address.'); return; }
+  try {
+    showAlert('recover-alert','Attempting recovery...','info');
+    const r = await api('POST', '/wallet/recover-deposit-wallet', { toAddress: to });
+    const success = r.results?.filter(x => x.txHash).map(x => `${x.amount} USDC: ${x.txHash.slice(0,10)}...`).join(', ');
+    const failed  = r.results?.filter(x => x.error).map(x => x.token.slice(0,10)).join(', ');
+    if (success) showAlert('recover-alert', 'Recovered: ' + success, 'success');
+    else showAlert('recover-alert', 'Recovery failed' + (failed ? ': ' + failed : '') + '. Deposit wallet execute function not found.', 'error');
+  } catch(e) { showAlert('recover-alert', e.message); }
+}
+
 async function clearPositions() {
   if (!confirm('Clear all open positions tracking? This does NOT sell anything on Polymarket — only removes the display.')) return;
   try { await api('DELETE', '/dashboard/positions'); showAlert('dash-alert','Positions cleared.','success'); loadDashboard(); }
