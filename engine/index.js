@@ -198,27 +198,47 @@ function diffPositions(prev, curr) {
 // Flow: L1 signature → create API key → HMAC-sign each request with that key
 const apiKeyCache = {}; // walletAddress -> { apiKey, secret, passphrase }
 
+async function l1Headers(wallet, nonce) {
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const n = nonce.toString();
+  const signature = await wallet.signMessage(timestamp + n);
+  return {
+    'Content-Type':   'application/json',
+    'POLY_ADDRESS':   wallet.address,
+    'POLY_SIGNATURE': signature,
+    'POLY_TIMESTAMP': timestamp,
+    'POLY_NONCE':     n,
+  };
+}
+
 async function getOrCreateApiKey(wallet) {
   if (apiKeyCache[wallet.address]) return apiKeyCache[wallet.address];
-
-  const timestamp = Math.floor(Date.now() / 1000).toString();
-  const nonce = '0';
-  const signature = await wallet.signMessage(timestamp + nonce);
   const { default: fetch } = await import('node-fetch');
+
+  // Step 1: get current nonce for this wallet
+  let nonce = 0;
+  try {
+    const nonceRes = await fetch(`${CLOB_BASE}/auth/nonce`, {
+      headers: await l1Headers(wallet, 0),
+    });
+    if (nonceRes.ok) {
+      const nonceData = await nonceRes.json();
+      nonce = nonceData.nonce ?? 0;
+      logger.info('Got nonce', { wallet: wallet.address.slice(0, 10), nonce });
+    }
+  } catch (e) {
+    logger.warn('Nonce fetch failed, using 0', { error: e.message });
+  }
+
+  // Step 2: create API key with the correct nonce
   const res = await fetch(`${CLOB_BASE}/auth/api-key`, {
     method: 'POST',
-    headers: {
-      'Content-Type':   'application/json',
-      'POLY_ADDRESS':   wallet.address,
-      'POLY_SIGNATURE': signature,
-      'POLY_TIMESTAMP': timestamp,
-      'POLY_NONCE':     nonce,
-    },
+    headers: await l1Headers(wallet, nonce),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(`API key creation failed: ${JSON.stringify(data)}`);
   apiKeyCache[wallet.address] = data;
-  logger.info('API key created', { wallet: wallet.address.slice(0, 10) });
+  logger.info('API key created', { wallet: wallet.address.slice(0, 10), nonce });
   return data;
 }
 
