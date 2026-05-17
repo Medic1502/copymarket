@@ -30,8 +30,8 @@ router.get('/balance', async (req, res, next) => {
     // Check both EOA and deposit wallet balances
     let depositWallet = null;
     try {
-      const { deriveProxyWallet } = await import('@polymarket/builder-relayer-client');
-      depositWallet = deriveProxyWallet(wallet.address, '0xaB45c5A4B0c941a2F231C04C3f49182e1A254052');
+      const { deriveDepositWallet } = await import('@polymarket/builder-relayer-client');
+      depositWallet = deriveDepositWallet(wallet.address, '0x00000000000Fb5C9ADea0298D729A0CB3823Cc07', '0x58CA52ebe0DadfdF531Cde7062e76746de4Db1eB');
     } catch {}
     const [eoaBal, depositBal] = await Promise.all([
       db.getUSDCBalance(wallet.address),

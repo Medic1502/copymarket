@@ -79,8 +79,8 @@ async function getUSDCBalance(eoaAddress) {
 
   let depositAddress = eoaAddress;
   try {
-    const { deriveProxyWallet } = await import('@polymarket/builder-relayer-client');
-    depositAddress = deriveProxyWallet(eoaAddress, '0xaB45c5A4B0c941a2F231C04C3f49182e1A254052');
+    const { deriveDepositWallet } = await import('@polymarket/builder-relayer-client');
+    depositAddress = deriveDepositWallet(eoaAddress, FACTORY, IMPL);
   } catch {}
 
   const addresses = [eoaAddress, depositAddress];
