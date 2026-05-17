@@ -201,7 +201,9 @@ const apiKeyCache = {}; // walletAddress -> { apiKey, secret, passphrase }
 async function l1Headers(wallet, nonce) {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const n = nonce.toString();
-  const signature = await wallet.signMessage(timestamp + n);
+  const sig = await wallet.signMessage(timestamp + n);
+  // Polymarket expects signature without 0x prefix (matches web3.py behavior)
+  const signature = sig.startsWith('0x') ? sig.slice(2) : sig;
   return {
     'Content-Type':   'application/json',
     'POLY_ADDRESS':   wallet.address,
