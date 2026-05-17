@@ -395,7 +395,10 @@ async function placeOrder(wallet, tokenId, side, price, amount) {
   // Round price to tick size decimal places
   const decimals = tickSize.includes('.') ? tickSize.split('.')[1].length : 2;
   const roundedPrice = parseFloat(price.toFixed(decimals));
-  const sharesSize = isBuy ? parseFloat((amount / roundedPrice).toFixed(4)) : parseFloat(amount.toFixed(4));
+  const MIN_SHARES = 5;
+  let sharesSize = isBuy ? amount / roundedPrice : amount;
+  if (sharesSize < MIN_SHARES) sharesSize = MIN_SHARES; // enforce Polymarket minimum
+  sharesSize = parseFloat(sharesSize.toFixed(4));
 
   const order = await client.createOrder(
     { tokenID: tokenId, price: roundedPrice, side: isBuy ? Side.BUY : Side.SELL, size: sharesSize },
