@@ -220,35 +220,9 @@ async function placeOrder(wallet, tokenId, side, price, amount) {
 async function processSignalForUser(user, wallet, signal, side) {
   try {
     if (side === 'BUY') {
-      if (user.followMode === 'initial_only' && signal.type === 'INCREASED') return;
-
       const tokenId = signal.tokenId || await getTokenId(signal.conditionId, signal.outcome);
       if (!tokenId) {
         logger.warn('Skip: tokenId not found', { userId: user.id, conditionId: signal.conditionId });
-        return;
-      }
-
-      // Fetch market info once for name + category
-      const market = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
-      const marketName = market?.question || market?.title || market?.market_slug || signal.conditionId;
-
-      if (user.categories?.length > 0) {
-        const gamma = await apiFetch(`https://gamma-api.polymarket.com/markets?conditionIds=${signal.conditionId}`).catch(() => null);
-        const gm = Array.isArray(gamma) ? gamma[0] : null;
-        const cat = gm?.category || gm?.tags?.join(' ') || market?.category || market?.market_type || '';
-        if (!user.categories.some(c => cat.toLowerCase().includes(c.toLowerCase()))) {
-          logger.warn('Skip: category mismatch', { userId: user.id, marketCat: cat, userCats: user.categories });
-          return;
-        }
-      }
-
-      const price = await getBestPrice(tokenId, 0);
-      if (!price || price <= 0 || price >= 0.9) {
-        logger.warn('Skip: invalid price', { userId: user.id, price });
-        return;
-      }
-      if (price < user.minSharePrice || price > user.maxSharePrice) {
-        logger.warn('Skip: price out of range', { userId: user.id, price, min: user.minSharePrice, max: user.maxSharePrice });
         return;
       }
 
@@ -256,17 +230,25 @@ async function processSignalForUser(user, wallet, signal, side) {
 
       const balance = await getWalletBalance(user.walletAddress);
       if (balance < size) {
-        logger.warn('Skipping BUY - low balance', { userId: user.id, balance, needed: size });
+        logger.warn('Skip: low balance', { userId: user.id, balance, needed: size });
         return;
       }
 
+      // Get current best ask price — use it for the order
+      const price = await getBestPrice(tokenId, 0);
+      if (!price || price <= 0) {
+        logger.warn('Skip: no liquidity', { userId: user.id, tokenId });
+        return;
+      }
+
+      const marketName = signal.conditionId;
       logger.trade('Placing BUY', { userId: user.id, conditionId: signal.conditionId, size, price });
       const result = await placeOrder(wallet, tokenId, 'BUY', price, size);
-      logger.trade('BUY result', { userId: user.id, orderId: result.orderID, status: result.status, matched: result.isMatched ?? result.matched });
+      logger.trade('BUY result', { userId: user.id, status: result.status, orderId: result.orderID });
 
       const filled = result.isMatched || result.matched || result.status === 'matched' || result.status === 'MATCHED';
       if (!filled) {
-        logger.warn('BUY not filled (FOK cancelled)', { userId: user.id, status: result.status });
+        logger.warn('BUY not filled', { userId: user.id, status: result.status });
         return;
       }
 
