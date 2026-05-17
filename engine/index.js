@@ -437,9 +437,10 @@ async function processSignalForUser(user, wallet, signal, side) {
         return;
       }
 
-      // Fetch market name for display
+      // Fetch market name and slug for display/links
       const market = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
       const marketName = market?.question || market?.title || market?.market_slug || signal.conditionId;
+      const marketSlug = market?.market_slug || null;
 
       logger.trade('Placing BUY', { userId: user.id, market: marketName.slice(0,40), price, usdc: usdcToSpend });
       const result = await placeOrder(wallet, tokenId, 'BUY', price, usdcToSpend);
@@ -449,7 +450,7 @@ async function processSignalForUser(user, wallet, signal, side) {
       const newShares = usdcToSpend / price;
       userBought[user.id].set(key, { usdc: prev.usdc + usdcToSpend, shares: prev.shares + newShares });
       await db.upsertBotPosition(user.id, user.configId, signal.conditionId, signal.outcome, usdcToSpend, newShares).catch(() => {});
-      await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName, outcome: signal.outcome, side: 'BUY', size: usdcToSpend, price, orderId: result.orderID || null, filledSize: null, status: result.status || 'OPEN', skipReason: null, pnl: null, configId: user.configId });
+      await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName, marketSlug, outcome: signal.outcome, side: 'BUY', size: usdcToSpend, price, orderId: result.orderID || null, filledSize: null, status: result.status || 'OPEN', skipReason: null, pnl: null, configId: user.configId });
 
     } else { // SELL
       const key = snapshotKey(signal);

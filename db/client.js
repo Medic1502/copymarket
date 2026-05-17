@@ -131,6 +131,7 @@ async function migrate() {
 
     // Add config_id to trades for per-trader stats
     await run(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS config_id UUID REFERENCES copy_configs(id) ON DELETE SET NULL`);
+    await run(`ALTER TABLE trades ADD COLUMN IF NOT EXISTS market_slug TEXT`);
 
     // License keys for desktop app
     await run(`

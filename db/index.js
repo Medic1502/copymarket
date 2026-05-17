@@ -135,11 +135,11 @@ async function getAllActiveConfigs() {
 
 // TRADES
 async function saveTrade(userId, trade) {
-  const { conditionId, marketName, outcome, side, size, price, orderId, filledSize, status, skipReason, pnl, configId } = trade;
+  const { conditionId, marketName, marketSlug, outcome, side, size, price, orderId, filledSize, status, skipReason, pnl, configId } = trade;
   const res = await query(
-    `INSERT INTO trades (user_id, config_id, condition_id, market_name, outcome, side, size, price, order_id, filled_size, status, skip_reason, pnl)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
-    [userId, configId||null, conditionId, marketName, outcome, side, size, price, orderId, filledSize, status, skipReason, pnl]
+    `INSERT INTO trades (user_id, config_id, condition_id, market_name, market_slug, outcome, side, size, price, order_id, filled_size, status, skip_reason, pnl)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+    [userId, configId||null, conditionId, marketName, marketSlug||null, outcome, side, size, price, orderId, filledSize, status, skipReason, pnl]
   );
   if (pnl != null) await upsertDailyPnl(userId, pnl);
   return res.rows[0];
@@ -230,10 +230,10 @@ async function getBotPositions(userId) {
 
 async function getBotPositionsWithNames(userId) {
   const res = await query(
-    `SELECT bp.*, t.market_name
+    `SELECT bp.*, t.market_name, t.market_slug
      FROM bot_positions bp
      LEFT JOIN LATERAL (
-       SELECT market_name FROM trades
+       SELECT market_name, market_slug FROM trades
        WHERE user_id=$1 AND condition_id=bp.condition_id AND market_name IS NOT NULL AND market_name != condition_id
        ORDER BY created_at DESC LIMIT 1
      ) t ON true
