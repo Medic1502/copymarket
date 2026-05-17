@@ -225,9 +225,6 @@ async function getClobClient(wallet) {
   const { ClobClient } = await getClobLib();
 
   const viemSigner = await makeViemSigner(wallet.privateKey);
-  const proxyWallet = await getProxyWalletAddress(wallet.address);
-  logger.info('Proxy wallet', { eoa: wallet.address.slice(0,10), proxyWallet });
-
   // Derive API key first, create only if missing
   const clientL1 = new ClobClient({ host: CLOB_BASE, chain: CHAIN_ID, signer: viemSigner });
   let creds;
@@ -239,18 +236,17 @@ async function getClobClient(wallet) {
     logger.info('API key created', { wallet: wallet.address.slice(0, 10) });
   }
 
-  // POLY_PROXY (signatureType: 1) — proxy wallet created via polymarket.com
+  // EOA (signatureType: 0) — simplest flow, USDC in EOA wallet directly
   const client = new ClobClient({
     host:          CLOB_BASE,
     chain:         CHAIN_ID,
     signer:        viemSigner,
     creds,
-    signatureType: 1,
-    funderAddress: proxyWallet,
+    signatureType: 0,
   });
 
   clobClients[wallet.address] = client;
-  logger.info('ClobClient ready (POLY_PROXY)', { wallet: wallet.address.slice(0,10), proxyWallet });
+  logger.info('ClobClient ready (EOA)', { wallet: wallet.address.slice(0,10) });
   return client;
 }
 

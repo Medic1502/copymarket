@@ -340,13 +340,12 @@ div.expand-panel.closed{display:none !important}
     <div id="tab-wallet" class="tab-panel">
       <div class="card">
         <div style="font-size:14px;font-weight:600;margin-bottom:14px">Your wallet</div>
-        <label>Deposit address — send USDC here (Polygon)</label>
+        <label>Your wallet address (send USDC here — Polygon)</label>
         <div class="addr-box" style="margin-bottom:6px">
           <span class="addr-text" id="dash-addr">—</span>
           <button class="btn btn-sm" onclick="copyDashAddr()">Copy</button>
         </div>
-        <p class="text-muted" style="color:var(--yellow)">⚠ This is your Polymarket deposit wallet. Send USDC (Polygon) to this address to fund trading.</p>
-        <div style="margin-top:8px;font-size:12px;color:var(--text3)">EOA key address: <span id="eoa-addr" style="font-family:monospace">—</span></div>
+        <p class="text-muted">Send USDC on Polygon only. Same address for everything.</p>
 
         <div class="divider"></div>
         <div class="info-row"><span class="info-label">USDC Balance</span><span class="info-val" id="wallet-balance">—</span></div>
@@ -1014,12 +1013,10 @@ async function loadDashboard() {
       badge.innerHTML = '<span class="paused-dot"></span> Paused';
     }
 
-    walletAddr = walletData.depositWallet || walletData.address;
+    walletAddr = walletData.address;
     localStorage.setItem('cm_wallet', walletAddr);
     document.getElementById('dash-addr').textContent    = walletAddr || '—';
     document.getElementById('profile-addr').textContent = walletAddr || '—';
-    const eoaEl = document.getElementById('eoa-addr');
-    if (eoaEl) eoaEl.textContent = walletData.address || '—';
     document.getElementById('wallet-balance').textContent = bal != null ? '$' + bal.toFixed(2) : '—';
     document.getElementById('wallet-locked').textContent  = '—';
     document.getElementById('wallet-free').textContent    = bal != null ? '$' + bal.toFixed(2) : '—';
