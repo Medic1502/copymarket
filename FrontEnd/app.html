@@ -302,6 +302,13 @@ div.expand-panel.closed{display:none !important}
         <div style="font-size:14px;font-weight:600;margin-bottom:14px" id="add-form-title">Add new trader</div>
         <div class="field"><label>Trader wallet address</label><input type="text" id="new-trader-wallet" placeholder="0x..."></div>
         <div class="field"><label>USDC per trade</label><input type="number" id="new-fixed-amount" value="1" min="1" placeholder="e.g. 5"></div>
+        <div style="margin-bottom:14px">
+          <label style="margin-bottom:6px">Follow mode</label>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm mode-btn selected" id="follow-all-btn" onclick="setFollowMode('all')">All buys</button>
+            <button class="btn btn-sm mode-btn" id="follow-init-btn" onclick="setFollowMode('initial_only')">Initial buy only</button>
+          </div>
+        </div>
         <input type="hidden" id="new-trader-nickname" value="">
         <input type="hidden" id="new-copy-mode" value="fixed">
         <input type="hidden" id="sl-pct" value="10">
@@ -683,6 +690,7 @@ function resetAddForm() {
   document.getElementById('new-trader-wallet').value = '';
   document.getElementById('new-trader-wallet').disabled = false;
   document.getElementById('new-fixed-amount').value = 1;
+  setFollowMode('all');
   document.getElementById('add-trader-btn').textContent = 'Start copying';
   document.getElementById('add-trader-btn').onclick = addTrader;
   clearAlert('add-trader-alert');
@@ -717,6 +725,7 @@ function editTrader(t) {
   document.getElementById('new-trader-wallet').value = t.targetWallet;
   document.getElementById('new-trader-wallet').disabled = true;
   document.getElementById('new-fixed-amount').value = t.fixedAmount || 1;
+  setFollowMode(t.followMode || 'all');
 
   const hdr = document.getElementById('add-form-title');
   if (hdr) hdr.textContent = 'Edit trader';
@@ -732,7 +741,8 @@ async function saveEditTrader() {
   setLoading('add-trader-btn', true);
   try {
     if (!_editingConfigId) throw new Error('No trader selected.');
-    await api('PUT', '/copy/config/' + _editingConfigId, { copyMode: 'fixed', fixedAmount: fixedAmt, copyPercentage: 10, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode: 'all', minSharePrice: 0.02, maxSharePrice: 0.88 });
+    const followMode = document.getElementById('new-follow-mode').value;
+    await api('PUT', '/copy/config/' + _editingConfigId, { copyMode: 'fixed', fixedAmount: fixedAmt, copyPercentage: 10, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode, minSharePrice: 0.02, maxSharePrice: 0.88 });
     document.getElementById('add-trader-form').classList.remove('open');
     resetAddForm();
     showAlert('dash-alert', 'Settings updated.', 'success');
@@ -753,7 +763,8 @@ async function addTrader() {
   }
   setLoading('add-trader-btn', true);
   try {
-    await api('POST', '/copy/config', { targetWallet: wallet, copyMode: 'fixed', fixedAmount: fixedAmt, copyPercentage: 10, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode: 'all', minSharePrice: 0.02, maxSharePrice: 0.88 });
+    const followMode = document.getElementById('new-follow-mode').value;
+    await api('POST', '/copy/config', { targetWallet: wallet, copyMode: 'fixed', fixedAmount: fixedAmt, copyPercentage: 10, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode, minSharePrice: 0.02, maxSharePrice: 0.88 });
     document.getElementById('add-trader-form').classList.remove('open');
     document.getElementById('new-trader-wallet').value = '';
     document.getElementById('new-trader-nickname').value = '';
@@ -913,6 +924,7 @@ function renderTradersHtml(traders) {
         '<div id="pos-'+t.id+'" style="margin-bottom:12px"></div>' +
         '<div class="expand-settings">' +
           '<span>Per trade: <strong>$' + t.fixedAmount + ' USDC</strong></span>' +
+          '<span>Follow: <strong>' + (t.followMode === 'initial_only' ? 'Initial only' : 'All buys') + '</strong></span>' +
           '<span>Wallet: <strong style="font-family:monospace">'+short+'</strong></span>' +
         '</div>' +
         '<div style="display:flex;gap:8px;margin-top:12px">' +

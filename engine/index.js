@@ -415,10 +415,10 @@ async function placeOrder(wallet, tokenId, side, price, amount) {
 async function processSignalForUser(user, wallet, signal, side) {
   try {
     if (side === 'BUY') {
-      // Skip if we already have this position open
+      // Skip if already in position AND user wants initial buy only
       const posKey = snapshotKey(signal);
-      if (userBought[user.id]?.has(posKey)) {
-        logger.info('Skip: already in position', { conditionId: signal.conditionId?.slice(0,10), outcome: signal.outcome });
+      if (user.followMode === 'initial_only' && userBought[user.id]?.has(posKey)) {
+        logger.info('Skip: already in position (initial_only)', { conditionId: signal.conditionId?.slice(0,10) });
         return;
       }
 
