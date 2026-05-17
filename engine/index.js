@@ -189,100 +189,91 @@ function diffPositions(prev, curr) {
 }
 
 // ── POLYMARKET L2 AUTH ────────────────────────────────────────────────────────
-const apiKeyCache = {};
+// Source: @polymarket/clob-client dist/headers/index.js + dist/signing/
+const CLOB_AUTH_DOMAIN = { name: 'ClobAuthDomain', version: '1', chainId: 137 };
+const CLOB_AUTH_TYPES  = {
+  ClobAuth: [
+    { name: 'address',   type: 'address' },
+    { name: 'timestamp', type: 'string'  },
+    { name: 'nonce',     type: 'uint256' },
+    { name: 'message',   type: 'string'  },
+  ],
+};
+const CLOB_AUTH_MSG = 'This message attests that I control the given wallet';
+
+const apiKeyCache = {}; // walletAddress -> { key, secret, passphrase }
 
 async function fetchRaw(url, opts = {}) {
   const { default: fetch } = await import('node-fetch');
   return fetch(url, opts);
 }
 
-async function l1Headers(wallet, nonce) {
+async function buildL1Headers(wallet, nonce = 0) {
   const timestamp = Math.floor(Date.now() / 1000).toString();
-  const n = nonce.toString();
-  // Polymarket TS client: sign keccak256(packed(timestamp, nonce)), not the raw string
-  const msgHash = ethers.solidityPackedKeccak256(['string', 'string'], [timestamp, n]);
-  const sig = await wallet.signMessage(ethers.getBytes(msgHash));
-  const signature = sig.startsWith('0x') ? sig.slice(2) : sig;
+  const sig = await wallet.signTypedData(CLOB_AUTH_DOMAIN, CLOB_AUTH_TYPES, {
+    address:   wallet.address,
+    timestamp,
+    nonce,
+    message:   CLOB_AUTH_MSG,
+  });
   return {
     'Content-Type':   'application/json',
     'POLY_ADDRESS':   wallet.address,
-    'POLY_SIGNATURE': signature,
+    'POLY_SIGNATURE': sig,
     'POLY_TIMESTAMP': timestamp,
-    'POLY_NONCE':     n,
+    'POLY_NONCE':     `${nonce}`,
   };
 }
 
-function normCreds(data) {
-  return {
-    apiKey:     data.apiKey     || data.api_key,
-    secret:     data.secret     || data.apiSecret || data.api_secret,
-    passphrase: data.passphrase || data.apiPassphrase,
-  };
-}
-
-async function getWalletNonce(wallet) {
-  // Try public nonce endpoint with address query param
-  try {
-    const r = await fetchRaw(`${CLOB_BASE}/auth/nonce?address=${wallet.address}`);
-    if (r.ok) { const d = await r.json(); return d.nonce ?? 0; }
-  } catch {}
-  // Try with L1 auth
-  try {
-    const r = await fetchRaw(`${CLOB_BASE}/auth/nonce`, { headers: await l1Headers(wallet, 0) });
-    if (r.ok) { const d = await r.json(); return d.nonce ?? 0; }
-  } catch {}
-  return 0;
+function buildHmac(secret, timestamp, method, path, body = '') {
+  const message = `${timestamp}${method}${path}${body}`;
+  // URL-safe base64 (Polymarket spec: + → -, / → _)
+  return crypto.createHmac('sha256', Buffer.from(secret, 'base64'))
+    .update(message).digest('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_');
 }
 
 async function getOrCreateApiKey(wallet) {
   if (apiKeyCache[wallet.address]) return apiKeyCache[wallet.address];
 
-  // Try GET existing key first
+  // Try derive (GET existing key) first
   try {
-    const nonce = await getWalletNonce(wallet);
-    const r = await fetchRaw(`${CLOB_BASE}/auth/api-key`, { headers: await l1Headers(wallet, nonce) });
+    const r = await fetchRaw(`${CLOB_BASE}/auth/derive-api-key`, {
+      headers: await buildL1Headers(wallet, 0),
+    });
     if (r.ok) {
       const d = await r.json();
-      const creds = normCreds(d);
-      if (creds.apiKey && creds.secret) {
+      if (d.apiKey && d.secret) {
+        const creds = { key: d.apiKey, secret: d.secret, passphrase: d.passphrase };
         apiKeyCache[wallet.address] = creds;
-        logger.info('Got existing API key', { wallet: wallet.address.slice(0, 10) });
+        logger.info('API key derived', { wallet: wallet.address.slice(0, 10) });
         return creds;
       }
     }
   } catch (e) {
-    logger.warn('GET api-key failed', { error: e.message });
+    logger.warn('derive-api-key failed', { error: e.message });
   }
 
-  // Create new key — try nonces 0..3
-  const baseNonce = await getWalletNonce(wallet);
-  for (let n = baseNonce; n <= baseNonce + 3; n++) {
+  // Create new key, try nonces 0..2
+  for (let n = 0; n <= 2; n++) {
     try {
       const r = await fetchRaw(`${CLOB_BASE}/auth/api-key`, {
         method:  'POST',
-        headers: await l1Headers(wallet, n),
+        headers: await buildL1Headers(wallet, n),
       });
       const d = await r.json();
-      if (r.ok) {
-        const creds = normCreds(d);
-        if (creds.apiKey && creds.secret) {
-          apiKeyCache[wallet.address] = creds;
-          logger.info('API key created', { wallet: wallet.address.slice(0, 10), nonce: n });
-          return creds;
-        }
+      if (r.ok && d.apiKey && d.secret) {
+        const creds = { key: d.apiKey, secret: d.secret, passphrase: d.passphrase };
+        apiKeyCache[wallet.address] = creds;
+        logger.info('API key created', { wallet: wallet.address.slice(0, 10), nonce: n });
+        return creds;
       }
-      logger.warn('API key creation attempt failed', { nonce: n, resp: JSON.stringify(d).slice(0, 150) });
+      logger.warn('API key attempt failed', { nonce: n, error: JSON.stringify(d).slice(0, 120) });
     } catch (e) {
-      logger.warn('API key creation error', { nonce: n, error: e.message });
+      logger.warn('API key error', { nonce: n, error: e.message });
     }
   }
-  throw new Error('Could not obtain API key after multiple attempts');
-}
-
-function hmacSign(secret, timestamp, method, path, body = '') {
-  const message = `${timestamp}${method}${path}${body}`;
-  const key = Buffer.from(secret, 'base64');
-  return crypto.createHmac('sha256', key).update(message).digest('base64');
+  throw new Error('Could not obtain Polymarket API key');
 }
 
 async function getAuthHeaders(wallet, method = 'POST', path = '/order', body = '') {
@@ -291,9 +282,9 @@ async function getAuthHeaders(wallet, method = 'POST', path = '/order', body = '
   return {
     'Content-Type':    'application/json',
     'POLY_ADDRESS':    wallet.address,
-    'POLY_SIGNATURE':  hmacSign(creds.secret, timestamp, method, path, body),
+    'POLY_SIGNATURE':  buildHmac(creds.secret, timestamp, method, path, body),
     'POLY_TIMESTAMP':  timestamp,
-    'POLY_API_KEY':    creds.apiKey,
+    'POLY_API_KEY':    creds.key,
     'POLY_PASSPHRASE': creds.passphrase,
   };
 }
