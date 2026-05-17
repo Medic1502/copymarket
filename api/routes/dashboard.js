@@ -31,7 +31,7 @@ router.get('/trades', async (req, res, next) => {
 
 router.get('/positions', async (req, res, next) => {
   try {
-    const positions = await db.getBotPositions(req.userId);
+    const positions = await db.getBotPositionsWithNames(req.userId);
     res.json({ positions });
   } catch (err) { next(err); }
 });

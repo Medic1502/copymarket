@@ -973,12 +973,16 @@ async function loadOpenPositions(traders) {
         '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Open Positions (' + tPos.length + ')</div>' +
         '<div style="display:flex;flex-direction:column;gap:4px">' +
         tPos.map(p => {
-          const usdc = parseFloat(p.usdc_spent).toFixed(2);
+          const usdc   = parseFloat(p.usdc_spent).toFixed(2);
           const shares = parseFloat(p.shares).toFixed(2);
-          const cid = (p.condition_id||'').slice(0,10) + '...';
-          return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:6px;padding:6px 10px;font-size:12px">' +
-            '<span style="color:var(--text2)">' + cid + ' <strong style="color:var(--text)">' + (p.outcome||'Yes') + '</strong></span>' +
-            '<span style="color:var(--green);font-weight:600">$' + usdc + ' · ' + shares + ' shares</span>' +
+          const name   = p.market_name && p.market_name !== p.condition_id ? p.market_name : null;
+          const link   = 'https://polymarket.com/event/' + p.condition_id;
+          const nameHtml = name
+            ? '<a href="' + link + '" target="_blank" style="color:var(--text);text-decoration:none;font-weight:600" onclick="event.stopPropagation()">' + name + ' ↗</a>'
+            : '<a href="' + link + '" target="_blank" style="color:var(--text2);text-decoration:none;font-family:monospace;font-size:11px" onclick="event.stopPropagation()">' + (p.condition_id||'').slice(0,14) + '... ↗</a>';
+          return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:6px;padding:6px 10px;font-size:12px;gap:8px">' +
+            '<span style="color:var(--text2);min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + nameHtml + ' <strong style="color:var(--blue-light)">' + (p.outcome||'Yes') + '</strong></span>' +
+            '<span style="color:var(--green);font-weight:600;flex-shrink:0">$' + usdc + ' · ' + shares + '</span>' +
             '</div>';
         }).join('') +
         '</div>';

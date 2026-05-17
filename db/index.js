@@ -228,6 +228,21 @@ async function getBotPositions(userId) {
   return res.rows;
 }
 
+async function getBotPositionsWithNames(userId) {
+  const res = await query(
+    `SELECT bp.*, t.market_name
+     FROM bot_positions bp
+     LEFT JOIN LATERAL (
+       SELECT market_name FROM trades
+       WHERE user_id=$1 AND condition_id=bp.condition_id AND market_name IS NOT NULL AND market_name != condition_id
+       ORDER BY created_at DESC LIMIT 1
+     ) t ON true
+     WHERE bp.user_id=$1 AND bp.shares > 0`,
+    [userId]
+  );
+  return res.rows;
+}
+
 async function clearBotPositions(userId) {
   await query('DELETE FROM bot_positions WHERE user_id=$1', [userId]);
 }
@@ -272,6 +287,6 @@ module.exports = {
   createWalletForUser, getWalletByUserId, getUSDCBalance,
   saveCopyConfig, updateCopyConfig, getCopyConfig, setActive, getAllActiveConfigs, deleteCopyConfig,
   saveTrade, getRecentTrades, getDashboardStats, getTodayLoss, getTraderStats,
-  upsertBotPosition, deleteBotPosition, getBotPositions, clearBotPositions,
+  upsertBotPosition, deleteBotPosition, getBotPositions, getBotPositionsWithNames, clearBotPositions,
   encryptPrivateKey, decryptPrivateKey,
 };
