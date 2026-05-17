@@ -93,7 +93,53 @@ router.post('/recover-deposit-wallet', async (req, res, next) => {
     const nonce    = await depositContract.nonce().catch(() => 0n);
     const deadline = Math.floor(Date.now() / 1000) + 3600;
 
+    // Step 1: Check if deposit wallet is deployed
+    const code = await provider.getCode(depositAddr);
+    const isDeployed = code && code !== '0x';
+    const deployLog = [];
+
+    if (!isDeployed) {
+      // Try many factory function signatures to deploy
+      const FACTORY = '0x00000000000Fb5C9ADea0298D729A0CB3823Cc07';
+      const IMPL    = '0x58CA52ebe0DadfdF531Cde7062e76746de4Db1eB';
+      const { pad, keccak256: viemKeccak, encodeAbiParameters, concat, toHex } = await import('viem');
+      const walletId = pad(wallet.address, { dir: 'left', size: 32 });
+      const args = encodeAbiParameters([{type:'address'},{type:'bytes32'}], [FACTORY, walletId]);
+      const salt = viemKeccak(args);
+      const deploySelectors = [
+        { fn: 'create(address)', args: [wallet.address] },
+        { fn: 'createWallet(address)', args: [wallet.address] },
+        { fn: 'deploy(address)', args: [wallet.address] },
+        { fn: 'createFor(address)', args: [wallet.address] },
+        { fn: 'newWallet(address)', args: [wallet.address] },
+        { fn: 'create(bytes32)', rawArgs: walletId },
+      ];
+      for (const d of deploySelectors) {
+        try {
+          const iface = new ethers.Interface([`function ${d.fn}`]);
+          const fnName = d.fn.split('(')[0];
+          const data = d.rawArgs
+            ? iface.encodeFunctionData(fnName, [d.rawArgs])
+            : iface.encodeFunctionData(fnName, d.args);
+          const tx = await signer.sendTransaction({ to: FACTORY, data });
+          await tx.wait();
+          const newCode = await provider.getCode(depositAddr);
+          if (newCode && newCode !== '0x') {
+            deployLog.push({ success: true, fn: d.fn });
+            break;
+          }
+          deployLog.push({ fn: d.fn, result: 'reverted or wrong address' });
+        } catch (e) {
+          deployLog.push({ fn: d.fn, error: e.message.slice(0,60) });
+        }
+      }
+    }
+
+    // Step 2: Try to transfer directly from deposit wallet
     const results = [];
+    const newCode = await provider.getCode(depositAddr);
+    const walletDeployed = newCode && newCode !== '0x';
+
     for (const tokenAddr of tokens) {
       const token = new ethers.Contract(tokenAddr, erc20Abi, provider);
       const bal   = await token.balanceOf(depositAddr).catch(() => 0n);
@@ -102,32 +148,31 @@ router.post('/recover-deposit-wallet', async (req, res, next) => {
       const transferData = transferIface.encodeFunctionData('transfer', [toAddress, bal]);
       const calls = [{ target: tokenAddr, value: 0n, data: transferData }];
 
-      const domain = { name: 'DepositWallet', version: '1', chainId: 137, verifyingContract: depositAddr };
-      const types  = {
-        Call:  [{ name: 'target', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'data', type: 'bytes' }],
-        Batch: [{ name: 'wallet', type: 'address' }, { name: 'nonce', type: 'uint256' }, { name: 'deadline', type: 'uint256' }, { name: 'calls', type: 'Call[]' }],
-      };
-      const message = { wallet: depositAddr, nonce: Number(nonce), deadline, calls };
-      const sig     = await signer.signTypedData(domain, types, message);
-
-      const callsAbi = ethers.AbiCoder.defaultAbiCoder().encode(
-        ['uint256','uint256','tuple(address,uint256,bytes)[]','bytes'],
-        [Number(nonce), deadline, calls.map(c => [c.target, c.value, c.data]), sig]
-      );
-
       let txHash = null;
-      for (const sel of ['0xe2ca8866','0xe7274679','0xf59c8ac6']) {
-        try {
-          const tx = await signer.sendTransaction({ to: depositAddr, data: sel + callsAbi.slice(2) });
-          await tx.wait();
-          txHash = tx.hash;
-          results.push({ token: tokenAddr, amount: ethers.formatUnits(bal, 6), txHash });
-          break;
-        } catch {}
+      if (walletDeployed) {
+        const domain = { name: 'DepositWallet', version: '1', chainId: 137, verifyingContract: depositAddr };
+        const types  = {
+          Call:  [{ name: 'target', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'data', type: 'bytes' }],
+          Batch: [{ name: 'wallet', type: 'address' }, { name: 'nonce', type: 'uint256' }, { name: 'deadline', type: 'uint256' }, { name: 'calls', type: 'Call[]' }],
+        };
+        const message = { wallet: depositAddr, nonce: Number(nonce), deadline, calls };
+        const sig     = await signer.signTypedData(domain, types, message);
+        const callsAbi = ethers.AbiCoder.defaultAbiCoder().encode(
+          ['uint256','uint256','tuple(address,uint256,bytes)[]','bytes'],
+          [Number(nonce), deadline, calls.map(c => [c.target, c.value, c.data]), sig]
+        );
+        for (const sel of ['0xe2ca8866','0xe7274679','0xf59c8ac6','0x30d8f990']) {
+          try {
+            const tx = await signer.sendTransaction({ to: depositAddr, data: sel + callsAbi.slice(2) });
+            await tx.wait(); txHash = tx.hash;
+            results.push({ token: tokenAddr, amount: ethers.formatUnits(bal, 6), txHash });
+            break;
+          } catch {}
+        }
       }
-      if (!txHash) results.push({ token: tokenAddr, amount: ethers.formatUnits(bal, 6), error: 'Execute failed' });
+      if (!txHash) results.push({ token: tokenAddr, amount: ethers.formatUnits(bal, 6), error: 'Execute failed — wallet not deployed or wrong ABI', deployed: walletDeployed, deployLog });
     }
-    res.json({ depositWallet: depositAddr, results });
+    res.json({ depositWallet: depositAddr, isDeployed, walletDeployed, deployLog, results });
   } catch (err) { next(err); }
 });
 
