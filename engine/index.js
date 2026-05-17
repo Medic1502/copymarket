@@ -266,14 +266,21 @@ async function processSignalForUser(user, wallet, signal, side) {
 
       logger.trade('Placing BUY', { userId: user.id, conditionId: signal.conditionId, size, price });
       const result = await placeOrder(wallet, tokenId, 'BUY', price, size);
-      logger.trade('BUY placed', { userId: user.id, orderId: result.orderID });
+      logger.trade('BUY result', { userId: user.id, orderId: result.orderID, status: result.status, matched: result.isMatched ?? result.matched });
 
+      const filled = result.isMatched || result.matched || result.status === 'matched' || result.status === 'MATCHED';
+      if (!filled) {
+        logger.warn('BUY not filled (FOK cancelled)', { userId: user.id, status: result.status });
+        return;
+      }
+
+      logger.trade('BUY filled', { userId: user.id, orderId: result.orderID });
       const key = snapshotKey(signal);
       const prev = userBought[user.id]?.get(key) || { usdc: 0, shares: 0 };
       const newShares = size / price;
       userBought[user.id].set(key, { usdc: prev.usdc + size, shares: prev.shares + newShares });
       await db.upsertBotPosition(user.id, user.configId, signal.conditionId, signal.outcome, size, newShares).catch(() => {});
-      await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName, outcome: signal.outcome, side: 'BUY', size, price, orderId: result.orderID || null, filledSize: null, status: result.status || 'PENDING', skipReason: null, pnl: null, configId: user.configId });
+      await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName, outcome: signal.outcome, side: 'BUY', size, price, orderId: result.orderID || null, filledSize: null, status: 'FILLED', skipReason: null, pnl: null, configId: user.configId });
 
     } else { // SELL
       const key = snapshotKey(signal);
