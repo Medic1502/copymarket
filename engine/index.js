@@ -215,15 +215,19 @@ async function placeOrder(wallet, tokenId, side, price, amount) {
   let negRisk = false;
   try { negRisk = await client.getNegRisk(tokenId); } catch {}
 
-  const sharesSize = isBuy ? amount / price : amount;
+  // Round price to tick size decimal places
+  const decimals = tickSize.includes('.') ? tickSize.split('.')[1].length : 2;
+  const roundedPrice = parseFloat(price.toFixed(decimals));
+  const sharesSize = isBuy ? parseFloat((amount / roundedPrice).toFixed(4)) : parseFloat(amount.toFixed(4));
 
   const order = await client.createOrder(
-    { tokenID: tokenId, price, side: isBuy ? Side.BUY : Side.SELL, size: sharesSize },
+    { tokenID: tokenId, price: roundedPrice, side: isBuy ? Side.BUY : Side.SELL, size: sharesSize },
     { tickSize, negRisk }
   );
 
   const result = await client.postOrder(order, OrderType.GTC);
   if (result.errorMsg) throw new Error(`CLOB rejected: ${result.errorMsg}`);
+  if (result.status && result.status >= 400) throw new Error(`CLOB error ${result.status}: ${JSON.stringify(result)}`);
   return result;
 }
 
@@ -254,9 +258,7 @@ async function processSignalForUser(user, wallet, signal, side) {
 
       logger.trade('Placing BUY', { userId: user.id, conditionId: signal.conditionId.slice(0,10), price, usdc: usdcToSpend });
       const result = await placeOrder(wallet, tokenId, 'BUY', price, usdcToSpend);
-      logger.trade('BUY result', { userId: user.id, status: result.status, orderId: result.orderID });
-
-      logger.trade('BUY placed', { userId: user.id, orderId: result.orderID });
+      logger.trade('BUY placed', { userId: user.id, orderId: result.orderID, status: result.status });
       const key = snapshotKey(signal);
       const prev = userBought[user.id]?.get(key) || { usdc: 0, shares: 0 };
       const newShares = usdcToSpend / price;
