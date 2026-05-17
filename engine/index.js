@@ -1,5 +1,7 @@
 require('dotenv').config();
 const crypto = require('crypto');
+// Polyfill Web Crypto for @polymarket/clob-client (required in Node 18)
+if (!globalThis.crypto) globalThis.crypto = crypto.webcrypto;
 const { ethers } = require('ethers');
 const db = require('../db');
 
