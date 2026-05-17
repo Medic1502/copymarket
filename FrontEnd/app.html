@@ -1138,7 +1138,8 @@ async function loadDashboard() {
     renderTrades(tradesData.trades);
 
     clearTimeout(window._dashTimer);
-    window._dashTimer = setTimeout(loadDashboard, 20000);
+    const hasActive = config.traders && config.traders.some(t => t.isActive);
+    window._dashTimer = setTimeout(loadDashboard, hasActive ? 10000 : 30000);
   } catch(e) {
     showAlert('dash-alert', 'Could not load dashboard: ' + e.message);
   }
