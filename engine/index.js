@@ -507,7 +507,8 @@ async function startCopyEngine(user, targetWallet) {
   // Decrypt key and approve USDC - fully isolated per user wallet
   const privateKey = decryptPrivateKey(user.encryptedPrivateKey);
   const wallet = new ethers.Wallet(privateKey);
-  await ensureApprovals(wallet);
+  // Skip EOA approvals for POLY_1271 — deposit wallet handles its own approvals via polymarket.com
+  ensureApprovals(wallet).catch(e => logger.warn('Approval warning', { error: e.message.slice(0,60) }));
 
   // Register config in the shared poll for this target wallet
   activeEngines[user.configId] = targetWallet;
@@ -546,7 +547,7 @@ async function startCopyEngine(user, targetWallet) {
 
           // Process signals for EACH user independently - fully isolated
           for (const [, { user: u, wallet: w }] of poll.users) {
-            if (!approvedWallets.has(w.address)) await ensureApprovals(w);
+            if (!approvedWallets.has(w.address)) ensureApprovals(w).catch(() => {});
             for (const signal of opened) {
               await processSignalForUser(u, w, signal, 'BUY');
             }
