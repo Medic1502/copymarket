@@ -148,9 +148,9 @@ async function saveTrade(userId, trade) {
 async function getTraderStats(configId) {
   const res = await query(
     `SELECT
-      COUNT(*) FILTER (WHERE status='FILLED') AS total_trades,
+      COUNT(*) FILTER (WHERE side='BUY' AND status != 'FAILED') AS total_trades,
       COALESCE(SUM(pnl),0) AS total_pnl,
-      COALESCE(SUM(size) FILTER (WHERE side='BUY' AND status='FILLED'),0) AS total_invested,
+      COALESCE(SUM(size) FILTER (WHERE side='BUY' AND status != 'FAILED'),0) AS total_invested,
       COUNT(*) FILTER (WHERE pnl > 0) AS wins,
       COUNT(*) FILTER (WHERE pnl < 0) AS losses
      FROM trades WHERE config_id = $1`,
@@ -182,7 +182,7 @@ async function getRecentTrades(userId, limit = 20) {
 
 async function getDashboardStats(userId) {
   const [totalRes, pnlRes, todayRes, winRes] = await Promise.all([
-    query("SELECT COUNT(*) AS total_trades, SUM(size) AS total_invested FROM trades WHERE user_id=$1 AND status='FILLED'", [userId]),
+    query("SELECT COUNT(*) AS total_trades, SUM(size) AS total_invested FROM trades WHERE user_id=$1 AND side='BUY' AND status != 'FAILED'", [userId]),
     query('SELECT COALESCE(SUM(pnl),0) AS total_pnl FROM trades WHERE user_id=$1', [userId]),
     query('SELECT COALESCE(SUM(pnl),0) AS today_pnl FROM daily_pnl WHERE user_id=$1 AND date=CURRENT_DATE', [userId]),
     query("SELECT COUNT(*) FILTER (WHERE pnl > 0) AS wins, COUNT(*) FILTER (WHERE pnl < 0) AS losses FROM trades WHERE user_id=$1 AND pnl IS NOT NULL", [userId]),
