@@ -36,4 +36,11 @@ router.get('/positions', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.delete('/positions', async (req, res, next) => {
+  try {
+    await db.clearBotPositions(req.userId);
+    res.json({ message: 'Positions cleared.' });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

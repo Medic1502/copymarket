@@ -909,6 +909,11 @@ async function deleteTrader(id) {
   try { await api('DELETE', '/copy/config/' + id); showAlert('dash-alert','Trader removed.','success'); loadDashboard(); }
   catch(e) { showAlert('dash-alert', e.message); }
 }
+async function clearPositions() {
+  if (!confirm('Clear all open positions tracking? This does NOT sell anything on Polymarket — only removes the display.')) return;
+  try { await api('DELETE', '/dashboard/positions'); showAlert('dash-alert','Positions cleared.','success'); loadDashboard(); }
+  catch(e) { showAlert('dash-alert', e.message); }
+}
 
 // ── RENDER TRADERS ────────────────────────────────────────────────────────────
 function renderTraders(config) {
@@ -989,6 +994,7 @@ function renderTradersHtml(traders) {
           (t.isActive
             ? '<button class="btn btn-sm btn-red" onclick="stopTrader(\''+t.id+'\')" style="width:auto">Pause</button>'
             : '<button class="btn btn-sm btn-green" onclick="resumeTrader(\''+t.id+'\')" style="width:auto">Resume</button>') +
+          '<button class="btn btn-sm" onclick="clearPositions()" style="width:auto">Clear positions</button>' +
           '<button class="btn btn-sm btn-red" onclick="deleteTrader(\''+t.id+'\')" style="width:auto">Remove trader</button>' +
         '</div>' +
       '</div>';

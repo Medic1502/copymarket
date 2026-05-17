@@ -214,6 +214,11 @@ async function getBotPositions(userId) {
   return res.rows;
 }
 
+async function clearBotPositions(userId) {
+  await query('DELETE FROM bot_positions WHERE user_id=$1', [userId]);
+}
+}
+
 async function deleteCopyConfig(id, userId) {
   await query('DELETE FROM copy_configs WHERE id = $1 AND user_id = $2', [id, userId]);
 }
@@ -254,6 +259,6 @@ module.exports = {
   createWalletForUser, getWalletByUserId, getUSDCBalance,
   saveCopyConfig, updateCopyConfig, getCopyConfig, setActive, getAllActiveConfigs, deleteCopyConfig,
   saveTrade, getRecentTrades, getDashboardStats, getTodayLoss, getTraderStats,
-  upsertBotPosition, deleteBotPosition, getBotPositions,
+  upsertBotPosition, deleteBotPosition, getBotPositions, clearBotPositions,
   encryptPrivateKey, decryptPrivateKey,
 };
