@@ -117,13 +117,23 @@ const CTF_EXCHANGES = [
 const DEPOSIT_WALLET_FACTORY = '0x00000000000Fb5C9ADea0298D729A0CB3823Cc07';
 const DEPOSIT_WALLET_IMPL    = '0x58CA52ebe0DadfdF531Cde7062e76746de4Db1eB';
 
-const _depositWalletCache = {}; // eoaAddress -> depositWalletAddress
+const PROXY_FACTORY = '0xaB45c5A4B0c941a2F231C04C3f49182e1A254052';
+
+const _depositWalletCache = {};
+const _proxyWalletCache   = {};
 
 async function getDepositWalletAddressCached(eoaAddress) {
   if (_depositWalletCache[eoaAddress]) return _depositWalletCache[eoaAddress];
   const { deriveDepositWallet } = await import('@polymarket/builder-relayer-client');
   _depositWalletCache[eoaAddress] = deriveDepositWallet(eoaAddress, DEPOSIT_WALLET_FACTORY, DEPOSIT_WALLET_IMPL);
   return _depositWalletCache[eoaAddress];
+}
+
+async function getProxyWalletAddress(eoaAddress) {
+  if (_proxyWalletCache[eoaAddress]) return _proxyWalletCache[eoaAddress];
+  const { deriveProxyWallet } = await import('@polymarket/builder-relayer-client');
+  _proxyWalletCache[eoaAddress] = deriveProxyWallet(eoaAddress, PROXY_FACTORY);
+  return _proxyWalletCache[eoaAddress];
 }
 
 async function getWalletBalance(eoaAddress) {
@@ -215,8 +225,8 @@ async function getClobClient(wallet) {
   const { ClobClient } = await getClobLib();
 
   const viemSigner = await makeViemSigner(wallet.privateKey);
-  const depositWallet = await getDepositWalletAddressCached(wallet.address);
-  logger.info('Deposit wallet', { eoa: wallet.address.slice(0,10), depositWallet });
+  const proxyWallet = await getProxyWalletAddress(wallet.address);
+  logger.info('Proxy wallet', { eoa: wallet.address.slice(0,10), proxyWallet });
 
   // Derive API key first, create only if missing
   const clientL1 = new ClobClient({ host: CLOB_BASE, chain: CHAIN_ID, signer: viemSigner });
@@ -229,26 +239,18 @@ async function getClobClient(wallet) {
     logger.info('API key created', { wallet: wallet.address.slice(0, 10) });
   }
 
-  // POLY_1271 (signatureType: 3) — deposit wallet flow for new API users
+  // POLY_PROXY (signatureType: 1) — proxy wallet created via polymarket.com
   const client = new ClobClient({
     host:          CLOB_BASE,
     chain:         CHAIN_ID,
     signer:        viemSigner,
     creds,
-    signatureType: 3,
-    funderAddress: depositWallet,
+    signatureType: 1,
+    funderAddress: proxyWallet,
   });
 
-  // Ensure deposit wallet has approved CTF Exchange to spend USDC
-  try {
-    await client.updateBalanceAllowance();
-    logger.info('Balance allowance updated', { depositWallet });
-  } catch (err) {
-    logger.warn('updateBalanceAllowance failed', { error: err.message });
-  }
-
   clobClients[wallet.address] = client;
-  logger.info('ClobClient ready (POLY_1271)', { wallet: wallet.address.slice(0,10), depositWallet });
+  logger.info('ClobClient ready (POLY_PROXY)', { wallet: wallet.address.slice(0,10), proxyWallet });
   return client;
 }
 

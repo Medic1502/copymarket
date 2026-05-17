@@ -9,17 +9,13 @@ router.get('/', async (req, res, next) => {
   try {
     const wallet = await db.getWalletByUserId(req.userId);
     if (!wallet) return res.status(404).json({ error: 'Wallet not found.' });
-    // Compute deposit wallet address
-    let depositWallet = null;
+    // Compute proxy wallet address (created via polymarket.com ToS)
+    let proxyWallet = null;
     try {
-      const { deriveDepositWallet } = await import('@polymarket/builder-relayer-client');
-      depositWallet = deriveDepositWallet(
-        wallet.address,
-        '0x00000000000Fb5C9ADea0298D729A0CB3823Cc07',
-        '0x58CA52ebe0DadfdF531Cde7062e76746de4Db1eB'
-      );
+      const { deriveProxyWallet } = await import('@polymarket/builder-relayer-client');
+      proxyWallet = deriveProxyWallet(wallet.address, '0xaB45c5A4B0c941a2F231C04C3f49182e1A254052');
     } catch {}
-    res.json({ address: wallet.address, depositWallet, createdAt: wallet.created_at });
+    res.json({ address: wallet.address, depositWallet: proxyWallet, proxyWallet, createdAt: wallet.created_at });
   } catch (err) { next(err); }
 });
 
@@ -30,8 +26,8 @@ router.get('/balance', async (req, res, next) => {
     // Check both EOA and deposit wallet balances
     let depositWallet = null;
     try {
-      const { deriveDepositWallet } = await import('@polymarket/builder-relayer-client');
-      depositWallet = deriveDepositWallet(wallet.address, '0x00000000000Fb5C9ADea0298D729A0CB3823Cc07', '0x58CA52ebe0DadfdF531Cde7062e76746de4Db1eB');
+      const { deriveProxyWallet } = await import('@polymarket/builder-relayer-client');
+      depositWallet = deriveProxyWallet(wallet.address, '0xaB45c5A4B0c941a2F231C04C3f49182e1A254052');
     } catch {}
     const [eoaBal, depositBal] = await Promise.all([
       db.getUSDCBalance(wallet.address),
