@@ -227,6 +227,14 @@ async function getClobClient(wallet) {
     funderAddress: depositWallet,
   });
 
+  // Ensure deposit wallet has approved CTF Exchange to spend USDC
+  try {
+    await client.updateBalanceAllowance();
+    logger.info('Balance allowance updated', { depositWallet });
+  } catch (err) {
+    logger.warn('updateBalanceAllowance failed', { error: err.message });
+  }
+
   clobClients[wallet.address] = client;
   logger.info('ClobClient ready (POLY_1271)', { wallet: wallet.address.slice(0,10), depositWallet });
   return client;
