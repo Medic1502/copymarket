@@ -220,11 +220,46 @@ function diffPositions(prev, curr) {
 // ── POLYMARKET CLOB CLIENT ───────────────────────────────────────────────────
 const clobClients = {}; // walletAddress -> ClobClient (initialized with creds)
 
+async function ensureDepositWalletDeployed(wallet) {
+  const depositAddr = await getDepositWalletAddressCached(wallet.address);
+  const provider = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
+  const code = await provider.getCode(depositAddr);
+  if (code && code !== '0x') {
+    logger.info('Deposit wallet deployed', { depositAddr: depositAddr.slice(0,10) });
+    return depositAddr;
+  }
+  logger.info('Deploying deposit wallet via factory...', { depositAddr: depositAddr.slice(0,10) });
+  const signer = new ethers.Wallet(wallet.privateKey, provider);
+  try {
+    const iface = new ethers.Interface(['function create(address owner)']);
+    const tx = await signer.sendTransaction({
+      to:   DEPOSIT_WALLET_FACTORY,
+      data: iface.encodeFunctionData('create', [wallet.address]),
+    });
+    await tx.wait();
+    logger.info('Deposit wallet deployed', { txHash: tx.hash });
+  } catch (err) {
+    logger.warn('Factory deploy failed, trying no-data call', { error: err.message.slice(0,80) });
+    try {
+      const tx = await signer.sendTransaction({ to: DEPOSIT_WALLET_FACTORY });
+      await tx.wait();
+      logger.info('Deposit wallet deployed (fallback)', { txHash: tx.hash });
+    } catch (e2) {
+      logger.warn('Deposit wallet deploy failed', { error: e2.message.slice(0,80) });
+    }
+  }
+  return depositAddr;
+}
+
 async function getClobClient(wallet) {
   if (clobClients[wallet.address]) return clobClients[wallet.address];
   const { ClobClient } = await getClobLib();
 
   const viemSigner = await makeViemSigner(wallet.privateKey);
+
+  // Deploy deposit wallet if needed, then set approvals
+  const depositAddr = await ensureDepositWalletDeployed(wallet);
+
   // Derive API key first, create only if missing
   const clientL1 = new ClobClient({ host: CLOB_BASE, chain: CHAIN_ID, signer: viemSigner });
   let creds;
@@ -236,17 +271,26 @@ async function getClobClient(wallet) {
     logger.info('API key created', { wallet: wallet.address.slice(0, 10) });
   }
 
-  // EOA (signatureType: 0) — simplest flow, USDC in EOA wallet directly
+  // POLY_1271 with deposit wallet
   const client = new ClobClient({
     host:          CLOB_BASE,
     chain:         CHAIN_ID,
     signer:        viemSigner,
     creds,
-    signatureType: 0,
+    signatureType: 3,
+    funderAddress: depositAddr,
   });
 
+  // Update balance allowance for the deposit wallet
+  try {
+    await client.updateBalanceAllowance();
+    logger.info('Balance allowance set', { depositAddr: depositAddr.slice(0,10) });
+  } catch (err) {
+    logger.warn('updateBalanceAllowance failed', { error: err.message.slice(0,80) });
+  }
+
   clobClients[wallet.address] = client;
-  logger.info('ClobClient ready (EOA)', { wallet: wallet.address.slice(0,10) });
+  logger.info('ClobClient ready (POLY_1271)', { wallet: wallet.address.slice(0,10), depositAddr: depositAddr.slice(0,10) });
   return client;
 }
 

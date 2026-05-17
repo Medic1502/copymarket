@@ -1013,7 +1013,7 @@ async function loadDashboard() {
       badge.innerHTML = '<span class="paused-dot"></span> Paused';
     }
 
-    walletAddr = walletData.address;
+    walletAddr = walletData.depositWallet || walletData.address;
     localStorage.setItem('cm_wallet', walletAddr);
     document.getElementById('dash-addr').textContent    = walletAddr || '—';
     document.getElementById('profile-addr').textContent = walletAddr || '—';
