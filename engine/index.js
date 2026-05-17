@@ -1,8 +1,13 @@
 require('dotenv').config();
 const crypto = require('crypto');
 const { ethers } = require('ethers');
-const { ClobClient, Side, OrderType } = require('@polymarket/clob-client');
 const db = require('../db');
+
+let _clobLib = null;
+async function getClobLib() {
+  if (!_clobLib) _clobLib = await import('@polymarket/clob-client');
+  return _clobLib;
+}
 
 const ALGORITHM = 'aes-256-gcm';
 const CLOB_BASE = 'https://clob.polymarket.com';
@@ -168,6 +173,7 @@ const clobClients = {}; // walletAddress -> ClobClient (initialized with creds)
 
 async function getClobClient(wallet) {
   if (clobClients[wallet.address]) return clobClients[wallet.address];
+  const { ClobClient } = await getClobLib();
   const client = new ClobClient(CLOB_BASE, CHAIN_ID, wallet);
   try {
     const creds = await client.createOrDeriveApiKey();
@@ -183,9 +189,10 @@ async function getClobClient(wallet) {
 // side: 'BUY' | 'SELL'
 // amount: USDC to spend (BUY), shares to sell (SELL)
 async function placeOrder(wallet, tokenId, side, price, amount) {
+  const { Side, OrderType } = await getClobLib();
   const client = await getClobClient(wallet);
   const isBuy = side === 'BUY';
-  const size = isBuy ? amount / price : amount;  // shares
+  const size = isBuy ? amount / price : amount;
 
   let tickSize = '0.01';
   try { tickSize = await client.getTickSize(tokenId); } catch {}
