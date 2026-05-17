@@ -397,7 +397,7 @@ async function placeOrder(wallet, tokenId, side, price, amount) {
   const roundedPrice = parseFloat(price.toFixed(decimals));
   const MIN_SHARES = 5;
   let sharesSize = isBuy ? amount / roundedPrice : amount;
-  if (sharesSize < MIN_SHARES) sharesSize = MIN_SHARES; // enforce Polymarket minimum
+  if (sharesSize < MIN_SHARES) throw new Error(`Min 5 shares required, have ${sharesSize.toFixed(2)} at price ${roundedPrice}. Increase per-trade amount.`);
   sharesSize = parseFloat(sharesSize.toFixed(4));
 
   const order = await client.createOrder(
