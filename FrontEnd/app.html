@@ -750,6 +750,11 @@ function toggleAddForm() {
   }
 }
 
+function editTraderById(id) {
+  const t = _allTraders.find(x => x.id === id);
+  if (t) editTrader(t);
+}
+
 function editTrader(t) {
   document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('open'));
   _editingConfigId = t.id;
@@ -996,7 +1001,7 @@ function renderTradersHtml(traders) {
         '<div class="trader-cell" onclick="event.stopPropagation()"><div class="menu-wrap"><button class="menu-btn" onclick="toggleMenu(\''+t.id+'\',this)">⋮</button>' +
           '<div class="dropdown" id="ddm-'+t.id+'">' +
             actionRow +
-            '<button class="dd-item" onclick="editTrader('+JSON.stringify(t).replace(/</g,'\\u003c')+');toggleMenu(\''+t.id+'\',null)">Edit settings</button>' +
+            '<button class="dd-item" onclick="editTraderById(\''+t.id+'\');toggleMenu(\''+t.id+'\',null)">Edit settings</button>' +
             '<button class="dd-item danger" onclick="deleteTrader(\''+t.id+'\')">Remove</button>' +
           '</div></div></div>' +
       '</div>' + expandPanel;
