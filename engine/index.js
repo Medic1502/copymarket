@@ -72,12 +72,6 @@ async function apiFetch(url, opts = {}) {
 async function getRecentActivity(walletAddress) {
   const data = await apiFetch(`https://data-api.polymarket.com/activity?user=${walletAddress}&limit=20`);
   const items = Array.isArray(data) ? data : (data.data || data.activity || []);
-  if (items.length > 0) {
-    const sample = items[0];
-    logger.info('Activity API sample', { wallet: walletAddress.slice(0,10), count: items.length, keys: Object.keys(sample).join(','), ts: sample.timestamp || sample.createdAt || sample.created_at });
-  } else {
-    logger.warn('Activity API returned empty', { wallet: walletAddress.slice(0,10) });
-  }
   return items.map(a => ({
     conditionId: a.conditionId || a.condition_id || a.market,
     outcome:     a.outcome     || 'Yes',
@@ -195,14 +189,17 @@ function diffPositions(prev, curr) {
 }
 
 // ── POLYMARKET L2 AUTH ────────────────────────────────────────────────────────
-// Flow: L1 signature → create API key → HMAC-sign each request with that key
-const apiKeyCache = {}; // walletAddress -> { apiKey, secret, passphrase }
+const apiKeyCache = {};
+
+async function fetchRaw(url, opts = {}) {
+  const { default: fetch } = await import('node-fetch');
+  return fetch(url, opts);
+}
 
 async function l1Headers(wallet, nonce) {
   const timestamp = Math.floor(Date.now() / 1000).toString();
   const n = nonce.toString();
   const sig = await wallet.signMessage(timestamp + n);
-  // Polymarket expects signature without 0x prefix (matches web3.py behavior)
   const signature = sig.startsWith('0x') ? sig.slice(2) : sig;
   return {
     'Content-Type':   'application/json',
@@ -213,35 +210,71 @@ async function l1Headers(wallet, nonce) {
   };
 }
 
+function normCreds(data) {
+  return {
+    apiKey:     data.apiKey     || data.api_key,
+    secret:     data.secret     || data.apiSecret || data.api_secret,
+    passphrase: data.passphrase || data.apiPassphrase,
+  };
+}
+
+async function getWalletNonce(wallet) {
+  // Try public nonce endpoint with address query param
+  try {
+    const r = await fetchRaw(`${CLOB_BASE}/auth/nonce?address=${wallet.address}`);
+    if (r.ok) { const d = await r.json(); return d.nonce ?? 0; }
+  } catch {}
+  // Try with L1 auth
+  try {
+    const r = await fetchRaw(`${CLOB_BASE}/auth/nonce`, { headers: await l1Headers(wallet, 0) });
+    if (r.ok) { const d = await r.json(); return d.nonce ?? 0; }
+  } catch {}
+  return 0;
+}
+
 async function getOrCreateApiKey(wallet) {
   if (apiKeyCache[wallet.address]) return apiKeyCache[wallet.address];
-  const { default: fetch } = await import('node-fetch');
 
-  // Step 1: get current nonce for this wallet
-  let nonce = 0;
+  // Try GET existing key first
   try {
-    const nonceRes = await fetch(`${CLOB_BASE}/auth/nonce`, {
-      headers: await l1Headers(wallet, 0),
-    });
-    if (nonceRes.ok) {
-      const nonceData = await nonceRes.json();
-      nonce = nonceData.nonce ?? 0;
-      logger.info('Got nonce', { wallet: wallet.address.slice(0, 10), nonce });
+    const nonce = await getWalletNonce(wallet);
+    const r = await fetchRaw(`${CLOB_BASE}/auth/api-key`, { headers: await l1Headers(wallet, nonce) });
+    if (r.ok) {
+      const d = await r.json();
+      const creds = normCreds(d);
+      if (creds.apiKey && creds.secret) {
+        apiKeyCache[wallet.address] = creds;
+        logger.info('Got existing API key', { wallet: wallet.address.slice(0, 10) });
+        return creds;
+      }
     }
   } catch (e) {
-    logger.warn('Nonce fetch failed, using 0', { error: e.message });
+    logger.warn('GET api-key failed', { error: e.message });
   }
 
-  // Step 2: create API key with the correct nonce
-  const res = await fetch(`${CLOB_BASE}/auth/api-key`, {
-    method: 'POST',
-    headers: await l1Headers(wallet, nonce),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(`API key creation failed: ${JSON.stringify(data)}`);
-  apiKeyCache[wallet.address] = data;
-  logger.info('API key created', { wallet: wallet.address.slice(0, 10), nonce });
-  return data;
+  // Create new key — try nonces 0..3
+  const baseNonce = await getWalletNonce(wallet);
+  for (let n = baseNonce; n <= baseNonce + 3; n++) {
+    try {
+      const r = await fetchRaw(`${CLOB_BASE}/auth/api-key`, {
+        method:  'POST',
+        headers: await l1Headers(wallet, n),
+      });
+      const d = await r.json();
+      if (r.ok) {
+        const creds = normCreds(d);
+        if (creds.apiKey && creds.secret) {
+          apiKeyCache[wallet.address] = creds;
+          logger.info('API key created', { wallet: wallet.address.slice(0, 10), nonce: n });
+          return creds;
+        }
+      }
+      logger.warn('API key creation attempt failed', { nonce: n, resp: JSON.stringify(d).slice(0, 150) });
+    } catch (e) {
+      logger.warn('API key creation error', { nonce: n, error: e.message });
+    }
+  }
+  throw new Error('Could not obtain API key after multiple attempts');
 }
 
 function hmacSign(secret, timestamp, method, path, body = '') {
@@ -251,20 +284,12 @@ function hmacSign(secret, timestamp, method, path, body = '') {
 }
 
 async function getAuthHeaders(wallet, method = 'POST', path = '/order', body = '') {
-  let creds;
-  try {
-    creds = await getOrCreateApiKey(wallet);
-  } catch (err) {
-    logger.warn('API key fetch failed, retrying fresh', { error: err.message });
-    delete apiKeyCache[wallet.address];
-    creds = await getOrCreateApiKey(wallet);
-  }
+  const creds = await getOrCreateApiKey(wallet);
   const timestamp = Math.floor(Date.now() / 1000).toString();
-  const sig = hmacSign(creds.secret, timestamp, method, path, body);
   return {
     'Content-Type':    'application/json',
     'POLY_ADDRESS':    wallet.address,
-    'POLY_SIGNATURE':  sig,
+    'POLY_SIGNATURE':  hmacSign(creds.secret, timestamp, method, path, body),
     'POLY_TIMESTAMP':  timestamp,
     'POLY_API_KEY':    creds.apiKey,
     'POLY_PASSPHRASE': creds.passphrase,
@@ -287,11 +312,11 @@ async function placeOrder(wallet, tokenId, side, price, amount, isShares = false
     makerAmount = BigInt(Math.round(amount * 1e6));
     takerAmount = BigInt(Math.round((amount / price) * 1e6));
   } else if (isShares) {
-    // amount = shares to sell
-    makerAmount = BigInt(Math.round(amount * 1e6));
-    takerAmount = BigInt(Math.round(amount * price * 1e6));
+    // SELL: maker gives shares, taker gives USDC
+    makerAmount = BigInt(Math.round(amount * 1e6));       // shares to sell (6 dec)
+    takerAmount = BigInt(Math.round(amount * price * 1e6)); // USDC to receive
   } else {
-    // amount = USDC value (fallback)
+    // SELL by USDC value fallback
     makerAmount = BigInt(Math.round((amount / price) * 1e6));
     takerAmount = BigInt(Math.round(amount * 1e6));
   }
@@ -343,6 +368,7 @@ async function placeOrder(wallet, tokenId, side, price, amount, isShares = false
 
   if (!res.ok) {
     const text = await res.text();
+    if (res.status === 401) delete apiKeyCache[wallet.address]; // force re-auth on next attempt
     throw new Error(`CLOB rejected: ${res.status} ${text.slice(0, 300)}`);
   }
 
