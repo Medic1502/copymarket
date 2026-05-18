@@ -156,6 +156,10 @@ async function migrate() {
     await run(`ALTER TABLE bot_positions ADD COLUMN IF NOT EXISTS resolved_outcome TEXT`);
     await run(`ALTER TABLE bot_positions ADD COLUMN IF NOT EXISTS resolved_pnl NUMERIC(12,4)`);
 
+    // Outcome index (0/1) and token ID — needed for correct winner detection and 99¢ auto-sell
+    await run(`ALTER TABLE bot_positions ADD COLUMN IF NOT EXISTS outcome_index INTEGER`);
+    await run(`ALTER TABLE bot_positions ADD COLUMN IF NOT EXISTS token_id TEXT`);
+
     // Backfill config_id on trades that were saved before the column existed
     await run(`
       UPDATE trades t

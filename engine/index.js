@@ -77,14 +77,15 @@ async function getRecentActivity(walletAddress) {
     const price    = parseFloat(a.price || a.outcome_price || (shares > 0 ? usdcSize / shares : 0));
     const ts = parseInt(a.timestamp || a.createdAt || a.created_at || 0);
     return {
-      conditionId: a.conditionId || a.condition_id || a.market,
-      outcome:     a.outcome     || 'Yes',
+      conditionId:  a.conditionId || a.condition_id || a.market,
+      outcome:      a.outcome     || 'Yes',
+      outcomeIndex: a.outcomeIndex ?? a.outcome_index ?? null,
       usdcSize,
       shares,
       price,
-      tokenId:     a.asset       || a.asset_id || a.tokenId || null,
-      side:        (a.side || a.type || '').toUpperCase(),
-      timestamp:   ts < 1e11 ? ts * 1000 : ts,
+      tokenId:      a.asset       || a.asset_id || a.tokenId || null,
+      side:         (a.side || a.type || '').toUpperCase(),
+      timestamp:    ts < 1e11 ? ts * 1000 : ts,
     };
   }).filter(a => a.conditionId && (a.side === 'BUY' || a.side === 'SELL'));
 }
@@ -491,7 +492,7 @@ async function processSignalForUser(user, wallet, signal, side) {
       const prev = userBought[user.id]?.get(key) || { usdc: 0, shares: 0 };
       const newShares = usdcToSpend / price;
       userBought[user.id].set(key, { usdc: prev.usdc + usdcToSpend, shares: prev.shares + newShares });
-      await db.upsertBotPosition(user.id, user.configId, signal.conditionId, signal.outcome, usdcToSpend, newShares).catch(() => {});
+      await db.upsertBotPosition(user.id, user.configId, signal.conditionId, signal.outcome, usdcToSpend, newShares, signal.outcomeIndex, tokenId).catch(() => {});
       await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName, marketSlug, outcome: signal.outcome, side: 'BUY', size: usdcToSpend, price, orderId: result.orderID || null, filledSize: null, status: result.status || 'OPEN', skipReason: null, pnl: null, configId: user.configId });
 
     } else { // SELL
@@ -537,8 +538,8 @@ async function checkAndRedeemPositions(user, wallet) {
     const positions = await db.getBotPositions(user.id);
     if (!positions || positions.length === 0) return;
 
-    const provider  = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
-    const signer    = new ethers.Wallet(wallet.privateKey, provider);
+    const provider    = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
+    const signer      = new ethers.Wallet(wallet.privateKey, provider);
     const depositAddr = await getDepositWalletAddressCached(wallet.address);
 
     for (const pos of positions) {
@@ -550,29 +551,69 @@ async function checkAndRedeemPositions(user, wallet) {
         ).catch(() => null);
         if (!marketArr || !Array.isArray(marketArr) || marketArr.length === 0) continue;
         const market = marketArr[0];
-        if (!market.resolved) continue;
 
-        const outcomes      = market.outcomes;
-        const outcomePrices = market.outcomePrices;
-        const ourIdx = Array.isArray(outcomes)
-          ? outcomes.findIndex(o => o.toLowerCase() === pos.outcome.toLowerCase())
-          : -1;
-        const isWinner = ourIdx >= 0 && Array.isArray(outcomePrices)
-          && parseFloat(outcomePrices[ourIdx]) >= 0.99;
+        // FIX: Gamma API uses "closed", not "resolved"
+        if (!market.closed) continue;
 
-        const shares   = parseFloat(pos.shares);
+        // FIX: outcomePrices and clobTokenIds come as JSON strings, not arrays
+        const outcomePrices = typeof market.outcomePrices === 'string'
+          ? JSON.parse(market.outcomePrices)
+          : (market.outcomePrices || []);
+        const clobTokenIds = typeof market.clobTokenIds === 'string'
+          ? JSON.parse(market.clobTokenIds)
+          : (market.clobTokenIds || []);
+
+        // FIX: use outcome_index for winner detection, not string matching
+        // Fallback for old positions without outcome_index: match via token_id -> clobTokenIds
+        let ourIdx = pos.outcome_index;
+        if (ourIdx == null && pos.token_id && clobTokenIds.length > 0) {
+          const found = clobTokenIds.findIndex(tid => tid === pos.token_id);
+          if (found >= 0) ourIdx = found;
+        }
+        if (ourIdx == null) {
+          logger.warn('Cannot determine outcome_index, skipping', { conditionId: conditionId.slice(0, 10) });
+          continue;
+        }
+
+        const isWinner  = Array.isArray(outcomePrices) && parseFloat(outcomePrices[ourIdx]) >= 0.99;
+        const shares    = parseFloat(pos.shares);
         const usdcSpent = parseFloat(pos.usdc_spent);
-        const pnl = isWinner ? parseFloat((shares - usdcSpent).toFixed(4)) : -usdcSpent;
+        const pnl       = isWinner ? parseFloat((shares - usdcSpent).toFixed(4)) : -usdcSpent;
         const marketName = market.question || market.title || conditionId;
         const marketSlug = market.slug || market.market_slug || null;
 
-        logger.info('Market resolved, settling position', {
+        logger.info('Market closed, settling position', {
+          userId: user.id, conditionId: conditionId.slice(0, 10),
+          outcome: pos.outcome, outcomeIndex: ourIdx, isWinner, pnl,
+        });
+
+        // FIX: update DB immediately — don't block on on-chain result
+        await db.resolveBotPosition(user.id, conditionId, pos.outcome, isWinner ? 'WON' : 'LOST', pnl).catch(() => {});
+        await db.resolveTradeOutcome(user.id, conditionId, isWinner ? 'WON' : 'LOST', pnl).catch(() => {});
+        await db.saveTrade(user.id, {
+          conditionId, marketName, marketSlug,
+          outcome:    pos.outcome,
+          side:       'REDEEM',
+          size:       isWinner ? shares : 0,
+          price:      isWinner ? 1.0 : 0,
+          orderId:    null,
+          filledSize: isWinner ? shares : null,
+          status:     'REDEEMED',
+          skipReason: null,
+          pnl,
+          configId:   user.configId,
+        }).catch(() => {});
+
+        if (userBought[user.id]) {
+          userBought[user.id].delete(`${conditionId}_${pos.outcome}`);
+        }
+
+        logger.trade('Position settled in DB', {
           userId: user.id, conditionId: conditionId.slice(0, 10),
           outcome: pos.outcome, isWinner, pnl,
         });
 
-        let onChainSuccess = false;
-
+        // Attempt on-chain redeem async (non-blocking) — only needed for winning positions
         if (isWinner) {
           const adapterAddr = market.negRisk
             ? NEG_RISK_CTF_COLLATERAL_ADAPTER
@@ -593,60 +634,26 @@ async function checkAndRedeemPositions(user, wallet) {
             'function exec(address to, uint256 value, bytes data)',
             'function call(address to, uint256 value, bytes data)',
           ];
-          for (const fn of executeFns) {
-            const iface  = new ethers.Interface([fn]);
-            const fnName = fn.split('(')[0].split(' ')[1];
-            try {
-              const tx = await signer.sendTransaction({
-                to:   depositAddr,
-                data: iface.encodeFunctionData(fnName, [adapterAddr, 0, redeemCalldata]),
-              });
-              await tx.wait();
-              logger.trade('Redemption tx confirmed', {
-                userId: user.id, txHash: tx.hash,
-                conditionId: conditionId.slice(0, 10), pnl,
-              });
-              onChainSuccess = true;
-              break;
-            } catch (e) {
-              logger.warn('Redeem execute attempt failed', { fn: fnName, error: e.message.slice(0, 80) });
+
+          ;(async () => {
+            for (const fn of executeFns) {
+              const iface  = new ethers.Interface([fn]);
+              const fnName = fn.split('(')[0].split(' ')[1];
+              try {
+                const tx = await signer.sendTransaction({
+                  to:   depositAddr,
+                  data: iface.encodeFunctionData(fnName, [adapterAddr, 0, redeemCalldata]),
+                });
+                await tx.wait();
+                logger.trade('On-chain redeem confirmed', {
+                  userId: user.id, txHash: tx.hash, conditionId: conditionId.slice(0, 10),
+                });
+                break;
+              } catch (e) {
+                logger.warn('On-chain redeem attempt failed', { fn: fnName, error: e.message.slice(0, 80) });
+              }
             }
-          }
-
-          if (!onChainSuccess) {
-            logger.warn('All redeem attempts failed, will retry next cycle', {
-              userId: user.id, conditionId: conditionId.slice(0, 10),
-            });
-          }
-        } else {
-          onChainSuccess = true; // losing position — nothing to redeem on-chain
-        }
-
-        if (onChainSuccess) {
-          await db.resolveBotPosition(user.id, conditionId, pos.outcome, isWinner ? 'WON' : 'LOST', pnl).catch(() => {});
-          await db.resolveTradeOutcome(user.id, conditionId, isWinner ? 'WON' : 'LOST', pnl).catch(() => {});
-          await db.saveTrade(user.id, {
-            conditionId, marketName, marketSlug,
-            outcome:    pos.outcome,
-            side:       'REDEEM',
-            size:       isWinner ? shares : 0,
-            price:      isWinner ? 1.0 : 0,
-            orderId:    null,
-            filledSize: isWinner ? shares : null,
-            status:     'REDEEMED',
-            skipReason: null,
-            pnl,
-            configId:   user.configId,
-          }).catch(() => {});
-
-          if (userBought[user.id]) {
-            userBought[user.id].delete(`${conditionId}_${pos.outcome}`);
-          }
-
-          logger.trade('Position settled', {
-            userId: user.id, conditionId: conditionId.slice(0, 10),
-            outcome: pos.outcome, isWinner, pnl,
-          });
+          })().catch(e => logger.warn('Async redeem error', { error: e.message.slice(0, 80) }));
         }
       } catch (posErr) {
         logger.warn('Redeem check error for position', {
@@ -657,6 +664,70 @@ async function checkAndRedeemPositions(user, wallet) {
     }
   } catch (err) {
     logger.warn('checkAndRedeemPositions error', { userId: user.id, error: err.message });
+  }
+}
+
+// Auto-sell positions when bid price hits 99¢ — captures value before formal resolution
+async function checkHighPricePositions(user, wallet) {
+  try {
+    const positions = await db.getBotPositions(user.id);
+    if (!positions || positions.length === 0) return;
+
+    for (const pos of positions) {
+      const tokenId = pos.token_id;
+      if (!tokenId) continue;
+      const shares = parseFloat(pos.shares);
+      if (shares <= 0) continue;
+
+      try {
+        const bid = await getBestPrice(tokenId, 1);
+        if (bid < 0.99) continue;
+
+        const posKey = `${pos.condition_id}_${pos.outcome}`;
+        logger.trade('Auto-sell: bid hit 99¢', {
+          userId: user.id, conditionId: pos.condition_id.slice(0, 10),
+          outcome: pos.outcome, bid, shares,
+        });
+
+        const result = await placeOrder(wallet, tokenId, 'SELL', bid, shares);
+        logger.trade('Auto-sell order placed', { userId: user.id, orderId: result.orderID });
+
+        const usdcReceived = parseFloat((shares * bid).toFixed(4));
+        const pnl          = parseFloat((usdcReceived - parseFloat(pos.usdc_spent)).toFixed(4));
+
+        const marketArr  = await apiFetch(`https://gamma-api.polymarket.com/markets?conditionIds=${pos.condition_id}`).catch(() => null);
+        const market     = marketArr?.[0];
+        const marketName = market?.question || market?.title || pos.condition_id;
+        const marketSlug = market?.slug || market?.market_slug || null;
+
+        await db.resolveBotPosition(user.id, pos.condition_id, pos.outcome, 'WON', pnl).catch(() => {});
+        await db.resolveTradeOutcome(user.id, pos.condition_id, 'WON', pnl).catch(() => {});
+        await db.saveTrade(user.id, {
+          conditionId: pos.condition_id, marketName, marketSlug,
+          outcome:    pos.outcome,
+          side:       'REDEEM',
+          size:       usdcReceived,
+          price:      bid,
+          orderId:    result.orderID || null,
+          filledSize: shares,
+          status:     'REDEEMED',
+          skipReason: null,
+          pnl,
+          configId:   user.configId,
+        }).catch(() => {});
+
+        if (userBought[user.id]) userBought[user.id].delete(posKey);
+
+        logger.trade('Auto-sell complete', { userId: user.id, pnl, usdcReceived });
+      } catch (err) {
+        logger.warn('Auto-sell failed', {
+          userId: user.id, conditionId: pos.condition_id?.slice(0, 10),
+          error: err.message.slice(0, 80),
+        });
+      }
+    }
+  } catch (err) {
+    logger.warn('checkHighPricePositions error', { userId: user.id, error: err.message });
   }
 }
 
@@ -750,14 +821,18 @@ async function startCopyEngine(user, targetWallet) {
             const bal = await getWalletBalance(u.walletAddress);
             if (bal < 1) {
               logger.warn('Skip all: insufficient balance', { userId: u.id, balance: bal });
-              continue;
+            } else {
+              for (const signal of deduped) {
+                await processSignalForUser(u, w, signal, 'BUY');
+              }
+              for (const signal of closed) {
+                await processSignalForUser(u, w, signal, 'SELL');
+              }
             }
-            for (const signal of deduped) {
-              await processSignalForUser(u, w, signal, 'BUY');
-            }
-            for (const signal of closed) {
-              await processSignalForUser(u, w, signal, 'SELL');
-            }
+            // Auto-sell positions at 99¢ — runs regardless of balance (selling doesn't need balance)
+            await checkHighPricePositions(u, w).catch(e =>
+              logger.warn('High price check error', { userId: u.id, error: e.message })
+            );
           }
         } catch (err) {
           logger.error('Shared poll failed', { targetWallet, error: err.message });

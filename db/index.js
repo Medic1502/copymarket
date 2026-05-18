@@ -213,16 +213,18 @@ async function getDashboardStats(userId) {
 }
 
 // BOT POSITIONS (persisted so sells survive server restarts)
-async function upsertBotPosition(userId, configId, conditionId, outcome, usdcDelta, sharesDelta) {
+async function upsertBotPosition(userId, configId, conditionId, outcome, usdcDelta, sharesDelta, outcomeIndex, tokenId) {
   await query(
-    `INSERT INTO bot_positions (user_id, config_id, condition_id, outcome, usdc_spent, shares)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO bot_positions (user_id, config_id, condition_id, outcome, usdc_spent, shares, outcome_index, token_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (user_id, condition_id, outcome)
      DO UPDATE SET
-       usdc_spent = bot_positions.usdc_spent + EXCLUDED.usdc_spent,
-       shares     = bot_positions.shares     + EXCLUDED.shares,
-       updated_at = NOW()`,
-    [userId, configId, conditionId, outcome, usdcDelta, sharesDelta]
+       usdc_spent    = bot_positions.usdc_spent + EXCLUDED.usdc_spent,
+       shares        = bot_positions.shares     + EXCLUDED.shares,
+       outcome_index = COALESCE(EXCLUDED.outcome_index, bot_positions.outcome_index),
+       token_id      = COALESCE(EXCLUDED.token_id,      bot_positions.token_id),
+       updated_at    = NOW()`,
+    [userId, configId, conditionId, outcome, usdcDelta, sharesDelta, outcomeIndex ?? null, tokenId ?? null]
   );
 }
 
