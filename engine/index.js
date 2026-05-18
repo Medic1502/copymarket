@@ -438,6 +438,18 @@ async function processSignalForUser(user, wallet, signal, side) {
         }
       }
 
+      // Skip if price outside copy range (cents filter)
+      if (signal.price > 0) {
+        if (user.minSharePrice != null && signal.price < user.minSharePrice) {
+          logger.info('Skip: price below min cc', { price: signal.price, min: user.minSharePrice, conditionId: signal.conditionId?.slice(0,10) });
+          return;
+        }
+        if (user.maxSharePrice != null && signal.price > user.maxSharePrice) {
+          logger.info('Skip: price above max cc', { price: signal.price, max: user.maxSharePrice, conditionId: signal.conditionId?.slice(0,10) });
+          return;
+        }
+      }
+
       const tokenId = signal.tokenId || await getTokenId(signal.conditionId, signal.outcome);
       logger.info('Token debug', { signalTokenId: signal.tokenId, resolved: tokenId, outcome: signal.outcome, conditionId: signal.conditionId?.slice(0,10) });
       if (!tokenId) {
