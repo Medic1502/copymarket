@@ -200,8 +200,8 @@ function calcTradeSize(user, signal) {
   if (user.copyMode === 'fixed') {
     return user.fixedAmount;
   }
-  // percentage of trader's bet
-  const size = parseFloat((signal.size * (user.copyPercentage / 100)).toFixed(2));
+  if (!signal.usdcSize || signal.usdcSize <= 0) return null; // skip if trader size unknown
+  const size = parseFloat((signal.usdcSize * (user.copyPercentage / 100)).toFixed(2));
   return Math.max(size, 1.0);
 }
 
@@ -429,15 +429,6 @@ async function processSignalForUser(user, wallet, signal, side) {
         return;
       }
 
-      // Skip if max position size reached
-      if (user.maxPositionSize != null) {
-        const existing = userBought[user.id]?.get(posKey);
-        if (existing && existing.usdc >= user.maxPositionSize) {
-          logger.info('Skip: max position size reached', { conditionId: signal.conditionId?.slice(0,10), spent: existing.usdc, max: user.maxPositionSize });
-          return;
-        }
-      }
-
       // Skip if price outside copy range (cents filter)
       if (signal.price > 0) {
         if (user.minSharePrice != null && signal.price < user.minSharePrice) {
@@ -464,7 +455,24 @@ async function processSignalForUser(user, wallet, signal, side) {
         return;
       }
 
-      const usdcToSpend = user.fixedAmount;
+      // Calculate USDC to spend (fixed amount or % of trader's bet)
+      let usdcToSpend = calcTradeSize(user, signal);
+      if (!usdcToSpend) {
+        logger.warn('Skip: % mode but trader usdcSize unknown', { conditionId: signal.conditionId?.slice(0,10) });
+        return;
+      }
+
+      // Clamp to maxPositionSize — don't skip, spend only what's left up to the cap
+      if (user.maxPositionSize != null) {
+        const alreadySpent = userBought[user.id]?.get(posKey)?.usdc ?? 0;
+        const remaining = user.maxPositionSize - alreadySpent;
+        if (remaining <= 0) {
+          logger.info('Skip: max position size reached', { conditionId: signal.conditionId?.slice(0,10), spent: alreadySpent, max: user.maxPositionSize });
+          return;
+        }
+        usdcToSpend = Math.min(usdcToSpend, remaining);
+      }
+
       const balance = await getWalletBalance(user.walletAddress);
       if (balance < usdcToSpend) {
         logger.warn('Skip: low balance', { userId: user.id, balance, needed: usdcToSpend });
@@ -738,10 +746,10 @@ async function startCopyEngine(user, targetWallet) {
           // Process signals for EACH user independently - fully isolated
           for (const [, { user: u, wallet: w }] of poll.users) {
             if (!approvedWallets.has(w.address)) ensureApprovals(w).catch(() => {});
-            // Check balance before processing — skip all if too low
+            // Check balance before processing — skip all if below $1 (per-signal check handles exact amount)
             const bal = await getWalletBalance(u.walletAddress);
-            if (bal < u.fixedAmount) {
-              logger.warn('Skip all: insufficient balance', { userId: u.id, balance: bal, needed: u.fixedAmount });
+            if (bal < 1) {
+              logger.warn('Skip all: insufficient balance', { userId: u.id, balance: bal });
               continue;
             }
             for (const signal of deduped) {

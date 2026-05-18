@@ -304,7 +304,20 @@ div.expand-panel.closed{display:none !important}
       <div class="add-form" id="add-trader-form">
         <div style="font-size:14px;font-weight:600;margin-bottom:14px" id="add-form-title">Add new trader</div>
         <div class="field"><label>Trader wallet address</label><input type="text" id="new-trader-wallet" placeholder="0x..."></div>
-        <div class="field"><label>USDC per trade</label><input type="number" id="new-fixed-amount" value="1" min="1" placeholder="e.g. 5"></div>
+        <div style="margin-bottom:14px">
+          <label style="margin-bottom:6px">Amount per trade</label>
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <button class="btn btn-sm mode-btn selected" id="mode-fixed-btn" onclick="setCopyMode('fixed')">Fixed $</button>
+            <button class="btn btn-sm mode-btn" id="mode-pct-btn" onclick="setCopyMode('percentage')">% of trader's bet</button>
+          </div>
+          <div id="fixed-amount-field">
+            <input type="number" id="new-fixed-amount" value="1" min="1" placeholder="e.g. 5" style="width:100%">
+          </div>
+          <div id="pct-amount-field" style="display:none">
+            <input type="number" id="new-copy-percentage" value="10" min="1" max="1000" placeholder="e.g. 10" style="width:100%">
+            <div style="color:var(--text3);font-size:12px;margin-top:4px">We bet X% of what the trader bets each time</div>
+          </div>
+        </div>
         <div class="field"><label>Max $ per position <span style="color:var(--text3);font-weight:400">(optional — leave empty for no limit)</span></label><input type="number" id="new-max-position" min="1" placeholder="e.g. 20"></div>
         <div style="margin-bottom:14px">
           <label style="margin-bottom:6px">Follow mode</label>
@@ -324,7 +337,6 @@ div.expand-panel.closed{display:none !important}
         </div>
         <input type="hidden" id="new-trader-nickname" value="">
         <input type="hidden" id="new-copy-mode" value="fixed">
-        <input type="hidden" id="sl-pct" value="10">
         <input type="hidden" id="new-follow-mode" value="all">
         <input type="hidden" id="new-min-bet" value="0">
         <input type="hidden" id="new-max-bet" value="100000">
@@ -674,9 +686,9 @@ function setCopyMode(mode) {
   document.getElementById('new-copy-mode').value = mode;
   const isPct = mode === 'percentage';
   document.getElementById('mode-pct-btn').className = 'btn btn-sm mode-btn' + (isPct ? ' selected' : '');
-  document.getElementById('mode-fix-btn').className = 'btn btn-sm mode-btn' + (!isPct ? ' selected' : '');
-  document.getElementById('mode-pct-section').style.display = isPct ? 'block' : 'none';
-  document.getElementById('mode-fix-section').style.display = isPct ? 'none' : 'block';
+  document.getElementById('mode-fixed-btn').className = 'btn btn-sm mode-btn' + (!isPct ? ' selected' : '');
+  document.getElementById('pct-amount-field').style.display = isPct ? 'block' : 'none';
+  document.getElementById('fixed-amount-field').style.display = isPct ? 'none' : 'block';
 }
 function setFollowMode(mode) {
   document.getElementById('new-follow-mode').value = mode;
@@ -701,9 +713,11 @@ function resetAddForm() {
   document.getElementById('new-trader-wallet').value = '';
   document.getElementById('new-trader-wallet').disabled = false;
   document.getElementById('new-fixed-amount').value = 1;
+  document.getElementById('new-copy-percentage').value = 10;
   document.getElementById('new-max-position').value = '';
   document.getElementById('new-min-price').value = 2;
   document.getElementById('new-max-price').value = 88;
+  setCopyMode('fixed');
   setFollowMode('all');
   document.getElementById('add-trader-btn').textContent = 'Start copying';
   document.getElementById('add-trader-btn').onclick = addTrader;
@@ -738,7 +752,9 @@ function editTrader(t) {
 
   document.getElementById('new-trader-wallet').value = t.targetWallet;
   document.getElementById('new-trader-wallet').disabled = true;
+  setCopyMode(t.copyMode || 'fixed');
   document.getElementById('new-fixed-amount').value = t.fixedAmount || 1;
+  document.getElementById('new-copy-percentage').value = t.copyPercentage || 10;
   document.getElementById('new-max-position').value = t.maxPositionSize != null ? t.maxPositionSize : '';
   document.getElementById('new-min-price').value = Math.round((t.minSharePrice || 0.02) * 100);
   document.getElementById('new-max-price').value = Math.round((t.maxSharePrice || 0.88) * 100);
@@ -753,8 +769,11 @@ function editTrader(t) {
 
 async function saveEditTrader() {
   clearAlert('add-trader-alert');
+  const copyMode = document.getElementById('new-copy-mode').value;
   const fixedAmt = parseFloat(document.getElementById('new-fixed-amount').value);
-  if (!fixedAmt || fixedAmt < 0.5) { showAlert('add-trader-alert', 'Minimum $0.50 per trade.'); return; }
+  const copyPct  = parseFloat(document.getElementById('new-copy-percentage').value);
+  if (copyMode === 'fixed' && (!fixedAmt || fixedAmt < 0.5)) { showAlert('add-trader-alert', 'Minimum $0.50 per trade.'); return; }
+  if (copyMode === 'percentage' && (!copyPct || copyPct <= 0)) { showAlert('add-trader-alert', 'Enter a valid percentage.'); return; }
   setLoading('add-trader-btn', true);
   try {
     if (!_editingConfigId) throw new Error('No trader selected.');
@@ -763,7 +782,7 @@ async function saveEditTrader() {
     const maxPositionSize = maxPosRaw !== '' ? parseFloat(maxPosRaw) : null;
     const minSharePrice = parseFloat(document.getElementById('new-min-price').value) / 100 || 0.02;
     const maxSharePrice = parseFloat(document.getElementById('new-max-price').value) / 100 || 0.88;
-    await api('PUT', '/copy/config/' + _editingConfigId, { copyMode: 'fixed', fixedAmount: fixedAmt, copyPercentage: 10, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode, minSharePrice, maxSharePrice, maxPositionSize });
+    await api('PUT', '/copy/config/' + _editingConfigId, { copyMode, fixedAmount: fixedAmt, copyPercentage: copyPct, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode, minSharePrice, maxSharePrice, maxPositionSize });
     document.getElementById('add-trader-form').classList.remove('open');
     resetAddForm();
     showAlert('dash-alert', 'Settings updated.', 'success');
@@ -775,10 +794,13 @@ async function saveEditTrader() {
 async function addTrader() {
   clearAlert('add-trader-alert');
   const wallet   = document.getElementById('new-trader-wallet').value.trim();
+  const copyMode = document.getElementById('new-copy-mode').value;
   const fixedAmt = parseFloat(document.getElementById('new-fixed-amount').value);
+  const copyPct  = parseFloat(document.getElementById('new-copy-percentage').value);
   if (!wallet) { showAlert('add-trader-alert','Enter a wallet address.'); return; }
   if (!/^0x[0-9a-fA-F]{40}$/.test(wallet)) { showAlert('add-trader-alert','Invalid address. Must start with 0x and be 42 characters.'); return; }
-  if (!fixedAmt || fixedAmt < 0.5) { showAlert('add-trader-alert','Minimum $0.50 per trade.'); return; }
+  if (copyMode === 'fixed' && (!fixedAmt || fixedAmt < 0.5)) { showAlert('add-trader-alert','Minimum $0.50 per trade.'); return; }
+  if (copyMode === 'percentage' && (!copyPct || copyPct <= 0)) { showAlert('add-trader-alert','Enter a valid percentage.'); return; }
   if (_allTraders.some(t => t.targetWallet && t.targetWallet.toLowerCase() === wallet.toLowerCase())) {
     showAlert('add-trader-alert', 'Already copying this wallet.'); return;
   }
@@ -789,7 +811,7 @@ async function addTrader() {
     const maxPositionSize = maxPosRaw !== '' ? parseFloat(maxPosRaw) : null;
     const minSharePrice = parseFloat(document.getElementById('new-min-price').value) / 100 || 0.02;
     const maxSharePrice = parseFloat(document.getElementById('new-max-price').value) / 100 || 0.88;
-    await api('POST', '/copy/config', { targetWallet: wallet, copyMode: 'fixed', fixedAmount: fixedAmt, copyPercentage: 10, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode, minSharePrice, maxSharePrice, maxPositionSize });
+    await api('POST', '/copy/config', { targetWallet: wallet, copyMode, fixedAmount: fixedAmt, copyPercentage: copyPct, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode, minSharePrice, maxSharePrice, maxPositionSize });
     document.getElementById('add-trader-form').classList.remove('open');
     document.getElementById('new-trader-wallet').value = '';
     document.getElementById('new-trader-nickname').value = '';
@@ -949,7 +971,7 @@ function renderTradersHtml(traders) {
         '</div>' +
         '<div id="pos-'+t.id+'" style="margin-bottom:12px"></div>' +
         '<div class="expand-settings">' +
-          '<span>Per trade: <strong>$' + t.fixedAmount + ' USDC</strong></span>' +
+          '<span>Per trade: <strong>' + (t.copyMode === 'percentage' ? (t.copyPercentage||10)+'% of bet' : '$'+t.fixedAmount+' USDC') + '</strong></span>' +
           '<span>Follow: <strong>' + (t.followMode === 'initial_only' ? 'Initial only' : 'All buys') + '</strong></span>' +
           '<span>Price range: <strong>' + Math.round((t.minSharePrice||0.02)*100) + '¢ – ' + Math.round((t.maxSharePrice||0.88)*100) + '¢</strong></span>' +
           (t.maxPositionSize != null ? '<span>Max position: <strong>$' + t.maxPositionSize + '</strong></span>' : '') +

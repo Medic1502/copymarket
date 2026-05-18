@@ -82,6 +82,7 @@ async function restoreActiveEngines() {
         followMode:          cfg.follow_mode || 'all',
         minSharePrice:       parseFloat(cfg.min_share_price)||0.02,
         maxSharePrice:       parseFloat(cfg.max_share_price)||0.98,
+        maxPositionSize:     cfg.max_position_size != null ? parseFloat(cfg.max_position_size) : null,
         encryptedPrivateKey: cfg.encrypted_private_key,
         walletAddress:       cfg.wallet_address,
       }, cfg.target_wallet);
