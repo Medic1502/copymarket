@@ -163,6 +163,8 @@ async function getTraderStats(configId) {
     totalTrades:   parseInt(row.total_trades)    || 0,
     totalPnl:      parseFloat(row.total_pnl)     || 0,
     totalInvested: parseFloat(row.total_invested) || 0,
+    wins,
+    losses,
     winRate:       wins + losses > 0 ? Math.round(wins / (wins + losses) * 100) : null,
   };
 }

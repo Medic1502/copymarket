@@ -109,9 +109,9 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
 .section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .section-title{font-size:14px;font-weight:600;color:var(--text)}
 .table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:10px;overflow:visible}
-.table-head{display:grid;grid-template-columns:2.2fr 1.1fr 1fr 1fr 1fr 36px;gap:0;padding:10px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--border)}
+.table-head{display:grid;grid-template-columns:2.2fr 1.2fr 1.6fr 1fr 36px;gap:0;padding:10px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--border)}
 .th{font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em}
-.trader-row{display:grid;grid-template-columns:2.2fr 1.1fr 1fr 1fr 1fr 36px;gap:0;padding:13px 16px;border-bottom:1px solid var(--border);align-items:center;transition:background .1s;cursor:default}
+.trader-row{display:grid;grid-template-columns:2.2fr 1.2fr 1.6fr 1fr 36px;gap:0;padding:13px 16px;border-bottom:1px solid var(--border);align-items:center;transition:background .1s;cursor:default}
 .trader-row:hover{background:rgba(255,255,255,.02)}
 .trader-row:last-child{border-bottom:none}
 .trader-cell{display:flex;align-items:center}
@@ -883,7 +883,7 @@ function renderTradersHtml(traders) {
     container.innerHTML =
       '<div class="table-wrap">' +
         '<div class="table-head">' +
-          '<div class="th">Trader</div><div class="th">P&amp;L (All time)</div><div class="th">Win Rate</div><div class="th">Copied Trades</div><div class="th">Status</div><div></div>' +
+          '<div class="th">Trader</div><div class="th">P&amp;L</div><div class="th">Copied / Won</div><div class="th">Status</div><div></div>' +
         '</div>' +
         '<div style="padding:20px 16px">' +
           '<p style="color:var(--text2);font-size:14px;font-weight:500;margin-bottom:4px">No traders yet</p>' +
@@ -898,12 +898,13 @@ function renderTradersHtml(traders) {
     const short  = tw ? tw.slice(0,6)+'...'+tw.slice(-4) : '—';
     const label  = t.nickname || ('0x'+tw.slice(2,6)+'...'+tw.slice(-4));
     const init   = t.nickname ? t.nickname.slice(0,2).toUpperCase() : (tw.slice(2,4)||'?').toUpperCase();
-    const pnl    = t.stats ? t.stats.totalPnl : 0;
-    const pnlStr = (pnl>=0?'+':'') + '$' + Math.abs(pnl).toFixed(2);
-    const pnlCls = pnl > 0 ? 'pnl-pos' : pnl < 0 ? 'pnl-neg' : 'pnl-neu';
-    const wr     = t.stats && t.stats.winRate != null ? t.stats.winRate + '%' : '—';
-    const trades = t.stats ? t.stats.totalTrades : 0;
+    const pnl      = t.stats ? t.stats.totalPnl : 0;
+    const pnlStr   = (pnl>=0?'+':'') + '$' + Math.abs(pnl).toFixed(2);
+    const pnlCls   = pnl > 0 ? 'pnl-pos' : pnl < 0 ? 'pnl-neg' : 'pnl-neu';
+    const trades   = t.stats ? t.stats.totalTrades : 0;
+    const wins     = t.stats ? (t.stats.wins || 0) : 0;
     const invested = t.stats ? '$' + t.stats.totalInvested.toFixed(2) : '$0.00';
+    const copiedWon = trades > 0 ? (trades + ' copied · ' + wins + ' won') : '—';
     const modeText = t.copyMode === 'fixed' ? '$'+t.fixedAmount+' fixed' : (t.copyPercentage||10)+'% of bet';
     const cats = t.categories && t.categories.length ? t.categories.join(', ') : 'All';
     const statusHtml = t.isActive
@@ -916,9 +917,9 @@ function renderTradersHtml(traders) {
     const expandPanel =
       '<div class="expand-panel" id="exp-'+t.id+'">' +
         '<div class="expand-grid">' +
-          '<div class="expand-stat"><div class="expand-stat-label">Total P&amp;L</div><div class="expand-stat-val ' + pnlCls + '">' + pnlStr + '</div></div>' +
-          '<div class="expand-stat"><div class="expand-stat-label">Copied Trades</div><div class="expand-stat-val">' + trades + '</div></div>' +
-          '<div class="expand-stat"><div class="expand-stat-label">Win Rate</div><div class="expand-stat-val">' + wr + '</div></div>' +
+          '<div class="expand-stat"><div class="expand-stat-label">P&amp;L</div><div class="expand-stat-val ' + pnlCls + '">' + pnlStr + '</div></div>' +
+          '<div class="expand-stat"><div class="expand-stat-label">Copied</div><div class="expand-stat-val">' + trades + '</div></div>' +
+          '<div class="expand-stat"><div class="expand-stat-label">Won</div><div class="expand-stat-val pnl-pos">' + wins + '</div></div>' +
           '<div class="expand-stat"><div class="expand-stat-label">Total Invested</div><div class="expand-stat-val">' + invested + '</div></div>' +
         '</div>' +
         '<div id="pos-'+t.id+'" style="margin-bottom:12px"></div>' +
@@ -939,8 +940,7 @@ function renderTradersHtml(traders) {
     return '<div id="row-'+t.id+'" class="trader-row" onclick="toggleExpand(\''+t.id+'\')">' +
         '<div class="trader-cell"><div class="t-avatar">' + init + '</div><div><div class="t-name">' + label + ' <span class="chevron">›</span></div><div class="t-addr">' + short + '</div></div></div>' +
         '<div class="trader-cell"><span class="' + pnlCls + '">' + pnlStr + '</span></div>' +
-        '<div class="trader-cell">' + wr + '</div>' +
-        '<div class="trader-cell">' + trades + '</div>' +
+        '<div class="trader-cell" style="font-size:12px;color:var(--text2)">' + copiedWon + '</div>' +
         '<div class="trader-cell">' + statusHtml + '</div>' +
         '<div class="trader-cell" onclick="event.stopPropagation()"><div class="menu-wrap"><button class="menu-btn" onclick="toggleMenu(\''+t.id+'\',this)">⋮</button>' +
           '<div class="dropdown" id="ddm-'+t.id+'">' +
@@ -954,7 +954,7 @@ function renderTradersHtml(traders) {
   container.innerHTML =
     '<div class="table-wrap">' +
       '<div class="table-head">' +
-        '<div class="th">Trader</div><div class="th">P&amp;L (All time)</div><div class="th">Win Rate</div><div class="th">Copied Trades</div><div class="th">Status</div><div></div>' +
+        '<div class="th">Trader</div><div class="th">P&amp;L</div><div class="th">Copied / Won</div><div class="th">Status</div><div></div>' +
       '</div>' + rows +
     '</div>';
 
