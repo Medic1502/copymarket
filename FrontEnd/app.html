@@ -77,7 +77,7 @@ body{color:var(--text);font-family:'Inter',-apple-system,sans-serif;font-size:14
 
 /* ── INPUTS ───────────────────────────────────────── */
 label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
-input[type=text],input[type=email],input[type=password],input[type=number]{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:9px 13px;color:var(--text);font-size:14px;font-family:'Inter',sans-serif;outline:none;transition:border .15s}
+input[type=text],input[type=email],input[type=password],input[type=number]{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:9px 13px;color:var(--text);font-size:14px;font-family:'Inter',sans-serif;outline:none;transition:border .15s;cursor:text}
 input:focus{border-color:var(--blue)}
 input::placeholder{color:var(--text3)}
 input[type=range]{width:100%;accent-color:var(--blue)}
@@ -1006,6 +1006,13 @@ function renderTradersHtml(traders) {
       '</div>' + expandPanel;
   }).join('');
 
+  // Save current position content before rebuild to prevent flicker
+  const savedPos = {};
+  traders.forEach(t => {
+    const el = document.getElementById('pos-' + t.id);
+    if (el && el.innerHTML.trim()) savedPos[t.id] = el.innerHTML;
+  });
+
   container.innerHTML =
     '<div class="table-wrap">' +
       '<div class="table-head">' +
@@ -1022,9 +1029,12 @@ function renderTradersHtml(traders) {
     } else if (row && openPanels.has(t.id)) {
       row.classList.add('expanded');
     }
+    // Restore saved positions immediately so there's no blank flash
+    const posEl = document.getElementById('pos-' + t.id);
+    if (posEl && savedPos[t.id]) posEl.innerHTML = savedPos[t.id];
   });
 
-  // Load open positions for each trader
+  // Load fresh positions in background (updates saved content quietly)
   loadOpenPositions(traders);
 }
 
