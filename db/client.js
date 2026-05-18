@@ -150,6 +150,21 @@ async function migrate() {
     await run(`ALTER TABLE license_keys ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id)`);
     await run(`UPDATE copy_configs SET min_trader_bet=0, max_share_price=0.88, categories='{}' WHERE min_trader_bet > 0`);
 
+    // Resolved position outcome tracking
+    await run(`ALTER TABLE bot_positions ADD COLUMN IF NOT EXISTS resolved_outcome TEXT`);
+    await run(`ALTER TABLE bot_positions ADD COLUMN IF NOT EXISTS resolved_pnl NUMERIC(12,4)`);
+
+    // Backfill config_id on trades that were saved before the column existed
+    await run(`
+      UPDATE trades t
+      SET config_id = (
+        SELECT id FROM copy_configs cc
+        WHERE cc.user_id = t.user_id
+        ORDER BY cc.created_at ASC LIMIT 1
+      )
+      WHERE t.config_id IS NULL
+    `);
+
     console.log('Database migration complete.');
   } catch (err) {
     console.error('Migration failed (server will continue):', err.message);

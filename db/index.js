@@ -148,22 +148,22 @@ async function saveTrade(userId, trade) {
 async function getTraderStats(configId) {
   const res = await query(
     `SELECT
-      COUNT(*) FILTER (WHERE side='BUY' AND status != 'FAILED') AS total_trades,
-      COALESCE(SUM(pnl),0) AS total_pnl,
-      COALESCE(SUM(size) FILTER (WHERE side='BUY' AND status != 'FAILED'),0) AS total_invested,
-      COUNT(*) FILTER (WHERE pnl > 0) AS wins,
-      COUNT(*) FILTER (WHERE pnl < 0) AS losses
+      COUNT(*)         FILTER (WHERE side='BUY'    AND status NOT IN ('FAILED','SKIPPED')) AS total_trades,
+      COALESCE(SUM(pnl) FILTER (WHERE side='REDEEM'), 0)                                  AS total_pnl,
+      COALESCE(SUM(size) FILTER (WHERE side='BUY' AND status NOT IN ('FAILED','SKIPPED')), 0) AS total_invested,
+      COUNT(*)         FILTER (WHERE side='REDEEM' AND pnl > 0)                            AS wins,
+      COUNT(*)         FILTER (WHERE side='REDEEM' AND pnl < 0)                            AS losses
      FROM trades WHERE config_id = $1`,
     [configId]
   );
   const row = res.rows[0];
-  const wins = parseInt(row.wins)||0;
-  const losses = parseInt(row.losses)||0;
+  const wins   = parseInt(row.wins)   || 0;
+  const losses = parseInt(row.losses) || 0;
   return {
-    totalTrades: parseInt(row.total_trades)||0,
-    totalPnl: parseFloat(row.total_pnl),
-    totalInvested: parseFloat(row.total_invested),
-    winRate: wins+losses>0 ? Math.round(wins/(wins+losses)*100) : null,
+    totalTrades:   parseInt(row.total_trades)    || 0,
+    totalPnl:      parseFloat(row.total_pnl)     || 0,
+    totalInvested: parseFloat(row.total_invested) || 0,
+    winRate:       wins + losses > 0 ? Math.round(wins / (wins + losses) * 100) : null,
   };
 }
 
@@ -220,6 +220,22 @@ async function deleteBotPosition(userId, conditionId, outcome) {
   );
 }
 
+async function resolveBotPosition(userId, conditionId, outcome, resolvedOutcome, resolvedPnl) {
+  await query(
+    `UPDATE bot_positions
+     SET resolved_outcome=$4, resolved_pnl=$5, shares=0, updated_at=NOW()
+     WHERE user_id=$1 AND condition_id=$2 AND outcome=$3`,
+    [userId, conditionId, outcome, resolvedOutcome, resolvedPnl]
+  );
+}
+
+async function deleteResolvedPosition(userId, conditionId, outcome) {
+  await query(
+    'DELETE FROM bot_positions WHERE user_id=$1 AND condition_id=$2 AND outcome=$3',
+    [userId, conditionId, outcome]
+  );
+}
+
 async function getBotPositions(userId) {
   const res = await query(
     'SELECT * FROM bot_positions WHERE user_id=$1 AND shares > 0',
@@ -237,7 +253,7 @@ async function getBotPositionsWithNames(userId) {
        WHERE user_id=$1 AND condition_id=bp.condition_id AND market_name IS NOT NULL AND market_name != condition_id
        ORDER BY created_at DESC LIMIT 1
      ) t ON true
-     WHERE bp.user_id=$1 AND bp.shares > 0`,
+     WHERE bp.user_id=$1 AND (bp.shares > 0 OR bp.resolved_outcome IS NOT NULL)`,
     [userId]
   );
   return res.rows;
@@ -287,6 +303,6 @@ module.exports = {
   createWalletForUser, getWalletByUserId, getUSDCBalance,
   saveCopyConfig, updateCopyConfig, getCopyConfig, setActive, getAllActiveConfigs, deleteCopyConfig,
   saveTrade, getRecentTrades, getDashboardStats, getTodayLoss, getTraderStats,
-  upsertBotPosition, deleteBotPosition, getBotPositions, getBotPositionsWithNames, clearBotPositions,
+  upsertBotPosition, deleteBotPosition, resolveBotPosition, deleteResolvedPosition, getBotPositions, getBotPositionsWithNames, clearBotPositions,
   encryptPrivateKey, decryptPrivateKey,
 };

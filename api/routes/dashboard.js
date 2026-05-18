@@ -36,6 +36,13 @@ router.get('/positions', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.delete('/positions/:conditionId/:outcome', async (req, res, next) => {
+  try {
+    await db.deleteResolvedPosition(req.userId, req.params.conditionId, req.params.outcome);
+    res.json({ message: 'Position deleted.' });
+  } catch (err) { next(err); }
+});
+
 router.delete('/positions', async (req, res, next) => {
   try {
     await db.clearBotPositions(req.userId);

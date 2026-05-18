@@ -979,27 +979,65 @@ async function loadOpenPositions(traders) {
     traders.forEach(t => {
       const el = document.getElementById('pos-' + t.id);
       if (!el) return;
-      const tPos = positions.filter(p => p.config_id === t.id && parseFloat(p.shares) > 0);
-      if (!tPos.length) { el.innerHTML = ''; return; }
-      el.innerHTML =
-        '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Open Positions (' + tPos.length + ')</div>' +
-        '<div style="display:flex;flex-direction:column;gap:4px">' +
-        tPos.map(p => {
-          const usdc   = parseFloat(p.usdc_spent).toFixed(2);
-          const shares = parseFloat(p.shares).toFixed(2);
-          const name   = p.market_name && p.market_name !== p.condition_id ? p.market_name : null;
-          const link   = p.market_slug ? 'https://polymarket.com/event/' + p.market_slug : 'https://polymarket.com/event/' + p.condition_id;
-          const nameHtml = name
-            ? '<a href="' + link + '" target="_blank" style="color:var(--text);text-decoration:none;font-weight:600" onclick="event.stopPropagation()">' + name + ' ↗</a>'
-            : '<a href="' + link + '" target="_blank" style="color:var(--text2);text-decoration:none;font-family:monospace;font-size:11px" onclick="event.stopPropagation()">' + (p.condition_id||'').slice(0,14) + '... ↗</a>';
-          return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:6px;padding:6px 10px;font-size:12px;gap:8px">' +
-            '<span style="color:var(--text2);min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + nameHtml + ' <strong style="color:var(--blue-light)">' + (p.outcome||'Yes') + '</strong></span>' +
-            '<span style="color:var(--green);font-weight:600;flex-shrink:0">$' + usdc + ' · ' + shares + '</span>' +
-            '</div>';
-        }).join('') +
-        '</div>';
+      const allPos     = positions.filter(p => p.config_id === t.id);
+      const openPos    = allPos.filter(p => !p.resolved_outcome && parseFloat(p.shares) > 0);
+      const resolvedPos = allPos.filter(p => p.resolved_outcome);
+      if (!allPos.length) { el.innerHTML = ''; return; }
+      let html = '';
+      if (openPos.length > 0) {
+        html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Open Positions (' + openPos.length + ')</div>' +
+          '<div style="display:flex;flex-direction:column;gap:4px">' +
+          openPos.map(p => {
+            const usdc   = parseFloat(p.usdc_spent).toFixed(2);
+            const shares = parseFloat(p.shares).toFixed(2);
+            const name   = p.market_name && p.market_name !== p.condition_id ? p.market_name : null;
+            const link   = p.market_slug ? 'https://polymarket.com/event/' + p.market_slug : 'https://polymarket.com/event/' + p.condition_id;
+            const nameHtml = name
+              ? '<a href="' + link + '" target="_blank" style="color:var(--text);text-decoration:none;font-weight:600" onclick="event.stopPropagation()">' + name + ' ↗</a>'
+              : '<a href="' + link + '" target="_blank" style="color:var(--text2);text-decoration:none;font-family:monospace;font-size:11px" onclick="event.stopPropagation()">' + (p.condition_id||'').slice(0,14) + '... ↗</a>';
+            return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:6px;padding:6px 10px;font-size:12px;gap:8px">' +
+              '<span style="color:var(--text2);min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + nameHtml + ' <strong style="color:var(--blue-light)">' + (p.outcome||'Yes') + '</strong></span>' +
+              '<span style="color:var(--green);font-weight:600;flex-shrink:0">$' + usdc + ' · ' + shares + '</span>' +
+              '</div>';
+          }).join('') + '</div>';
+      }
+      if (resolvedPos.length > 0) {
+        if (openPos.length > 0) html += '<div style="height:8px"></div>';
+        html += '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Resolved (' + resolvedPos.length + ')</div>' +
+          '<div style="display:flex;flex-direction:column;gap:4px">' +
+          resolvedPos.map(p => {
+            const isWin  = p.resolved_outcome === 'WON';
+            const pnl    = parseFloat(p.resolved_pnl || 0);
+            const pnlStr = (pnl >= 0 ? '+' : '') + '$' + Math.abs(pnl).toFixed(2);
+            const color  = isWin ? 'var(--green)' : 'var(--red)';
+            const badge  = isWin
+              ? '<span style="background:var(--green-dim);color:var(--green);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;flex-shrink:0">WIN</span>'
+              : '<span style="background:rgba(239,68,68,.12);color:#ef4444;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;flex-shrink:0">LOSS</span>';
+            const name   = p.market_name && p.market_name !== p.condition_id ? p.market_name : null;
+            const link   = p.market_slug ? 'https://polymarket.com/event/' + p.market_slug : 'https://polymarket.com/event/' + p.condition_id;
+            const nameHtml = name
+              ? '<a href="' + link + '" target="_blank" style="color:var(--text);text-decoration:none;font-weight:600" onclick="event.stopPropagation()">' + name + ' ↗</a>'
+              : '<a href="' + link + '" target="_blank" style="color:var(--text2);text-decoration:none;font-family:monospace;font-size:11px" onclick="event.stopPropagation()">' + (p.condition_id||'').slice(0,14) + '... ↗</a>';
+            const cid = p.condition_id.replace(/'/g, '');
+            const out = (p.outcome||'Yes').replace(/'/g, '');
+            return '<div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:6px;padding:6px 10px;font-size:12px">' +
+              badge +
+              '<span style="color:var(--text2);min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + nameHtml + ' <strong style="color:var(--blue-light)">' + (p.outcome||'Yes') + '</strong></span>' +
+              '<span style="color:' + color + ';font-weight:600;flex-shrink:0">' + pnlStr + '</span>' +
+              '<button onclick="event.stopPropagation();deletePosition(\'' + cid + '\',\'' + out + '\')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px;flex-shrink:0" title="Remove">×</button>' +
+              '</div>';
+          }).join('') + '</div>';
+      }
+      el.innerHTML = html;
     });
   } catch {}
+}
+
+async function deletePosition(conditionId, outcome) {
+  try {
+    await api('DELETE', '/dashboard/positions/' + encodeURIComponent(conditionId) + '/' + encodeURIComponent(outcome));
+    loadDashboard();
+  } catch(e) {}
 }
 
 // ── RENDER TRADES ─────────────────────────────────────────────────────────────
