@@ -40,6 +40,39 @@ const redeemIntervals = {}; // userId -> intervalId
 const configToUserId  = {}; // configId -> userId
 const userConfigCount = {}; // userId -> number of active configs
 
+// TTL caches — shared across all users, prevents excessive API calls at scale
+const _tokenBidCache = {}; // tokenId -> { bid, ts }
+const _marketCache   = {}; // conditionId -> { data, ts }
+const _balanceCache  = {}; // walletAddress -> { balance, ts }
+const TOKEN_BID_TTL  = 20 * 1000;       // 20s — one fresh fetch per poll cycle
+const MARKET_TTL     = 4 * 60 * 1000;  // 4min — safe for closed-market detection
+const BALANCE_TTL    = 30 * 1000;      // 30s — fresh enough for trade decisions
+
+async function getCachedTokenBid(tokenId) {
+  const c = _tokenBidCache[tokenId];
+  if (c && Date.now() - c.ts < TOKEN_BID_TTL) return c.bid;
+  const bid = await getBestPrice(tokenId, 1).catch(() => 0);
+  _tokenBidCache[tokenId] = { bid, ts: Date.now() };
+  return bid;
+}
+
+async function getCachedMarket(conditionId) {
+  const c = _marketCache[conditionId];
+  if (c && Date.now() - c.ts < MARKET_TTL) return c.data;
+  const arr = await apiFetch(`https://gamma-api.polymarket.com/markets?conditionIds=${conditionId}`).catch(() => null);
+  const data = (Array.isArray(arr) && arr.length > 0) ? arr[0] : null;
+  if (data) _marketCache[conditionId] = { data, ts: Date.now() };
+  return data;
+}
+
+async function getWalletBalanceCached(eoaAddress) {
+  const c = _balanceCache[eoaAddress];
+  if (c && Date.now() - c.ts < BALANCE_TTL) return c.balance;
+  const balance = await getWalletBalance(eoaAddress);
+  _balanceCache[eoaAddress] = { balance, ts: Date.now() };
+  return balance;
+}
+
 const logger = {
   info:  (msg, data = {}) => console.log(JSON.stringify({ level: 'INFO',  msg, ...data, ts: new Date().toISOString() })),
   warn:  (msg, data = {}) => console.log(JSON.stringify({ level: 'WARN',  msg, ...data, ts: new Date().toISOString() })),
@@ -546,11 +579,8 @@ async function checkAndRedeemPositions(user, wallet) {
       try {
         const conditionId = pos.condition_id;
 
-        const marketArr = await apiFetch(
-          `https://gamma-api.polymarket.com/markets?conditionIds=${conditionId}`
-        ).catch(() => null);
-        if (!marketArr || !Array.isArray(marketArr) || marketArr.length === 0) continue;
-        const market = marketArr[0];
+        const market = await getCachedMarket(conditionId);
+        if (!market) continue;
 
         // FIX: Gamma API uses "closed", not "resolved"
         if (!market.closed) continue;
@@ -680,7 +710,7 @@ async function checkHighPricePositions(user, wallet) {
       if (shares <= 0) continue;
 
       try {
-        const bid = await getBestPrice(tokenId, 1);
+        const bid = await getCachedTokenBid(tokenId);
         if (bid < 0.99) continue;
 
         const posKey = `${pos.condition_id}_${pos.outcome}`;
@@ -695,8 +725,7 @@ async function checkHighPricePositions(user, wallet) {
         const usdcReceived = parseFloat((shares * bid).toFixed(4));
         const pnl          = parseFloat((usdcReceived - parseFloat(pos.usdc_spent)).toFixed(4));
 
-        const marketArr  = await apiFetch(`https://gamma-api.polymarket.com/markets?conditionIds=${pos.condition_id}`).catch(() => null);
-        const market     = marketArr?.[0];
+        const market     = await getCachedMarket(pos.condition_id);
         const marketName = market?.question || market?.title || pos.condition_id;
         const marketSlug = market?.slug || market?.market_slug || null;
 
@@ -797,6 +826,13 @@ async function startCopyEngine(user, targetWallet) {
             logger.info('Poll heartbeat', { targetWallet: targetWallet.slice(0, 10), polls: poll.pollCount, lastTs, freshActivities: fresh.length });
           }
 
+          // Auto-sell check runs every tick for all users — TTL cache prevents excess API calls
+          for (const [, { user: u, wallet: w }] of poll.users) {
+            await checkHighPricePositions(u, w).catch(e =>
+              logger.warn('High price check error', { userId: u.id, error: e.message })
+            );
+          }
+
           if (fresh.length === 0) return;
 
           lastActivityTs[targetWallet] = Math.max(...fresh.map(a => a.timestamp));
@@ -817,22 +853,18 @@ async function startCopyEngine(user, targetWallet) {
           // Process signals for EACH user independently - fully isolated
           for (const [, { user: u, wallet: w }] of poll.users) {
             if (!approvedWallets.has(w.address)) ensureApprovals(w).catch(() => {});
-            // Check balance before processing — skip all if below $1 (per-signal check handles exact amount)
-            const bal = await getWalletBalance(u.walletAddress);
+            // Cached balance — 30s TTL prevents N calls per poll when no new activity
+            const bal = await getWalletBalanceCached(u.walletAddress);
             if (bal < 1) {
               logger.warn('Skip all: insufficient balance', { userId: u.id, balance: bal });
-            } else {
-              for (const signal of deduped) {
-                await processSignalForUser(u, w, signal, 'BUY');
-              }
-              for (const signal of closed) {
-                await processSignalForUser(u, w, signal, 'SELL');
-              }
+              continue;
             }
-            // Auto-sell positions at 99¢ — runs regardless of balance (selling doesn't need balance)
-            await checkHighPricePositions(u, w).catch(e =>
-              logger.warn('High price check error', { userId: u.id, error: e.message })
-            );
+            for (const signal of deduped) {
+              await processSignalForUser(u, w, signal, 'BUY');
+            }
+            for (const signal of closed) {
+              await processSignalForUser(u, w, signal, 'SELL');
+            }
           }
         } catch (err) {
           logger.error('Shared poll failed', { targetWallet, error: err.message });

@@ -36,6 +36,23 @@ router.get('/positions', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/positions/prices', async (req, res, next) => {
+  try {
+    const { default: fetch } = await import('node-fetch');
+    const positions = await db.getBotPositions(req.userId);
+    const openWithToken = positions.filter(p => p.token_id && parseFloat(p.shares) > 0);
+    const prices = {};
+    await Promise.all(openWithToken.map(async p => {
+      try {
+        const r = await fetch(`https://clob.polymarket.com/book?token_id=${p.token_id}`, { timeout: 5000 });
+        const book = await r.json();
+        prices[p.token_id] = parseFloat(book.bids?.[0]?.price ?? 0) || null;
+      } catch { prices[p.token_id] = null; }
+    }));
+    res.json({ prices });
+  } catch (err) { next(err); }
+});
+
 router.delete('/positions/:conditionId/:outcome', async (req, res, next) => {
   try {
     await db.deleteResolvedPosition(req.userId, req.params.conditionId, req.params.outcome);
