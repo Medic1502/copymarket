@@ -40,15 +40,32 @@ router.get('/positions/prices', async (req, res, next) => {
   try {
     const { default: fetch } = await import('node-fetch');
     const positions = await db.getBotPositions(req.userId);
-    const openWithToken = positions.filter(p => p.token_id && parseFloat(p.shares) > 0);
+    const open = positions.filter(p => p.token_id && parseFloat(p.shares) > 0);
+
+    // Group by conditionId — one CLOB market fetch per unique market
+    const byCondition = {};
+    for (const p of open) {
+      if (!byCondition[p.condition_id]) byCondition[p.condition_id] = [];
+      byCondition[p.condition_id].push(p);
+    }
+
     const prices = {};
-    await Promise.all(openWithToken.map(async p => {
+    await Promise.all(Object.entries(byCondition).map(async ([conditionId, posList]) => {
       try {
-        const r = await fetch(`https://clob.polymarket.com/book?token_id=${p.token_id}`, { timeout: 5000 });
-        const book = await r.json();
-        prices[p.token_id] = parseFloat(book.bids?.[0]?.price ?? 0) || null;
-      } catch { prices[p.token_id] = null; }
+        const r = await fetch(`https://clob.polymarket.com/markets/${conditionId}`, { timeout: 5000 });
+        const market = await r.json();
+        const tokens = market.tokens || [];
+        for (const pos of posList) {
+          // Match by token_id first, then by outcome_index as fallback
+          const token = tokens.find(t => t.token_id === pos.token_id)
+            ?? (pos.outcome_index != null ? tokens[pos.outcome_index] : null);
+          if (token?.price != null) {
+            prices[pos.token_id] = parseFloat(token.price);
+          }
+        }
+      } catch {}
     }));
+
     res.json({ prices });
   } catch (err) { next(err); }
 });
