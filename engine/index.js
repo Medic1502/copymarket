@@ -396,7 +396,8 @@ async function getClobClient(wallet) {
     logger.info('API key created', { wallet: wallet.address.slice(0, 10) });
   }
 
-  // POLY_1271 with deposit wallet
+  // POLY_1271 with deposit wallet + builder attribution
+  const builderCode = process.env.POLY_BUILDER_CODE || null;
   const client = new ClobClient({
     host:          CLOB_BASE,
     chain:         CHAIN_ID,
@@ -404,6 +405,7 @@ async function getClobClient(wallet) {
     creds,
     signatureType: 3,
     funderAddress: depositAddr,
+    ...(builderCode ? { builderConfig: { builderCode } } : {}),
   });
 
   // Update balance allowance for the deposit wallet
@@ -441,8 +443,9 @@ async function placeOrder(wallet, tokenId, side, price, amount) {
   if (sharesSize < MIN_SHARES) throw new Error(`Min 5 shares required, have ${sharesSize.toFixed(2)} at price ${roundedPrice}. Increase per-trade amount.`);
   sharesSize = parseFloat(sharesSize.toFixed(4));
 
+  const builderCode = process.env.POLY_BUILDER_CODE || null;
   const order = await client.createOrder(
-    { tokenID: tokenId, price: roundedPrice, side: isBuy ? Side.BUY : Side.SELL, size: sharesSize },
+    { tokenID: tokenId, price: roundedPrice, side: isBuy ? Side.BUY : Side.SELL, size: sharesSize, ...(builderCode ? { builderCode } : {}) },
     { tickSize, negRisk }
   );
 
