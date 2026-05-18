@@ -304,6 +304,7 @@ div.expand-panel.closed{display:none !important}
       <div class="add-form" id="add-trader-form">
         <div style="font-size:14px;font-weight:600;margin-bottom:14px" id="add-form-title">Add new trader</div>
         <div class="field"><label>Trader wallet address</label><input type="text" id="new-trader-wallet" placeholder="0x..."></div>
+        <div class="field"><label>Nickname <span style="color:var(--text3);font-weight:400">(optional)</span></label><input type="text" id="new-trader-nickname" placeholder="e.g. Whale Mike" maxlength="40"></div>
         <div style="margin-bottom:14px">
           <label style="margin-bottom:6px">Amount per trade</label>
           <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -335,7 +336,6 @@ div.expand-panel.closed{display:none !important}
             <span style="color:var(--text3);font-size:13px">¢</span>
           </div>
         </div>
-        <input type="hidden" id="new-trader-nickname" value="">
         <input type="hidden" id="new-copy-mode" value="fixed">
         <input type="hidden" id="new-follow-mode" value="all">
         <input type="hidden" id="new-min-bet" value="0">
@@ -712,6 +712,7 @@ function resetAddForm() {
   _editingConfigId = null;
   document.getElementById('new-trader-wallet').value = '';
   document.getElementById('new-trader-wallet').disabled = false;
+  document.getElementById('new-trader-nickname').value = '';
   document.getElementById('new-fixed-amount').value = 1;
   document.getElementById('new-copy-percentage').value = 10;
   document.getElementById('new-max-position').value = '';
@@ -752,6 +753,7 @@ function editTrader(t) {
 
   document.getElementById('new-trader-wallet').value = t.targetWallet;
   document.getElementById('new-trader-wallet').disabled = true;
+  document.getElementById('new-trader-nickname').value = t.nickname || '';
   setCopyMode(t.copyMode || 'fixed');
   document.getElementById('new-fixed-amount').value = t.fixedAmount || 1;
   document.getElementById('new-copy-percentage').value = t.copyPercentage || 10;
@@ -777,12 +779,13 @@ async function saveEditTrader() {
   setLoading('add-trader-btn', true);
   try {
     if (!_editingConfigId) throw new Error('No trader selected.');
+    const nickname   = document.getElementById('new-trader-nickname').value.trim() || null;
     const followMode = document.getElementById('new-follow-mode').value;
     const maxPosRaw  = document.getElementById('new-max-position').value;
     const maxPositionSize = maxPosRaw !== '' ? parseFloat(maxPosRaw) : null;
     const minSharePrice = parseFloat(document.getElementById('new-min-price').value) / 100 || 0.02;
     const maxSharePrice = parseFloat(document.getElementById('new-max-price').value) / 100 || 0.88;
-    await api('PUT', '/copy/config/' + _editingConfigId, { copyMode, fixedAmount: fixedAmt, copyPercentage: copyPct, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode, minSharePrice, maxSharePrice, maxPositionSize });
+    await api('PUT', '/copy/config/' + _editingConfigId, { nickname, copyMode, fixedAmount: fixedAmt, copyPercentage: copyPct, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode, minSharePrice, maxSharePrice, maxPositionSize });
     document.getElementById('add-trader-form').classList.remove('open');
     resetAddForm();
     showAlert('dash-alert', 'Settings updated.', 'success');
@@ -806,12 +809,13 @@ async function addTrader() {
   }
   setLoading('add-trader-btn', true);
   try {
+    const nickname    = document.getElementById('new-trader-nickname').value.trim() || null;
     const followMode  = document.getElementById('new-follow-mode').value;
     const maxPosRaw   = document.getElementById('new-max-position').value;
     const maxPositionSize = maxPosRaw !== '' ? parseFloat(maxPosRaw) : null;
     const minSharePrice = parseFloat(document.getElementById('new-min-price').value) / 100 || 0.02;
     const maxSharePrice = parseFloat(document.getElementById('new-max-price').value) / 100 || 0.88;
-    await api('POST', '/copy/config', { targetWallet: wallet, copyMode, fixedAmount: fixedAmt, copyPercentage: copyPct, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode, minSharePrice, maxSharePrice, maxPositionSize });
+    await api('POST', '/copy/config', { targetWallet: wallet, nickname, copyMode, fixedAmount: fixedAmt, copyPercentage: copyPct, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode, minSharePrice, maxSharePrice, maxPositionSize });
     document.getElementById('add-trader-form').classList.remove('open');
     document.getElementById('new-trader-wallet').value = '';
     document.getElementById('new-trader-nickname').value = '';
@@ -986,8 +990,9 @@ function renderTradersHtml(traders) {
         '</div>' +
       '</div>';
 
+    const polyUrl = 'https://polymarket.com/profile/' + tw;
     return '<div id="row-'+t.id+'" class="trader-row" onclick="toggleExpand(\''+t.id+'\')">' +
-        '<div class="trader-cell"><div class="t-avatar">' + init + '</div><div><div class="t-name">' + label + ' <span class="chevron">›</span></div><div class="t-addr">' + short + '</div></div></div>' +
+        '<div class="trader-cell"><div class="t-avatar">' + init + '</div><div><div class="t-name"><a href="'+polyUrl+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:none" title="Open on Polymarket">' + label + '</a> <span class="chevron">›</span></div><div class="t-addr">' + short + '</div></div></div>' +
         '<div class="trader-cell"><span class="' + pnlCls + '">' + pnlStr + '</span></div>' +
         '<div class="trader-cell" style="font-size:12px;color:var(--text2)">' + copiedWon + '</div>' +
         '<div class="trader-cell">' + statusHtml + '</div>' +
