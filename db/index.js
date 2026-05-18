@@ -95,11 +95,11 @@ async function getUSDCBalance(eoaAddress) {
 }
 
 // COPY CONFIGS
-async function saveCopyConfig(userId, { targetWallet, nickname, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice }) {
+async function saveCopyConfig(userId, { targetWallet, nickname, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice, maxPositionSize }) {
   const res = await query(
-    `INSERT INTO copy_configs (user_id, target_wallet, nickname, copy_mode, copy_percentage, fixed_amount, min_trader_bet, max_trader_bet, categories, follow_mode, min_share_price, max_share_price)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-    [userId, targetWallet, nickname||null, copyMode||'percentage', copyPercentage||10, fixedAmount||10, minTraderBet||5, maxTraderBet||100000, categories||[], followMode||'all', minSharePrice||0.02, maxSharePrice||0.98]
+    `INSERT INTO copy_configs (user_id, target_wallet, nickname, copy_mode, copy_percentage, fixed_amount, min_trader_bet, max_trader_bet, categories, follow_mode, min_share_price, max_share_price, max_position_size)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+    [userId, targetWallet, nickname||null, copyMode||'percentage', copyPercentage||10, fixedAmount||10, minTraderBet||5, maxTraderBet||100000, categories||[], followMode||'all', minSharePrice||0.02, maxSharePrice||0.98, maxPositionSize||null]
   );
   return res.rows[0];
 }
@@ -280,14 +280,15 @@ async function deleteCopyConfig(id, userId) {
   await query('DELETE FROM copy_configs WHERE id = $1 AND user_id = $2', [id, userId]);
 }
 
-async function updateCopyConfig(id, userId, { nickname, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice }) {
+async function updateCopyConfig(id, userId, { nickname, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice, maxPositionSize }) {
   const res = await query(
     `UPDATE copy_configs SET nickname=$3, copy_mode=$4, copy_percentage=$5, fixed_amount=$6,
      min_trader_bet=$7, max_trader_bet=$8, categories=$9, follow_mode=$10,
-     min_share_price=$11, max_share_price=$12, updated_at=NOW()
+     min_share_price=$11, max_share_price=$12, max_position_size=$13, updated_at=NOW()
      WHERE id=$1 AND user_id=$2 RETURNING *`,
     [id, userId, nickname||null, copyMode||'percentage', copyPercentage||10, fixedAmount||10,
-     minTraderBet||5, maxTraderBet||100000, categories||[], followMode||'all', minSharePrice||0.02, maxSharePrice||0.98]
+     minTraderBet||5, maxTraderBet||100000, categories||[], followMode||'all', minSharePrice||0.02, maxSharePrice||0.98,
+     maxPositionSize||null]
   );
   return res.rows[0];
 }

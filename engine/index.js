@@ -429,6 +429,15 @@ async function processSignalForUser(user, wallet, signal, side) {
         return;
       }
 
+      // Skip if max position size reached
+      if (user.maxPositionSize != null) {
+        const existing = userBought[user.id]?.get(posKey);
+        if (existing && existing.usdc >= user.maxPositionSize) {
+          logger.info('Skip: max position size reached', { conditionId: signal.conditionId?.slice(0,10), spent: existing.usdc, max: user.maxPositionSize });
+          return;
+        }
+      }
+
       const tokenId = signal.tokenId || await getTokenId(signal.conditionId, signal.outcome);
       logger.info('Token debug', { signalTokenId: signal.tokenId, resolved: tokenId, outcome: signal.outcome, conditionId: signal.conditionId?.slice(0,10) });
       if (!tokenId) {
