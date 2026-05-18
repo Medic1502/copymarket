@@ -23,7 +23,11 @@ async function makeViemSigner(privateKey) {
 const ALGORITHM = 'aes-256-gcm';
 const CLOB_BASE = 'https://clob.polymarket.com';
 const POLL_INTERVAL_MS = 15000;
+const REDEEM_INTERVAL_MS = 5 * 60 * 1000;
 const CHAIN_ID = 137;
+
+const CTF_COLLATERAL_ADAPTER          = '0xAdA100Db00Ca00073811820692005400218FcE1f';
+const NEG_RISK_CTF_COLLATERAL_ADAPTER = '0xadA2005600Dec949baf300f4C6120000bDB6eAab';
 
 // Shared polling: one Polymarket API call per unique target wallet regardless of how many users copy it
 // sharedPolls[targetWallet] = { interval, users: Map<userId, userConfig>, lock: bool }
@@ -32,6 +36,9 @@ const activeEngines   = {}; // configId -> targetWallet
 const userBought      = {}; // userId -> Map<key, { usdc, shares }>
 const approvedWallets = new Set(); // walletAddress -> approved
 const lastActivityTs  = {}; // targetWallet -> unix timestamp of last processed activity
+const redeemIntervals = {}; // userId -> intervalId
+const configToUserId  = {}; // configId -> userId
+const userConfigCount = {}; // userId -> number of active configs
 
 const logger = {
   info:  (msg, data = {}) => console.log(JSON.stringify({ level: 'INFO',  msg, ...data, ts: new Date().toISOString() })),
@@ -496,6 +503,133 @@ async function processSignalForUser(user, wallet, signal, side) {
   }
 }
 
+async function checkAndRedeemPositions(user, wallet) {
+  try {
+    const positions = await db.getBotPositions(user.id);
+    if (!positions || positions.length === 0) return;
+
+    const provider  = new ethers.JsonRpcProvider(process.env.POLYGON_RPC_URL);
+    const signer    = new ethers.Wallet(wallet.privateKey, provider);
+    const depositAddr = await getDepositWalletAddressCached(wallet.address);
+
+    for (const pos of positions) {
+      try {
+        const conditionId = pos.condition_id;
+
+        const marketArr = await apiFetch(
+          `https://gamma-api.polymarket.com/markets?conditionIds=${conditionId}`
+        ).catch(() => null);
+        if (!marketArr || !Array.isArray(marketArr) || marketArr.length === 0) continue;
+        const market = marketArr[0];
+        if (!market.resolved) continue;
+
+        const outcomes      = market.outcomes;
+        const outcomePrices = market.outcomePrices;
+        const ourIdx = Array.isArray(outcomes)
+          ? outcomes.findIndex(o => o.toLowerCase() === pos.outcome.toLowerCase())
+          : -1;
+        const isWinner = ourIdx >= 0 && Array.isArray(outcomePrices)
+          && parseFloat(outcomePrices[ourIdx]) >= 0.99;
+
+        const shares   = parseFloat(pos.shares);
+        const usdcSpent = parseFloat(pos.usdc_spent);
+        const pnl = isWinner ? parseFloat((shares - usdcSpent).toFixed(4)) : -usdcSpent;
+        const marketName = market.question || market.title || conditionId;
+        const marketSlug = market.slug || market.market_slug || null;
+
+        logger.info('Market resolved, settling position', {
+          userId: user.id, conditionId: conditionId.slice(0, 10),
+          outcome: pos.outcome, isWinner, pnl,
+        });
+
+        let onChainSuccess = false;
+
+        if (isWinner) {
+          const adapterAddr = market.negRisk
+            ? NEG_RISK_CTF_COLLATERAL_ADAPTER
+            : CTF_COLLATERAL_ADAPTER;
+
+          const adapterIface = new ethers.Interface([
+            'function redeemPositions(address collateralToken, bytes32 parentCollectionId, bytes32 conditionId, uint256[] indexSets)',
+          ]);
+          const redeemCalldata = adapterIface.encodeFunctionData('redeemPositions', [
+            PUSD_ADDRESS,
+            '0x0000000000000000000000000000000000000000000000000000000000000000',
+            conditionId,
+            [1n, 2n],
+          ]);
+
+          const executeFns = [
+            'function execute(address to, uint256 value, bytes data)',
+            'function exec(address to, uint256 value, bytes data)',
+            'function call(address to, uint256 value, bytes data)',
+          ];
+          for (const fn of executeFns) {
+            const iface  = new ethers.Interface([fn]);
+            const fnName = fn.split('(')[0].split(' ')[1];
+            try {
+              const tx = await signer.sendTransaction({
+                to:   depositAddr,
+                data: iface.encodeFunctionData(fnName, [adapterAddr, 0, redeemCalldata]),
+              });
+              await tx.wait();
+              logger.trade('Redemption tx confirmed', {
+                userId: user.id, txHash: tx.hash,
+                conditionId: conditionId.slice(0, 10), pnl,
+              });
+              onChainSuccess = true;
+              break;
+            } catch (e) {
+              logger.warn('Redeem execute attempt failed', { fn: fnName, error: e.message.slice(0, 80) });
+            }
+          }
+
+          if (!onChainSuccess) {
+            logger.warn('All redeem attempts failed, will retry next cycle', {
+              userId: user.id, conditionId: conditionId.slice(0, 10),
+            });
+          }
+        } else {
+          onChainSuccess = true; // losing position — nothing to redeem on-chain
+        }
+
+        if (onChainSuccess) {
+          await db.deleteBotPosition(user.id, conditionId, pos.outcome).catch(() => {});
+          await db.saveTrade(user.id, {
+            conditionId, marketName, marketSlug,
+            outcome:    pos.outcome,
+            side:       'REDEEM',
+            size:       isWinner ? shares : 0,
+            price:      isWinner ? 1.0 : 0,
+            orderId:    null,
+            filledSize: isWinner ? shares : null,
+            status:     'REDEEMED',
+            skipReason: null,
+            pnl,
+            configId:   user.configId,
+          }).catch(() => {});
+
+          if (userBought[user.id]) {
+            userBought[user.id].delete(`${conditionId}_${pos.outcome}`);
+          }
+
+          logger.trade('Position settled', {
+            userId: user.id, conditionId: conditionId.slice(0, 10),
+            outcome: pos.outcome, isWinner, pnl,
+          });
+        }
+      } catch (posErr) {
+        logger.warn('Redeem check error for position', {
+          userId: user.id, conditionId: pos.condition_id?.slice(0, 10),
+          error: posErr.message,
+        });
+      }
+    }
+  } catch (err) {
+    logger.warn('checkAndRedeemPositions error', { userId: user.id, error: err.message });
+  }
+}
+
 async function startCopyEngine(user, targetWallet) {
   if (activeEngines[user.configId]) {
     logger.warn('Engine already running', { configId: user.configId });
@@ -523,6 +657,18 @@ async function startCopyEngine(user, targetWallet) {
   const wallet = new ethers.Wallet(privateKey);
   // Skip EOA approvals for POLY_1271 — deposit wallet handles its own approvals via polymarket.com
   ensureApprovals(wallet).catch(e => logger.warn('Approval warning', { error: e.message.slice(0,60) }));
+
+  // Start redemption checker (once per user across all their configs)
+  configToUserId[user.configId] = user.id;
+  userConfigCount[user.id] = (userConfigCount[user.id] || 0) + 1;
+  if (!redeemIntervals[user.id]) {
+    redeemIntervals[user.id] = setInterval(() => {
+      checkAndRedeemPositions(user, wallet).catch(e =>
+        logger.warn('Redeem interval error', { userId: user.id, error: e.message })
+      );
+    }, REDEEM_INTERVAL_MS);
+    logger.info('Redemption checker started', { userId: user.id });
+  }
 
   // Register config in the shared poll for this target wallet
   activeEngines[user.configId] = targetWallet;
@@ -611,6 +757,19 @@ function stopCopyEngine(configId) {
     } else {
       logger.info('Config left shared poll', { configId, targetWallet, remaining: poll.users.size });
     }
+  }
+
+  // Stop redemption interval when user has no more active configs
+  const userId = configToUserId[configId];
+  if (userId) {
+    userConfigCount[userId] = (userConfigCount[userId] || 1) - 1;
+    if (userConfigCount[userId] <= 0) {
+      clearInterval(redeemIntervals[userId]);
+      delete redeemIntervals[userId];
+      delete userConfigCount[userId];
+      logger.info('Redemption checker stopped', { userId });
+    }
+    delete configToUserId[configId];
   }
 
   delete activeEngines[configId];
