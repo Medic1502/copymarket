@@ -178,6 +178,9 @@ div.expand-panel.closed{display:none !important}
 .b-buy{background:var(--green-dim);color:var(--green)}
 .b-sell{background:var(--red-dim);color:var(--red)}
 .b-skip{background:var(--yellow-dim);color:var(--yellow)}
+.b-open{background:rgba(99,102,241,.15);color:#818cf8}
+.b-win{background:var(--green-dim);color:var(--green)}
+.b-loss{background:rgba(239,68,68,.12);color:#ef4444}
 .b-blue{background:var(--blue-dim);color:var(--blue-light)}
 
 /* ── WALLET / PROFILE ─────────────────────────────── */
@@ -1048,19 +1051,33 @@ function renderTrades(trades) {
     return;
   }
   c.innerHTML = trades.map(function(t) {
-    const isBuy  = t.side === 'BUY';
-    const isSkip = t.status === 'SKIPPED';
-    const pnlColor = (t.pnl||0) >= 0 ? 'var(--green)' : 'var(--red)';
-    const pnlText    = t.pnl != null ? ((t.pnl>=0?'+':'') + '$' + Math.abs(t.pnl).toFixed(2)) : '—';
-    const badge      = isSkip ? '<span class="badge b-skip">SKIP</span>' : isBuy ? '<span class="badge b-buy">BUY</span>' : '<span class="badge b-sell">SELL</span>';
+    const st = t.status || '';
+    const isSkip = st === 'SKIPPED';
+    const isWon  = st === 'WON';
+    const isLost = st === 'LOST';
+    const isFail = st === 'FAILED';
+    const isOpen = !isSkip && !isWon && !isLost && !isFail;
+
+    let badge;
+    if (isSkip)     badge = '<span class="badge b-skip">SKIP</span>';
+    else if (isFail) badge = '<span class="badge b-loss">FAIL</span>';
+    else if (isWon)  badge = '<span class="badge b-win">WIN</span>';
+    else if (isLost) badge = '<span class="badge b-loss">LOSS</span>';
+    else             badge = '<span class="badge b-open">OPEN</span>';
+
+    const pnlColor = isWon ? 'var(--green)' : isLost ? 'var(--red)' : 'var(--text3)';
+    const pnlText  = (isWon || isLost) && t.pnl != null
+      ? (t.pnl >= 0 ? '+' : '') + '$' + Math.abs(t.pnl).toFixed(2)
+      : '—';
+
     const entryPrice = !isSkip && t.price ? (parseFloat(t.price)*100).toFixed(1) + '¢' : null;
     const spent      = !isSkip && t.size  ? '$' + parseFloat(t.size).toFixed(2) : null;
     const polyLink   = t.market_slug ? 'https://polymarket.com/event/' + t.market_slug : (t.condition_id ? 'https://polymarket.com/event/' + t.condition_id : null);
     const meta       = isSkip
-      ? (t.skip_reason||'Skipped')
+      ? (t.skip_reason || 'Skipped')
       : [spent, t.outcome, entryPrice ? 'entry: ' + entryPrice : null, timeAgo(t.created_at)].filter(Boolean).join(' · ');
-    const mktName    = (t.market_name && t.market_name !== t.condition_id) ? t.market_name : (t.condition_id ? t.condition_id.slice(0,18)+'...' : '—');
-    const linkIcon   = polyLink ? ' <a href="' + polyLink + '" target="_blank" style="color:var(--blue-light);font-size:11px;vertical-align:middle" onclick="event.stopPropagation()">↗</a>' : '';
+    const mktName  = (t.market_name && t.market_name !== t.condition_id) ? t.market_name : (t.condition_id ? t.condition_id.slice(0,18)+'...' : '—');
+    const linkIcon = polyLink ? ' <a href="' + polyLink + '" target="_blank" style="color:var(--blue-light);font-size:11px;vertical-align:middle" onclick="event.stopPropagation()">↗</a>' : '';
     return '<div class="trade-row">' + badge +
       '<div class="trade-name"><div class="trade-market">' + mktName + linkIcon + '</div><div class="trade-meta">' + meta + '</div></div>' +
       '<div style="font-size:13px;font-weight:600;color:' + pnlColor + ';flex-shrink:0">' + pnlText + '</div></div>';

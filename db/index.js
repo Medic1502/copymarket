@@ -177,17 +177,28 @@ async function upsertDailyPnl(userId, pnlDelta) {
   );
 }
 
+async function resolveTradeOutcome(userId, conditionId, status, pnl) {
+  await query(
+    `UPDATE trades SET status=$3, pnl=$4
+     WHERE user_id=$1 AND condition_id=$2 AND side='BUY' AND status NOT IN ('FAILED','SKIPPED')`,
+    [userId, conditionId, status, pnl]
+  );
+}
+
 async function getRecentTrades(userId, limit = 20) {
-  const res = await query('SELECT * FROM trades WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2', [userId, limit]);
+  const res = await query(
+    `SELECT * FROM trades WHERE user_id = $1 AND side != 'REDEEM' ORDER BY created_at DESC LIMIT $2`,
+    [userId, limit]
+  );
   return res.rows;
 }
 
 async function getDashboardStats(userId) {
   const [totalRes, pnlRes, todayRes, winRes] = await Promise.all([
     query("SELECT COUNT(*) AS total_trades, SUM(size) AS total_invested FROM trades WHERE user_id=$1 AND side='BUY' AND status != 'FAILED'", [userId]),
-    query('SELECT COALESCE(SUM(pnl),0) AS total_pnl FROM trades WHERE user_id=$1', [userId]),
+    query("SELECT COALESCE(SUM(pnl),0) AS total_pnl FROM trades WHERE user_id=$1 AND side='REDEEM'", [userId]),
     query('SELECT COALESCE(SUM(pnl),0) AS today_pnl FROM daily_pnl WHERE user_id=$1 AND date=CURRENT_DATE', [userId]),
-    query("SELECT COUNT(*) FILTER (WHERE pnl > 0) AS wins, COUNT(*) FILTER (WHERE pnl < 0) AS losses FROM trades WHERE user_id=$1 AND pnl IS NOT NULL", [userId]),
+    query("SELECT COUNT(*) FILTER (WHERE pnl > 0) AS wins, COUNT(*) FILTER (WHERE pnl < 0) AS losses FROM trades WHERE user_id=$1 AND side='REDEEM'", [userId]),
   ]);
   const wins = parseInt(winRes.rows[0].wins) || 0;
   const losses = parseInt(winRes.rows[0].losses) || 0;
@@ -304,7 +315,7 @@ module.exports = {
   setConfigActive,
   createWalletForUser, getWalletByUserId, getUSDCBalance,
   saveCopyConfig, updateCopyConfig, getCopyConfig, setActive, getAllActiveConfigs, deleteCopyConfig,
-  saveTrade, getRecentTrades, getDashboardStats, getTodayLoss, getTraderStats,
+  saveTrade, resolveTradeOutcome, getRecentTrades, getDashboardStats, getTodayLoss, getTraderStats,
   upsertBotPosition, deleteBotPosition, resolveBotPosition, deleteResolvedPosition, getBotPositions, getBotPositionsWithNames, clearBotPositions,
   encryptPrivateKey, decryptPrivateKey,
 };

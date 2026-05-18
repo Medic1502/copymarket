@@ -595,6 +595,7 @@ async function checkAndRedeemPositions(user, wallet) {
 
         if (onChainSuccess) {
           await db.resolveBotPosition(user.id, conditionId, pos.outcome, isWinner ? 'WON' : 'LOST', pnl).catch(() => {});
+          await db.resolveTradeOutcome(user.id, conditionId, isWinner ? 'WON' : 'LOST', pnl).catch(() => {});
           await db.saveTrade(user.id, {
             conditionId, marketName, marketSlug,
             outcome:    pos.outcome,
