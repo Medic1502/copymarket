@@ -194,20 +194,24 @@ async function getRecentTrades(userId, limit = 20) {
 }
 
 async function getDashboardStats(userId) {
-  const [totalRes, pnlRes, todayRes, winRes] = await Promise.all([
-    query("SELECT COUNT(*) AS total_trades, SUM(size) AS total_invested FROM trades WHERE user_id=$1 AND side='BUY' AND status != 'FAILED'", [userId]),
-    query("SELECT COALESCE(SUM(pnl),0) AS total_pnl FROM trades WHERE user_id=$1 AND side='REDEEM'", [userId]),
-    query('SELECT COALESCE(SUM(pnl),0) AS today_pnl FROM daily_pnl WHERE user_id=$1 AND date=CURRENT_DATE', [userId]),
-    query("SELECT COUNT(*) FILTER (WHERE pnl > 0) AS wins, COUNT(*) FILTER (WHERE pnl < 0) AS losses FROM trades WHERE user_id=$1 AND side='REDEEM'", [userId]),
-  ]);
-  const wins = parseInt(winRes.rows[0].wins) || 0;
-  const losses = parseInt(winRes.rows[0].losses) || 0;
+  const posRes = await query(
+    `SELECT
+       COALESCE(SUM(resolved_pnl), 0)                                                 AS total_pnl,
+       COALESCE(SUM(resolved_pnl) FILTER (WHERE updated_at::date = CURRENT_DATE), 0)  AS today_pnl,
+       COUNT(*) FILTER (WHERE resolved_outcome='WON')                                 AS wins,
+       COUNT(*) FILTER (WHERE resolved_outcome='LOST')                                AS losses,
+       COUNT(*) FILTER (WHERE resolved_outcome IS NOT NULL)                           AS resolved_count
+     FROM bot_positions WHERE user_id=$1 AND resolved_outcome IS NOT NULL`,
+    [userId]
+  );
+  const row    = posRes.rows[0];
+  const wins   = parseInt(row.wins)   || 0;
+  const losses = parseInt(row.losses) || 0;
   const winRate = wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : null;
   return {
-    totalTrades:   parseInt(totalRes.rows[0].total_trades) || 0,
-    totalInvested: parseFloat(totalRes.rows[0].total_invested) || 0,
-    totalPnl:      parseFloat(pnlRes.rows[0].total_pnl),
-    todayPnl:      parseFloat(todayRes.rows[0].today_pnl),
+    totalPnl:      parseFloat(row.total_pnl)    || 0,
+    todayPnl:      parseFloat(row.today_pnl)    || 0,
+    resolvedCount: parseInt(row.resolved_count) || 0,
     winRate,
   };
 }

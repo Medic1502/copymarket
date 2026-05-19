@@ -1264,7 +1264,7 @@ async function loadDashboard() {
     todayEl.textContent = (today>=0?'+':'-') + '$' + Math.abs(today).toFixed(2);
     todayEl.className = 'stat-value ' + (today>=0?'pos':'neg');
     document.getElementById('stat-winrate').textContent    = stats.winRate != null ? stats.winRate + '%' : '—';
-    document.getElementById('stat-trades-sub').textContent = (stats.totalTrades||0) + ' trades';
+    document.getElementById('stat-trades-sub').textContent = (stats.resolvedCount||0) + ' resolved';
     document.getElementById('stat-traders').textContent    = config.traders ? config.traders.filter(t=>t.isActive).length : '0';
 
     copyActive = config.isActive;
