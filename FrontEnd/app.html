@@ -1063,7 +1063,7 @@ async function loadOpenPositions(traders) {
               ? '<a href="' + link + '" target="_blank" style="color:var(--text);text-decoration:none;font-weight:600" onclick="event.stopPropagation()">' + name + ' ↗</a>'
               : '<a href="' + link + '" target="_blank" style="color:var(--text2);text-decoration:none;font-family:monospace;font-size:11px" onclick="event.stopPropagation()">' + (p.condition_id||'').slice(0,14) + '... ↗</a>';
             const liveSpan   = p.token_id
-              ? '<span data-price-token="' + p.token_id + '" style="color:var(--text3)">—</span>'
+              ? '<span data-price-token="' + p.token_id + '" data-condition-id="' + p.condition_id + '" data-outcome="' + (p.outcome||'Yes').replace(/"/g,'') + '" style="color:var(--text3)">—</span>'
               : '<span style="color:var(--text3)">—</span>';
             const cid = p.condition_id.replace(/'/g, '');
             const out = (p.outcome||'Yes').replace(/'/g, '');
@@ -1140,16 +1140,29 @@ async function sellPosition(conditionId, outcome, btn) {
 async function refreshPositionPrices() {
   try {
     const { prices } = await api('GET', '/dashboard/positions/prices');
+    if (!window._resolving) window._resolving = new Set();
+
     document.querySelectorAll('[data-price-token]').forEach(el => {
-      const tokenId = el.dataset.priceToken;
-      const price = prices[tokenId];
-      if (!price) { el.textContent = '—'; el.style.color = 'var(--text3)'; return; }
+      const tokenId    = el.dataset.priceToken;
+      const price      = prices[tokenId];
+      if (price == null) { el.textContent = '—'; el.style.color = 'var(--text3)'; return; }
       const cents = Math.round(price * 100);
       el.textContent = cents + '¢';
       el.style.color = price >= 0.99 ? 'var(--green)'
         : price >= 0.70 ? 'var(--blue-light)'
         : price >= 0.50 ? 'var(--text2)'
         : 'var(--text3)';
+
+      // Auto-resolve when price hits 100¢ (WIN) or 0¢ (LOSS)
+      const conditionId = el.dataset.conditionId;
+      const outcome     = el.dataset.outcome;
+      const key         = conditionId + '_' + outcome;
+      if (conditionId && outcome && !window._resolving.has(key) && (price >= 0.99 || price <= 0.01)) {
+        window._resolving.add(key);
+        api('POST', '/dashboard/positions/' + encodeURIComponent(conditionId) + '/' + encodeURIComponent(outcome) + '/resolve')
+          .then(() => { window._resolving.delete(key); loadDashboard(); })
+          .catch(() => window._resolving.delete(key));
+      }
     });
   } catch {}
 }
