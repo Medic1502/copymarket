@@ -237,6 +237,59 @@ div.expand-panel.closed{display:none !important}
 </style>
 </head>
 <body>
+
+<!-- ══ WELCOME MODAL ════════════════════════════════════════════════════════ -->
+<div id="welcome-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:32px 28px;max-width:440px;width:90%;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">
+      <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--cyan));display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🎉</div>
+      <div>
+        <div style="font-size:17px;font-weight:700;color:var(--text)">Welcome to Jonin CT!</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:2px">Follow these steps to start copying trades</div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:28px">
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--blue);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">1</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px">Export your wallet</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.6">Go to the <strong style="color:var(--cyan)">Wallet</strong> tab → click <strong>Export private key</strong> → copy your 12-word seed phrase.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--blue);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">2</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px">Import into MetaMask</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.6">Open MetaMask → <strong>Add wallet</strong> → <strong>Import account</strong> → paste your 12-word seed phrase.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--blue);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">3</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px">Register on Polymarket</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.6">Go to <strong style="color:var(--cyan)">polymarket.com</strong> → connect your MetaMask → accept Terms of Service. This activates your wallet for trading.</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">4</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px">Add a trader & start earning</div>
+          <div style="font-size:12px;color:var(--text2);line-height:1.6">Deposit USDC to your wallet, click <strong>+ Add trader</strong> and hit <strong>Resume</strong>. The bot will copy trades automatically 24/7.</div>
+        </div>
+      </div>
+    </div>
+
+    <button onclick="closeWelcome()" style="width:100%;background:linear-gradient(135deg,var(--blue),var(--cyan));border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;padding:12px;cursor:pointer;letter-spacing:.02em">
+      Got it — let's go! 🚀
+    </button>
+    <div style="text-align:center;margin-top:10px;font-size:11px;color:var(--text3)">You can always find help in the Discord server</div>
+  </div>
+</div>
+
 <div class="app">
 
 <!-- ══ TOP HEADER ════════════════════════════════════════════════════════════ -->
@@ -516,9 +569,19 @@ let token      = localStorage.getItem('cm_token') || null;
 let walletAddr = localStorage.getItem('cm_wallet') || null;
 let userEmail  = localStorage.getItem('cm_email')  || null;
 let userName   = localStorage.getItem('cm_username') || null;
+
+function closeWelcome() {
+  document.getElementById('welcome-overlay').style.display = 'none';
+  localStorage.setItem('cm_welcomed', '1');
+}
+function maybeShowWelcome() {
+  if (!localStorage.getItem('cm_welcomed') && token) {
+    document.getElementById('welcome-overlay').style.display = 'flex';
+  }
+}
 let copyActive = false;
 
-loadDashboard();
+loadDashboard().then(() => maybeShowWelcome());
 
 // ── NAVIGATION ──────────────────────────────────────────────────────────────
 function navSwitch(key, el) {
