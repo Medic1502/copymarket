@@ -25,7 +25,7 @@ body{color:var(--text);font-family:'Inter',-apple-system,sans-serif;font-size:14
 /* ── TOP HEADER (full width, one logo) ───────────── */
 .app-header{display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:54px;background:var(--bg);border-bottom:1px solid var(--border);flex-shrink:0;-webkit-app-region:drag}
 .header-logo{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;letter-spacing:-.3px;-webkit-app-region:no-drag}
-.header-logo img{height:38px;width:38px;object-fit:contain}
+.header-logo img{height:38px;width:38px;object-fit:contain;mix-blend-mode:screen;border-radius:0}
 .header-logo span{color:var(--cyan)}
 .live-badge{-webkit-app-region:no-drag}
 
@@ -176,7 +176,7 @@ div.expand-panel.closed{display:none !important}
 .form-section-label{font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px}
 
 /* ── TRADE ROWS ───────────────────────────────────── */
-.trade-row{display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--border)}
+.trade-row{display:flex;align-items:center;gap:12px;padding:11px 18px !important;border-bottom:1px solid var(--border)}
 .trade-row:last-child{border-bottom:none}
 .trade-name{flex:1;min-width:0}
 .trade-market{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -463,7 +463,7 @@ div.expand-panel.closed{display:none !important}
       <!-- Recent Trades -->
       <div class="card" style="padding:0;overflow:hidden">
         <div style="padding:14px 18px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--text3);text-transform:uppercase">Recent Trades</div>
-        <div id="trades-list" style="padding:4px 0">
+        <div id="trades-list" style="padding:4px 0 0 0">
           <div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading trades...</div>
         </div>
       </div>
