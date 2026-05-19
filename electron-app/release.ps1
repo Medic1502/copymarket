@@ -29,11 +29,20 @@ if ($newVer -notmatch '^\d+\.\d+\.\d+$') {
 }
 
 Write-Host ""
-Write-Host " Get your token at: github.com > Settings > Developer settings > Personal access tokens" -ForegroundColor Gray
-Write-Host " Required scope: repo" -ForegroundColor Gray
-Write-Host ""
-$ghToken = Read-Host " GitHub token (ghp_...)"
-if ([string]::IsNullOrWhiteSpace($ghToken)) { Write-Host "ERROR: Token cannot be empty." -ForegroundColor Red; exit 1 }
+$tokenFile = "$PSScriptRoot\.release-token"
+if (Test-Path $tokenFile) {
+    $ghToken = (Get-Content $tokenFile -Raw).Trim()
+    Write-Host " GitHub token: loaded from saved file (ghp_...${ghToken.Substring([Math]::Max(0,$ghToken.Length-4))})" -ForegroundColor Green
+} else {
+    Write-Host " Get your token at: github.com > Settings > Developer settings > Personal access tokens" -ForegroundColor Gray
+    Write-Host " Required scope: repo" -ForegroundColor Gray
+    Write-Host ""
+    $ghToken = Read-Host " GitHub token (ghp_...)"
+    if ([string]::IsNullOrWhiteSpace($ghToken)) { Write-Host "ERROR: Token cannot be empty." -ForegroundColor Red; exit 1 }
+    $utf8 = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText($tokenFile, $ghToken, $utf8)
+    Write-Host " Token saved for next time." -ForegroundColor Green
+}
 
 Write-Host ""
 
