@@ -1250,7 +1250,7 @@ function renderTradersHtml(traders) {
         '<div class="expand-settings">' +
           '<span>Per trade: <strong>' + (t.copyMode === 'percentage' ? (t.copyPercentage||10)+'% of bet' : '$'+t.fixedAmount+' USDC') + '</strong></span>' +
           '<span>Follow: <strong>' + (t.followMode === 'initial_only' ? 'Initial only' : 'All buys') + '</strong></span>' +
-          '<span>Price range: <strong>' + Math.round((t.minSharePrice||0.02)*100) + '¢ – ' + Math.round((t.maxSharePrice||0.88)*100) + '¢</strong></span>' +
+          (t.minSharePrice != null || t.maxSharePrice != null ? '<span>Price range: <strong>' + (t.minSharePrice != null ? Math.round(t.minSharePrice*100)+'¢' : 'any') + ' – ' + (t.maxSharePrice != null ? Math.round(t.maxSharePrice*100)+'¢' : 'any') + '</strong></span>' : '') +
           (t.maxPositionSize != null ? '<span>Max position: <strong>$' + t.maxPositionSize + '</strong></span>' : '') +
           '<span>Wallet: <strong style="font-family:monospace">'+short+'</strong></span>' +
         '</div>' +
