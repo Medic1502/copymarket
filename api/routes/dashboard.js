@@ -67,7 +67,8 @@ router.get('/daily-stats', async (req, res, next) => {
     const totalLoss = parseFloat(o.total_loss) || 0;
 
     const daily = dailyRes.rows.map(r => ({
-      date: r.date.toISOString().slice(0, 10),
+      // Use String() to avoid timezone shift — pg DATE → "YYYY-MM-DD" string directly
+      date: String(r.date).slice(0, 10),
       pnl: parseFloat(r.pnl),
       trades: parseInt(r.trades),
     }));

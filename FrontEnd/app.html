@@ -1428,7 +1428,7 @@ async function refreshPositionPrices() {
       if (conditionId && outcome && !window._resolving.has(key) && (price >= 0.99 || price <= 0.01)) {
         window._resolving.add(key);
         api('POST', '/dashboard/positions/' + encodeURIComponent(conditionId) + '/' + encodeURIComponent(outcome) + '/resolve')
-          .then(() => { window._resolving.delete(key); loadDashboard(); })
+          .then(() => { window._resolving.delete(key); _historyLoaded = false; loadDashboard(); })
           .catch(() => window._resolving.delete(key));
       }
     });
@@ -1470,10 +1470,13 @@ let _calYear = new Date().getFullYear();
 let _calMonth = new Date().getMonth(); // 0-indexed
 let _dailyData = []; // [{date, pnl, trades}]
 
-async function loadTradeHistory() {
+let _historyLoaded = false;
+async function loadTradeHistory(force) {
+  if (_historyLoaded && !force) { renderCalendar(); return; }
   try {
     const data = await api('GET', '/dashboard/daily-stats');
     _dailyData = data.daily || [];
+    _historyLoaded = true;
     renderOverallStats(data.overall);
     renderCalendar();
   } catch {}
@@ -1497,23 +1500,24 @@ function renderOverallStats(o) {
   };
   const pct = v => v != null ? v + '%' : '—';
   const num = v => v != null ? v : '—';
+  const noData = o.totalResolved === 0;
   const rows = [
     ['TOTAL RESOLVED',  o.totalResolved,  null],
-    ['WIN RATE',        pct(o.winRate),    o.winRate >= 50 ? 'var(--green)' : 'var(--red)'],
-    ['TOTAL PROFIT',   fmt(o.totalProfit, true), 'var(--green)'],
-    ['TOTAL LOSS',     fmt(o.totalLoss,  false), 'var(--red)'],
-    ['NET PNL',        fmt(o.netPnl,     true),  o.netPnl >= 0 ? 'var(--green)' : 'var(--red)'],
-    ['BEST DAY',       fmt(o.bestDay,    true),  'var(--green)'],
-    ['WORST DAY',      fmt(o.worstDay,   false), 'var(--red)'],
-    ['PROFIT FACTOR',  o.profitFactor != null ? o.profitFactor : '—', null],
-    ['AVG TRADE',      fmt(o.avgTrade,   true),  o.avgTrade >= 0 ? 'var(--green)' : 'var(--red)'],
+    ['WIN RATE',        pct(o.winRate),    o.winRate == null ? null : o.winRate >= 50 ? 'var(--green)' : 'var(--red)'],
+    ['TOTAL PROFIT',    noData ? '—' : fmt(o.totalProfit, true),  noData ? null : 'var(--green)'],
+    ['TOTAL LOSS',      noData ? '—' : fmt(o.totalLoss,  false),  noData ? null : 'var(--red)'],
+    ['NET PNL',         noData ? '—' : fmt(o.netPnl,     true),   noData ? null : o.netPnl >= 0 ? 'var(--green)' : 'var(--red)'],
+    ['BEST DAY',        noData ? '—' : fmt(o.bestDay,    true),   noData ? null : 'var(--green)'],
+    ['WORST DAY',       noData ? '—' : fmt(o.worstDay,   false),  noData ? null : o.worstDay < 0 ? 'var(--red)' : 'var(--text)'],
+    ['PROFIT FACTOR',   o.profitFactor != null ? o.profitFactor : '—', null],
+    ['AVG TRADE',       noData ? '—' : fmt(o.avgTrade,   true),   noData ? null : o.avgTrade >= 0 ? 'var(--green)' : 'var(--red)'],
   ];
-  el.innerHTML = rows.map(([label, val, color]) =>
-    '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 18px;border-bottom:1px solid var(--border)">' +
+  el.innerHTML = rows.map(([label, val, color], i) =>
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 18px;' + (i < rows.length - 1 ? 'border-bottom:1px solid var(--border)' : '') + '">' +
     '<span style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.05em">' + label + '</span>' +
     '<span style="font-size:14px;font-weight:700;color:' + (color || 'var(--text)') + '">' + val + '</span>' +
     '</div>'
-  ).join('').replace(/border-bottom[^"]+"\s*><\/div>$/, '"></div>');
+  ).join('');
 }
 
 function renderCalendar() {
