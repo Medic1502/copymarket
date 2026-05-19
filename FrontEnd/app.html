@@ -314,6 +314,7 @@ div.expand-panel.closed{display:none !important}
         <div style="font-size:14px;font-weight:600;margin-bottom:14px" id="add-form-title">Add new trader</div>
         <div class="field"><label>Trader wallet address</label><input type="text" id="new-trader-wallet" placeholder="0x..."></div>
         <div class="field"><label>Nickname <span style="color:var(--text3);font-weight:400">(optional)</span></label><input type="text" id="new-trader-nickname" placeholder="e.g. Whale Mike" maxlength="40"></div>
+        <div class="field"><label>Notes <span style="color:var(--text3);font-weight:400">(optional — visible on trader card)</span></label><input type="text" id="new-trader-notes" placeholder="e.g. Top NBA trader, high volume" maxlength="120"></div>
         <div style="margin-bottom:14px">
           <label style="margin-bottom:6px">Amount per trade</label>
           <div style="display:flex;gap:8px;margin-bottom:10px">
@@ -436,8 +437,8 @@ div.expand-panel.closed{display:none !important}
             </div>
             <div style="background:var(--bg3);border-radius:8px;padding:12px;font-size:12px;color:var(--text2);line-height:1.8">
               <strong style="color:var(--text)">How to import into MetaMask:</strong><br>
-              1. MetaMask → account icon → <em>Import account</em><br>
-              2. Select <em>"Secret recovery phrase"</em> → paste 12 words → Import<br>
+              1. MetaMask → account icon (top right) → <em>Add wallet</em><br>
+              2. Select <em>"Import account"</em> → paste private key → Import<br>
               3. Go to <strong style="color:var(--cyan)">polymarket.com</strong> → Connect wallet → Accept Terms ✓
             </div>
           </div>
@@ -601,7 +602,7 @@ function confirmExportKey() { doExportKey(); }
 async function doExportKey() {
   try {
     const data = await api('POST', '/wallet/export-key', {});
-    document.getElementById('export-key-value').textContent = data.privateKey;
+    document.getElementById('export-key-value').textContent = data.privateKey || '';
     _exportedMnemonic = data.mnemonic || '';
     const mnemonicSection = document.getElementById('export-mnemonic-section');
     const pkSection       = document.getElementById('export-pk-section');
@@ -620,7 +621,6 @@ async function doExportKey() {
       pkSection.style.display = 'block';
     }
     document.getElementById('export-key-result').style.display = 'block';
-    document.getElementById('export-key-pass').value = '';
     clearAlert('export-key-alert');
   } catch(e) { showAlert('export-key-alert', e.message); }
 }
@@ -721,6 +721,7 @@ function resetAddForm() {
   document.getElementById('new-trader-wallet').value = '';
   document.getElementById('new-trader-wallet').disabled = false;
   document.getElementById('new-trader-nickname').value = '';
+  document.getElementById('new-trader-notes').value = '';
   document.getElementById('new-fixed-amount').value = 1;
   document.getElementById('new-copy-percentage').value = 10;
   document.getElementById('new-max-position').value = '';
@@ -762,6 +763,7 @@ function editTrader(t) {
   document.getElementById('new-trader-wallet').value = t.targetWallet;
   document.getElementById('new-trader-wallet').disabled = true;
   document.getElementById('new-trader-nickname').value = t.nickname || '';
+  document.getElementById('new-trader-notes').value = t.notes || '';
   setCopyMode(t.copyMode || 'fixed');
   document.getElementById('new-fixed-amount').value = t.fixedAmount || 1;
   document.getElementById('new-copy-percentage').value = t.copyPercentage || 10;
@@ -788,12 +790,13 @@ async function saveEditTrader() {
   try {
     if (!_editingConfigId) throw new Error('No trader selected.');
     const nickname   = document.getElementById('new-trader-nickname').value.trim() || null;
+    const notes      = document.getElementById('new-trader-notes').value.trim() || null;
     const followMode = document.getElementById('new-follow-mode').value;
     const maxPosRaw  = document.getElementById('new-max-position').value;
     const maxPositionSize = maxPosRaw !== '' ? parseFloat(maxPosRaw) : null;
     const minSharePrice = parseFloat(document.getElementById('new-min-price').value) / 100 || 0.02;
     const maxSharePrice = parseFloat(document.getElementById('new-max-price').value) / 100 || 0.88;
-    await api('PUT', '/copy/config/' + _editingConfigId, { nickname, copyMode, fixedAmount: fixedAmt, copyPercentage: copyPct, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode, minSharePrice, maxSharePrice, maxPositionSize });
+    await api('PUT', '/copy/config/' + _editingConfigId, { nickname, notes, copyMode, fixedAmount: fixedAmt, copyPercentage: copyPct, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode, minSharePrice, maxSharePrice, maxPositionSize });
     document.getElementById('add-trader-form').classList.remove('open');
     resetAddForm();
     showAlert('dash-alert', 'Settings updated.', 'success');
@@ -818,12 +821,13 @@ async function addTrader() {
   setLoading('add-trader-btn', true);
   try {
     const nickname    = document.getElementById('new-trader-nickname').value.trim() || null;
+    const notes       = document.getElementById('new-trader-notes').value.trim() || null;
     const followMode  = document.getElementById('new-follow-mode').value;
     const maxPosRaw   = document.getElementById('new-max-position').value;
     const maxPositionSize = maxPosRaw !== '' ? parseFloat(maxPosRaw) : null;
     const minSharePrice = parseFloat(document.getElementById('new-min-price').value) / 100 || 0.02;
     const maxSharePrice = parseFloat(document.getElementById('new-max-price').value) / 100 || 0.88;
-    await api('POST', '/copy/config', { targetWallet: wallet, nickname, copyMode, fixedAmount: fixedAmt, copyPercentage: copyPct, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode, minSharePrice, maxSharePrice, maxPositionSize });
+    await api('POST', '/copy/config', { targetWallet: wallet, nickname, notes, copyMode, fixedAmount: fixedAmt, copyPercentage: copyPct, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode, minSharePrice, maxSharePrice, maxPositionSize });
     document.getElementById('add-trader-form').classList.remove('open');
     document.getElementById('new-trader-wallet').value = '';
     document.getElementById('new-trader-nickname').value = '';
@@ -1024,8 +1028,9 @@ function renderTradersHtml(traders) {
       '</div>';
 
     const polyUrl = 'https://polymarket.com/profile/' + tw;
+    const notesHtml = t.notes ? '<div style="font-size:11px;color:var(--text3);margin-top:2px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + t.notes.replace(/"/g,'&quot;') + '">' + t.notes + '</div>' : '';
     return '<div id="row-'+t.id+'" class="trader-row" onclick="toggleExpand(\''+t.id+'\')">' +
-        '<div class="trader-cell"><div class="t-avatar">' + init + '</div><div><div class="t-name"><a href="'+polyUrl+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:none" title="Open on Polymarket">' + label + '</a> <span class="chevron">›</span></div><div class="t-addr">' + short + '</div></div></div>' +
+        '<div class="trader-cell"><div class="t-avatar">' + init + '</div><div><div class="t-name"><a href="'+polyUrl+'" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:none" title="Open on Polymarket">' + label + '</a> <span class="chevron">›</span></div><div class="t-addr">' + short + '</div>' + notesHtml + '</div></div>' +
         '<div class="trader-cell"><span class="' + pnlCls + '">' + pnlStr + '</span></div>' +
         '<div class="trader-cell" style="font-size:12px;color:var(--text2)">' + copiedWon + '</div>' +
         '<div class="trader-cell">' + statusHtml + '</div>' +

@@ -22,9 +22,9 @@ router.post('/config',
   }),
   async (req, res, next) => {
     try {
-      const { targetWallet, nickname, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice, maxPositionSize } = req.body;
+      const { targetWallet, nickname, notes, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice, maxPositionSize } = req.body;
       const config = await db.saveCopyConfig(req.userId, {
-        targetWallet, nickname, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice, maxPositionSize
+        targetWallet, nickname, notes, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice, maxPositionSize
       });
       res.json({ config, message: 'Settings saved.' });
     } catch (err) { next(err); }
@@ -75,9 +75,9 @@ router.post('/stop', async (req, res, next) => {
 
 router.put('/config/:id', async (req, res, next) => {
   try {
-    const { nickname, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice, maxPositionSize } = req.body;
+    const { nickname, notes, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice, maxPositionSize } = req.body;
     const config = await db.updateCopyConfig(req.params.id, req.userId, {
-      nickname, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice, maxPositionSize
+      nickname, notes, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice, maxPositionSize
     });
     if (!config) return res.status(404).json({ error: 'Config not found.' });
     // restart engine with new settings if active
@@ -133,6 +133,7 @@ router.get('/status', async (req, res, next) => {
         pausedReason:   c.paused_reason,
         targetWallet:   c.target_wallet,
         nickname:       c.nickname || null,
+        notes:          c.notes || null,
         copyMode:       c.copy_mode || 'percentage',
         copyPercentage: parseFloat(c.copy_percentage)||10,
         fixedAmount:    parseFloat(c.fixed_amount)||10,

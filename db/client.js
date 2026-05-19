@@ -163,6 +163,9 @@ async function migrate() {
     // HWID reset tracking for user self-service machine transfers
     await run(`ALTER TABLE license_keys ADD COLUMN IF NOT EXISTS hwid_reset_at TIMESTAMPTZ`);
 
+    // Notes per trader config
+    await run(`ALTER TABLE copy_configs ADD COLUMN IF NOT EXISTS notes TEXT`);
+
     // Market name + slug stored on position so stats reset doesn't wipe display names
     await run(`ALTER TABLE bot_positions ADD COLUMN IF NOT EXISTS market_name TEXT`);
     await run(`ALTER TABLE bot_positions ADD COLUMN IF NOT EXISTS market_slug TEXT`);
