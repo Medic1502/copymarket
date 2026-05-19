@@ -318,6 +318,9 @@ div.expand-panel.closed{display:none !important}
           <div id="pct-amount-field" style="display:none">
             <input type="number" id="new-copy-percentage" value="10" min="1" max="1000" placeholder="e.g. 10" style="width:100%">
             <div style="color:var(--text3);font-size:12px;margin-top:4px">We bet X% of what the trader bets each time</div>
+            <div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.25);border-radius:6px;padding:8px 10px;margin-top:8px;font-size:11px;color:#ca8a04;line-height:1.6">
+              <strong>⚠ Minimum order:</strong> Polymarket requires at least 5 shares per trade. If the calculated amount is too small to buy 5 shares at the current price, that trade will be skipped. Low percentages on small trader bets may result in many skipped trades.
+            </div>
           </div>
         </div>
         <div class="field"><label>Max $ per position <span style="color:var(--text3);font-weight:400">(optional — leave empty for no limit)</span></label><input type="number" id="new-max-position" min="1" placeholder="e.g. 20"></div>
@@ -386,17 +389,6 @@ div.expand-panel.closed{display:none !important}
           <button class="btn btn-sm" style="flex:1" onclick="refreshBalance()">Refresh</button>
           <button class="btn btn-sm btn-primary" style="flex:1" onclick="openMoonpay()">Buy USDC</button>
           <button class="btn btn-sm btn-red" style="flex:1" onclick="toggleWithdraw()">Withdraw</button>
-        </div>
-        <div style="margin-top:8px" id="recover-section">
-          <button class="btn btn-sm btn-yellow btn-block" onclick="toggleRecover()">Recover funds from deposit wallet</button>
-          <div id="recover-form" style="display:none;margin-top:8px">
-            <div class="field" style="margin-bottom:6px"><label>Send to address</label><input type="text" id="recover-addr" placeholder="0x... (your Binance/Phantom address)"></div>
-            <div style="display:flex;gap:6px">
-              <button class="btn btn-sm btn-yellow" style="flex:1" onclick="recoverDepositWallet()">Confirm recovery</button>
-              <button class="btn btn-sm" onclick="toggleRecover()">Cancel</button>
-            </div>
-          </div>
-          <div id="recover-alert" style="margin-top:6px"></div>
         </div>
 
         <div id="withdraw-form" style="display:none;margin-top:14px">
