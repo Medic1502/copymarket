@@ -597,11 +597,31 @@ async function checkAndRedeemPositions(user, wallet) {
           : (market.clobTokenIds || []);
 
         // FIX: use outcome_index for winner detection, not string matching
-        // Fallback for old positions without outcome_index: match via token_id -> clobTokenIds
+        // Fallback 1: match via saved token_id -> clobTokenIds
         let ourIdx = pos.outcome_index;
         if (ourIdx == null && pos.token_id && clobTokenIds.length > 0) {
           const found = clobTokenIds.findIndex(tid => tid === pos.token_id);
           if (found >= 0) ourIdx = found;
+        }
+        // Fallback 2 (old positions): check on-chain CTF ERC-1155 balances
+        // Polymarket CTF contract holds conditional tokens — balanceOf tells us which side we bought
+        if (ourIdx == null && clobTokenIds.length >= 2) {
+          const ctfAbi = ['function balanceOf(address,uint256) view returns (uint256)'];
+          const ctf = new ethers.Contract('0x4D97DCd97eC945f40cF65F87097ACe5EA0476045', ctfAbi, provider);
+          const [bal0, bal1] = await Promise.all([
+            ctf.balanceOf(depositAddr, BigInt(clobTokenIds[0])).catch(() => 0n),
+            ctf.balanceOf(depositAddr, BigInt(clobTokenIds[1])).catch(() => 0n),
+          ]);
+          if (bal0 > 0n) ourIdx = 0;
+          else if (bal1 > 0n) ourIdx = 1;
+          else {
+            // No balance on either side — already redeemed on-chain or never filled
+            logger.info('No CTF balance, cleaning up DB position', { conditionId: conditionId.slice(0, 10) });
+            const winnerIdx = outcomePrices.findIndex(p => parseFloat(p) >= 0.99);
+            const cleanPnl  = winnerIdx < 0 ? -parseFloat(pos.usdc_spent) : 0;
+            await db.resolveBotPosition(user.id, conditionId, pos.outcome, 'LOST', cleanPnl).catch(() => {});
+            continue;
+          }
         }
         if (ourIdx == null) {
           logger.warn('Cannot determine outcome_index, skipping', { conditionId: conditionId.slice(0, 10) });
@@ -669,6 +689,14 @@ async function checkAndRedeemPositions(user, wallet) {
           ];
 
           ;(async () => {
+            // Check MATIC balance first — no gas = all txs will fail
+            const maticBal = await provider.getBalance(signer.address).catch(() => 0n);
+            if (maticBal < ethers.parseEther('0.001')) {
+              logger.warn('On-chain redeem skipped: EOA has insufficient MATIC for gas', {
+                userId: user.id, eoaAddress: signer.address, maticBal: ethers.formatEther(maticBal),
+              });
+              return;
+            }
             for (const fn of executeFns) {
               const iface  = new ethers.Interface([fn]);
               const fnName = fn.split('(')[0].split(' ')[1];
@@ -683,10 +711,10 @@ async function checkAndRedeemPositions(user, wallet) {
                 });
                 break;
               } catch (e) {
-                logger.warn('On-chain redeem attempt failed', { fn: fnName, error: e.message.slice(0, 80) });
+                logger.warn('On-chain redeem attempt failed', { fn: fnName, error: e.message.slice(0, 200) });
               }
             }
-          })().catch(e => logger.warn('Async redeem error', { error: e.message.slice(0, 80) }));
+          })().catch(e => logger.warn('Async redeem error', { error: e.message.slice(0, 200) }));
         }
       } catch (posErr) {
         logger.warn('Redeem check error for position', {
@@ -916,4 +944,4 @@ function stopCopyEngine(configId) {
   logger.info('Engine stopped', { configId });
 }
 
-module.exports = { startCopyEngine, stopCopyEngine };
+module.exports = { startCopyEngine, stopCopyEngine, placeOrder };

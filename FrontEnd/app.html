@@ -1065,11 +1065,14 @@ async function loadOpenPositions(traders) {
             const liveSpan   = p.token_id
               ? '<span data-price-token="' + p.token_id + '" style="color:var(--text3)">—</span>'
               : '<span style="color:var(--text3)">—</span>';
+            const cid = p.condition_id.replace(/'/g, '');
+            const out = (p.outcome||'Yes').replace(/'/g, '');
             return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:6px;padding:6px 10px;font-size:12px;gap:8px">' +
               '<span style="background:var(--green-dim);color:var(--green);font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px;flex-shrink:0">OPEN</span>' +
               '<span style="color:var(--text2);min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + nameHtml + ' <strong style="color:var(--blue-light)">' + (p.outcome||'Yes') + '</strong></span>' +
               '<span style="color:var(--text3);font-size:11px;flex-shrink:0;white-space:nowrap">' + entryPrice + '¢ → ' + liveSpan + '</span>' +
               '<span style="color:var(--green);font-weight:600;flex-shrink:0">$' + usdc + '</span>' +
+              '<button onclick="event.stopPropagation();sellPosition(\'' + cid + '\',\'' + out + '\',this)" style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#ef4444;cursor:pointer;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;flex-shrink:0;white-space:nowrap" title="Sell position at market price">SELL</button>' +
               '</div>';
           }).join('') + '</div>';
       }
@@ -1114,6 +1117,24 @@ async function deletePosition(conditionId, outcome) {
     await api('DELETE', '/dashboard/positions/' + encodeURIComponent(conditionId) + '/' + encodeURIComponent(outcome));
     loadDashboard();
   } catch(e) {}
+}
+
+async function sellPosition(conditionId, outcome, btn) {
+  if (!confirm('Sell "' + outcome + '" at current market price?')) return;
+  const orig = btn.textContent;
+  btn.textContent = '...';
+  btn.disabled = true;
+  try {
+    const data = await api('POST', '/dashboard/positions/' + encodeURIComponent(conditionId) + '/' + encodeURIComponent(outcome) + '/sell');
+    const pnlStr = (data.pnl >= 0 ? '+' : '') + '$' + Math.abs(data.pnl).toFixed(2);
+    const cents  = Math.round(data.price * 100);
+    alert('Sell order placed at ' + cents + '¢\nEstimated: ' + pnlStr + ' PnL\nOrder ID: ' + (data.orderId || 'N/A'));
+    loadDashboard();
+  } catch(e) {
+    alert('Sell failed: ' + e.message);
+    btn.textContent = orig;
+    btn.disabled = false;
+  }
 }
 
 async function refreshPositionPrices() {
