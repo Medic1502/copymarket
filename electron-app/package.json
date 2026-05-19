@@ -1,7 +1,7 @@
-{
+﻿{
   "name": "jonin-ct",
-  "version": "1.2.0",
-  "description": "Jonin CT Desktop — Copy Top Polymarket Traders",
+  "version": "1.0.5",
+  "description": "Jonin CT Desktop â€” Copy Top Polymarket Traders",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -21,7 +21,7 @@
   "build": {
     "appId": "com.joninCT.desktop",
     "productName": "Jonin CT",
-    "copyright": "© 2026 Jonin CT",
+    "copyright": "Â© 2026 Jonin CT",
     "directories": {
       "output": "dist"
     },
@@ -61,3 +61,5 @@
     }
   }
 }
+
+
