@@ -1,4 +1,34 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Tray, Menu, nativeTheme } = require('electron');
+const { autoUpdater } = require('electron-updater');
+nativeTheme.themeSource = 'dark';
+
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
+
+autoUpdater.on('update-available', () => {
+  dialog.showMessageBox({
+    type: 'info',
+    title: 'Update available',
+    message: 'A new version of Jonin CT is available. Downloading in the background...',
+    buttons: ['OK'],
+  });
+});
+
+autoUpdater.on('update-downloaded', () => {
+  dialog.showMessageBox({
+    type: 'info',
+    title: 'Update ready',
+    message: 'Jonin CT has been updated. Restart now to apply the latest version?',
+    buttons: ['Restart now', 'Later'],
+    defaultId: 0,
+  }).then(({ response }) => {
+    if (response === 0) autoUpdater.quitAndInstall();
+  });
+});
+
+autoUpdater.on('error', (err) => {
+  console.error('Auto-updater error:', err.message);
+});
 const { machineIdSync } = require('node-machine-id');
 const Store = require('electron-store');
 const fetch = require('node-fetch');
@@ -36,6 +66,35 @@ function createLicenseWindow() {
   licenseWindow.loadFile(path.join(__dirname, 'license.html'));
 }
 
+let _licenseInterval = null;
+
+function startLicensePolling() {
+  if (_licenseInterval) clearInterval(_licenseInterval);
+  _licenseInterval = setInterval(async () => {
+    const key = store.get('licenseKey');
+    if (!key || !mainWindow) return;
+    try {
+      const result = await validateLicense(key);
+      if (!result.valid && mainWindow) {
+        clearInterval(_licenseInterval);
+        _licenseInterval = null;
+        store.delete('licenseKey');
+        store.delete('authToken');
+        mainWindow.close();
+        mainWindow = null;
+        await dialog.showMessageBox({
+          type: 'warning',
+          title: 'License Deactivated',
+          message: 'Your Jonin CT license has been deactivated.',
+          detail: result.message || 'Your Premium CT subscription has ended. Renew on Discord to continue.',
+          buttons: ['OK'],
+        });
+        createLicenseWindow();
+      }
+    } catch {} // network error — try next cycle
+  }, 5 * 60 * 1000); // every 5 minutes
+}
+
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -50,12 +109,21 @@ function createMainWindow() {
     },
     icon: path.join(__dirname, 'icon.png'),
     title: 'Jonin CT',
-    backgroundColor: '#0a0a0f',
+    backgroundColor: '#0F172A',
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#0F172A',
+      symbolColor: '#94A3B8',
+      height: 32,
+    },
   });
 
   mainWindow.setMenuBarVisibility(false);
   mainWindow.loadURL(`${RAILWAY_URL}/app.html`);
   if (!tray) createTray();
+  startLicensePolling();
+  // Check for updates 5s after launch (give window time to load)
+  setTimeout(() => autoUpdater.checkForUpdatesAndNotify().catch(() => {}), 5000);
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -132,6 +200,20 @@ ipcMain.on('get-wallet-address', (event) => {
 ipcMain.handle('get-version', () => app.getVersion());
 
 ipcMain.handle('quit-app', () => app.quit());
+
+ipcMain.handle('force-logout', () => {
+  store.delete('licenseKey');
+  store.delete('authToken');
+  if (mainWindow) { mainWindow.close(); mainWindow = null; }
+  dialog.showMessageBox({
+    type: 'warning',
+    title: 'License Deactivated',
+    message: 'Your Jonin CT license has been deactivated.',
+    detail: 'Your Premium CT subscription has ended. Please renew your subscription on Discord to continue using Jonin CT.',
+    buttons: ['OK'],
+  });
+  createLicenseWindow();
+});
 
 async function deactivateLicense() {
   const key = store.get('licenseKey');

@@ -1,4 +1,4 @@
-const { ipcRenderer } = require('electron');
+const { ipcRenderer, contextBridge } = require('electron');
 
 try {
   const token  = ipcRenderer.sendSync('get-auth-token');
@@ -9,3 +9,7 @@ try {
     if (wallet) localStorage.setItem('cm_wallet', wallet);
   }
 } catch {}
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  forceLogout: () => ipcRenderer.invoke('force-logout'),
+});
