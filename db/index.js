@@ -217,18 +217,20 @@ async function getDashboardStats(userId) {
 }
 
 // BOT POSITIONS (persisted so sells survive server restarts)
-async function upsertBotPosition(userId, configId, conditionId, outcome, usdcDelta, sharesDelta, outcomeIndex, tokenId) {
+async function upsertBotPosition(userId, configId, conditionId, outcome, usdcDelta, sharesDelta, outcomeIndex, tokenId, marketName, marketSlug) {
   await query(
-    `INSERT INTO bot_positions (user_id, config_id, condition_id, outcome, usdc_spent, shares, outcome_index, token_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO bot_positions (user_id, config_id, condition_id, outcome, usdc_spent, shares, outcome_index, token_id, market_name, market_slug)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      ON CONFLICT (user_id, condition_id, outcome)
      DO UPDATE SET
        usdc_spent    = bot_positions.usdc_spent + EXCLUDED.usdc_spent,
        shares        = bot_positions.shares     + EXCLUDED.shares,
        outcome_index = COALESCE(EXCLUDED.outcome_index, bot_positions.outcome_index),
        token_id      = COALESCE(EXCLUDED.token_id,      bot_positions.token_id),
+       market_name   = COALESCE(EXCLUDED.market_name,   bot_positions.market_name),
+       market_slug   = COALESCE(EXCLUDED.market_slug,   bot_positions.market_slug),
        updated_at    = NOW()`,
-    [userId, configId, conditionId, outcome, usdcDelta, sharesDelta, outcomeIndex ?? null, tokenId ?? null]
+    [userId, configId, conditionId, outcome, usdcDelta, sharesDelta, outcomeIndex ?? null, tokenId ?? null, marketName ?? null, marketSlug ?? null]
   );
 }
 
@@ -265,7 +267,9 @@ async function getBotPositions(userId) {
 
 async function getBotPositionsWithNames(userId) {
   const res = await query(
-    `SELECT bp.*, t.market_name, t.market_slug
+    `SELECT bp.*,
+       COALESCE(bp.market_name, t.market_name) AS market_name,
+       COALESCE(bp.market_slug, t.market_slug) AS market_slug
      FROM bot_positions bp
      LEFT JOIN LATERAL (
        SELECT market_name, market_slug FROM trades

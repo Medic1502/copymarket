@@ -160,6 +160,21 @@ async function migrate() {
     await run(`ALTER TABLE bot_positions ADD COLUMN IF NOT EXISTS outcome_index INTEGER`);
     await run(`ALTER TABLE bot_positions ADD COLUMN IF NOT EXISTS token_id TEXT`);
 
+    // Market name + slug stored on position so stats reset doesn't wipe display names
+    await run(`ALTER TABLE bot_positions ADD COLUMN IF NOT EXISTS market_name TEXT`);
+    await run(`ALTER TABLE bot_positions ADD COLUMN IF NOT EXISTS market_slug TEXT`);
+    // Backfill from trades for existing positions
+    await run(`
+      UPDATE bot_positions bp
+      SET market_name = t.market_name, market_slug = t.market_slug
+      FROM (
+        SELECT DISTINCT ON (condition_id) condition_id, market_name, market_slug
+        FROM trades WHERE market_name IS NOT NULL AND market_name != condition_id
+        ORDER BY condition_id, created_at DESC
+      ) t
+      WHERE bp.condition_id = t.condition_id AND bp.market_name IS NULL
+    `);
+
     // Backfill config_id on trades that were saved before the column existed
     await run(`
       UPDATE trades t

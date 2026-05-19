@@ -528,7 +528,7 @@ async function processSignalForUser(user, wallet, signal, side) {
       const prev = userBought[user.id]?.get(key) || { usdc: 0, shares: 0 };
       const newShares = usdcToSpend / price;
       userBought[user.id].set(key, { usdc: prev.usdc + usdcToSpend, shares: prev.shares + newShares });
-      await db.upsertBotPosition(user.id, user.configId, signal.conditionId, signal.outcome, usdcToSpend, newShares, signal.outcomeIndex, tokenId).catch(() => {});
+      await db.upsertBotPosition(user.id, user.configId, signal.conditionId, signal.outcome, usdcToSpend, newShares, signal.outcomeIndex, tokenId, marketName, marketSlug).catch(() => {});
       await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName, marketSlug, outcome: signal.outcome, side: 'BUY', size: usdcToSpend, price, orderId: result.orderID || null, filledSize: null, status: result.status || 'OPEN', skipReason: null, pnl: null, configId: user.configId });
 
     } else { // SELL
