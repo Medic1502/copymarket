@@ -7,7 +7,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 
 const { getAllActiveConfigs } = require('../db');
-const { migrate } = require('../db/client');
+const { migrate, query } = require('../db/client');
 const { startCopyEngine } = require('../engine');
 
 const app = express();
@@ -63,6 +63,36 @@ app.get('*', (req, res) => {
 
 app.use(require('./middleware/errors'));
 
+async function fixMissingMarketNames() {
+  try {
+    const { default: fetch } = await import('node-fetch');
+    const res = await query(
+      `SELECT DISTINCT condition_id FROM bot_positions
+       WHERE (market_name IS NULL OR market_name = condition_id) AND shares > 0`
+    );
+    if (!res.rows.length) return;
+    console.log(`Fetching market names for ${res.rows.length} position(s)...`);
+    await Promise.all(res.rows.map(async ({ condition_id }) => {
+      try {
+        const r = await fetch(`https://clob.polymarket.com/markets/${condition_id}`, { timeout: 8000 });
+        const m = await r.json();
+        const name = m.question || m.title;
+        const slug = m.market_slug || null;
+        if (name && name !== condition_id) {
+          await query(
+            `UPDATE bot_positions SET market_name=$1, market_slug=$2
+             WHERE condition_id=$3 AND (market_name IS NULL OR market_name = condition_id)`,
+            [name, slug, condition_id]
+          );
+          console.log(`  Fixed: ${condition_id.slice(0, 10)}... → ${name.slice(0, 50)}`);
+        }
+      } catch {}
+    }));
+  } catch (err) {
+    console.error('fixMissingMarketNames error:', err.message);
+  }
+}
+
 async function restoreActiveEngines() {
   try {
     const configs = await getAllActiveConfigs();
@@ -99,6 +129,7 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, '0.0.0.0', async () => {
   console.log(`CopyMarket API running on port ${PORT}`);
   await migrate();
+  await fixMissingMarketNames();
   await restoreActiveEngines();
 });
 
