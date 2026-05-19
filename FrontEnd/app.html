@@ -357,10 +357,6 @@ div.expand-panel.closed{display:none !important}
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       Profile
     </button>
-    <button class="nav-item" id="nav-settings" onclick="navSwitch('settings',this)">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-      Settings
-    </button>
   </nav>
 
   <div class="sb-bottom">
@@ -603,29 +599,6 @@ div.expand-panel.closed{display:none !important}
       </div>
     </div>
 
-    <!-- ── SETTINGS ────────────────────────────────── -->
-    <div id="tab-settings" class="tab-panel">
-
-      <div class="card">
-        <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">Appearance</div>
-        <div class="info-row" style="border-bottom:none">
-          <span class="info-label">Theme</span>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-sm mode-btn" id="theme-dark" onclick="setTheme('dark')" style="width:auto">Dark</button>
-            <button class="btn btn-sm mode-btn" id="theme-light" onclick="setTheme('light')" style="width:auto">Light</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div style="font-size:13px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">About</div>
-        <div class="info-row"><span class="info-label">App</span><span class="info-val">Jonin CT Desktop</span></div>
-        <div class="info-row"><span class="info-label">Version</span><span class="info-val" id="settings-version">—</span></div>
-        <div class="info-row"><span class="info-label">License</span><span class="info-val"><span class="badge b-buy">Active</span></span></div>
-        <div class="info-row" style="border-bottom:none"><span class="info-label">Support</span><span class="info-val"><a href="https://discord.gg/SxumcmKcEm" target="_blank" style="color:var(--blue-light);text-decoration:none">Discord Server ↗</a></span></div>
-      </div>
-
-    </div>
 
   </div><!-- /content -->
 </main>
