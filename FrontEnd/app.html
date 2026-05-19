@@ -1413,13 +1413,16 @@ async function shareWin(marketName, outcome, pnlStr, invested) {
   const L = 72; // left margin
   ctx.textAlign = 'left';
 
-  // WIN badge
+  // WIN badge — width fits text
+  ctx.font = 'bold 18px system-ui,sans-serif';
+  const winText = '✓  WIN';
+  const winTW = ctx.measureText(winText).width + 36;
   ctx.fillStyle = 'rgba(0,0,0,.35)';
-  rr(L, 148, 134, 46, 23); ctx.fill();
+  rr(L, 148, winTW, 46, 23); ctx.fill();
   ctx.strokeStyle = '#22C55E'; ctx.lineWidth = 1.5;
-  rr(L, 148, 134, 46, 23); ctx.stroke();
-  ctx.fillStyle = '#22C55E'; ctx.font = 'bold 18px system-ui,sans-serif';
-  ctx.fillText('✓  WIN', L + 20, 178);
+  rr(L, 148, winTW, 46, 23); ctx.stroke();
+  ctx.fillStyle = '#22C55E';
+  ctx.fillText(winText, L + 18, 178);
 
   // Market name — split into two lines if needed (max width 580px before 3D logo)
   const maxTW = 580;
@@ -1462,45 +1465,54 @@ async function shareWin(marketName, outcome, pnlStr, invested) {
   ctx.fillStyle = '#fff';
   ctx.fillText(outcome, L + 16, outY + 23);
 
-  // Profit amount — strip +/- and $ so we control display
+  // Profit amount — strip +/- and $
   const amount = pnlStr.replace(/[+\-$]/g, '');
-  const profY = outY + 210;  // more space between outcome pill and profit
-  ctx.font = 'bold 140px system-ui,sans-serif';
-  if (ctx.measureText('$' + amount).width > maxTW + 80) ctx.font = 'bold 100px system-ui,sans-serif';
-  const profGrad = ctx.createLinearGradient(L, profY - 120, L, profY);
-  profGrad.addColorStop(0, '#4ade80');
+  const profY = outY + 220;
+  let profFont = 'bold 170px system-ui,sans-serif';
+  ctx.font = profFont;
+  if (ctx.measureText('$' + amount).width > maxTW + 100) profFont = 'bold 130px system-ui,sans-serif';
+  ctx.font = profFont;
+
+  // Green glow effect
+  ctx.save();
+  ctx.shadowColor = '#22C55E';
+  ctx.shadowBlur = 40;
+  const profGrad = ctx.createLinearGradient(L, profY - 150, L, profY);
+  profGrad.addColorStop(0, '#6ee7b7');
+  profGrad.addColorStop(0.5, '#4ade80');
   profGrad.addColorStop(1, '#16a34a');
   ctx.fillStyle = profGrad;
   ctx.fillText('$' + amount, L, profY);
+  ctx.restore();
 
-  // PROFIT label — more space below profit number
-  ctx.fillStyle = 'rgba(255,255,255,.35)';
-  ctx.font = '700 18px system-ui,sans-serif';
-  ctx.letterSpacing = '0.2em';
-  ctx.fillText('PROFIT', L, profY + 54);
+  // PROFIT label — bigger, more space
+  ctx.fillStyle = 'rgba(255,255,255,.45)';
+  ctx.font = '700 26px system-ui,sans-serif';
+  ctx.letterSpacing = '0.25em';
+  ctx.fillText('PROFIT', L, profY + 68);
   ctx.letterSpacing = '0';
 
-  // INVESTED / ROI boxes
+  // INVESTED / ROI boxes — bigger
   const pnlNum = parseFloat(amount) * (pnlStr.startsWith('-') ? -1 : 1);
   const investedNum = parseFloat(invested) || 0;
   const roi = investedNum > 0 ? (pnlNum / investedNum) * 100 : 0;
   const roiStr = (roi >= 0 ? '+' : '') + roi.toFixed(1) + '%';
-  const bxY = profY + 80, bxH = 90, bxW = 230, bxGap = 16;
+  const bxY = profY + 100, bxH = 110, bxW = 270, bxGap = 18;
 
   [0, 1].forEach(i => {
     const bx = L + i * (bxW + bxGap);
-    ctx.fillStyle = 'rgba(255,255,255,.06)';
-    rr(bx, bxY, bxW, bxH, 12); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.1)'; ctx.lineWidth = 1;
-    rr(bx, bxY, bxW, bxH, 12); ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,.4)';
-    ctx.font = '700 12px system-ui,sans-serif';
-    ctx.letterSpacing = '0.1em';
-    ctx.fillText(i === 0 ? 'INVESTED' : 'ROI', bx + 18, bxY + 26);
+    ctx.fillStyle = 'rgba(255,255,255,.07)';
+    rr(bx, bxY, bxW, bxH, 14); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.12)'; ctx.lineWidth = 1;
+    rr(bx, bxY, bxW, bxH, 14); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.45)';
+    ctx.font = '700 14px system-ui,sans-serif';
+    ctx.letterSpacing = '0.12em';
+    ctx.fillText(i === 0 ? 'INVESTED' : 'ROI', bx + 20, bxY + 32);
     ctx.letterSpacing = '0';
     ctx.fillStyle = i === 0 ? '#fff' : (roi >= 0 ? '#22C55E' : '#ef4444');
-    ctx.font = 'bold 34px system-ui,sans-serif';
-    ctx.fillText(i === 0 ? '$' + (invested||0).toFixed(2) : roiStr, bx + 18, bxY + 68);
+    ctx.font = 'bold 42px system-ui,sans-serif';
+    ctx.fillText(i === 0 ? '$' + investedNum.toFixed(2) : roiStr, bx + 20, bxY + 84);
   });
 
   // Show share modal
