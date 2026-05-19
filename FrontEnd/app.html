@@ -635,6 +635,8 @@ function showShareModal(imgDataUrl, pnlStr) {
   _shareImgData = imgDataUrl;
   document.getElementById('share-preview').src = imgDataUrl;
   document.getElementById('share-status').textContent = '';
+  document.getElementById('share-tagged-btn').disabled = false;
+  document.getElementById('share-anon-btn').disabled = false;
   document.getElementById('share-modal').style.display = 'flex';
 }
 function closeShareModal() {
