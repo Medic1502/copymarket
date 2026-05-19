@@ -115,6 +115,79 @@ router.post('/self-reset', async (req, res) => {
   }
 });
 
+// POST /api/license/revoke-by-discord  — called by bot when user loses Premium CT role
+router.post('/revoke-by-discord', async (req, res) => {
+  try {
+    const auth = req.headers['authorization'];
+    const secret = process.env.DISCORD_BOT_SECRET;
+    if (!secret || auth !== `Bearer ${secret}`) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { discordUserId } = req.body;
+    if (!discordUserId) return res.status(400).json({ error: 'discordUserId is required' });
+
+    const r = await query('UPDATE license_keys SET active = FALSE WHERE discord_user_id = $1 RETURNING key', [discordUserId]);
+    res.json({ revoked: r.rowCount });
+  } catch (err) {
+    console.error('revoke-by-discord error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/license/reactivate-by-discord  — called by bot when user gets Premium CT role back
+router.post('/reactivate-by-discord', async (req, res) => {
+  try {
+    const auth = req.headers['authorization'];
+    const secret = process.env.DISCORD_BOT_SECRET;
+    if (!secret || auth !== `Bearer ${secret}`) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { discordUserId } = req.body;
+    if (!discordUserId) return res.status(400).json({ error: 'discordUserId is required' });
+
+    // Reactivate only the most recent key for this user
+    await query(
+      `UPDATE license_keys SET active = TRUE
+       WHERE id = (SELECT id FROM license_keys WHERE discord_user_id = $1 ORDER BY created_at DESC LIMIT 1)`,
+      [discordUserId]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('reactivate-by-discord error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/license/user-reset-hwid  — user resets their own device binding (7-day cooldown)
+router.post('/user-reset-hwid', async (req, res) => {
+  try {
+    const auth = req.headers['authorization'];
+    const secret = process.env.DISCORD_BOT_SECRET;
+    if (!secret || auth !== `Bearer ${secret}`) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { discordUserId } = req.body;
+    if (!discordUserId) return res.status(400).json({ error: 'discordUserId is required' });
+
+    const r = await query('SELECT * FROM license_keys WHERE discord_user_id = $1 ORDER BY created_at DESC LIMIT 1', [discordUserId]);
+    const license = r.rows[0];
+    if (!license) return res.status(404).json({ error: 'No license found.' });
+    if (!license.active) return res.status(403).json({ error: 'License is inactive.' });
+
+    // 7-day cooldown check
+    if (license.hwid_reset_at) {
+      const daysSince = (Date.now() - new Date(license.hwid_reset_at).getTime()) / 86400000;
+      if (daysSince < 7) {
+        const daysLeft = Math.ceil(7 - daysSince);
+        return res.json({ cooldown: true, daysLeft, error: `Cooldown active. Try again in ${daysLeft} day(s).` });
+      }
+    }
+
+    await query('UPDATE license_keys SET hwid = NULL, activated_at = NULL, hwid_reset_at = NOW() WHERE key = $1', [license.key]);
+    res.json({ success: true, key: license.key });
+  } catch (err) {
+    console.error('user-reset-hwid error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // POST /api/license/shuffle  — Discord bot generates new key for same user (invalidates old)
 router.post('/shuffle', async (req, res) => {
   try {

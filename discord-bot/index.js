@@ -372,6 +372,11 @@ async function registerCommands() {
         opt.setName('key').setDescription('License key UUID').setRequired(true)
       )
       .toJSON(),
+
+    new SlashCommandBuilder()
+      .setName('resetdevice')
+      .setDescription('Unlink your license from your current machine (7-day cooldown). Use if you reinstalled or got a new PC.')
+      .toJSON(),
   ];
 
   const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
@@ -412,6 +417,54 @@ client.on('guildMemberAdd', async (member) => {
         embeds: [welcomeEmbed(member)],
       });
     } catch {}
+  }
+});
+
+// Auto-revoke/reactivate license when Premium CT role changes
+client.on('guildMemberUpdate', async (oldMember, newMember) => {
+  try {
+    if (oldMember.partial) oldMember = await oldMember.fetch();
+    const hadRole = oldMember.roles.cache.some(r => r.name === PREMIUM_ROLE);
+    const hasRole = newMember.roles.cache.some(r => r.name === PREMIUM_ROLE);
+    if (hadRole === hasRole) return; // no role change
+
+    if (hadRole && !hasRole) {
+      // Lost Premium CT — revoke license
+      await fetch(`${RAILWAY_URL}/api/license/revoke-by-discord`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BOT_SECRET}` },
+        body: JSON.stringify({ discordUserId: newMember.user.id }),
+      });
+      console.log(`License revoked: ${newMember.user.tag} lost Premium CT`);
+      try {
+        await newMember.send({ embeds: [
+          new EmbedBuilder()
+            .setColor(RED)
+            .setTitle('❌ Jonin CT License Deactivated')
+            .setDescription(`Your **Premium CT** subscription has ended and your license has been deactivated.\n\nThe Jonin CT app will stop working on your next restart.\n\n**To restore access:** renew your subscription and type \`/getkey\` again.`)
+            .setFooter({ text: 'Jonin CT — Copy. Track. Win.' })
+        ]});
+      } catch {}
+    } else if (!hadRole && hasRole) {
+      // Gained Premium CT — reactivate license
+      await fetch(`${RAILWAY_URL}/api/license/reactivate-by-discord`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BOT_SECRET}` },
+        body: JSON.stringify({ discordUserId: newMember.user.id }),
+      });
+      console.log(`License reactivated: ${newMember.user.tag} got Premium CT`);
+      try {
+        await newMember.send({ embeds: [
+          new EmbedBuilder()
+            .setColor(GREEN)
+            .setTitle('✅ Jonin CT License Reactivated')
+            .setDescription(`Your **Premium CT** role has been restored and your license is active again.\n\nType \`/getkey\` to get your key and reopen the app.`)
+            .setFooter({ text: 'Jonin CT — Copy. Track. Win.' })
+        ]});
+      } catch {}
+    }
+  } catch (err) {
+    console.error('guildMemberUpdate license error:', err.message);
   }
 });
 
@@ -630,6 +683,40 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.editReply({ content: `✅ Machine reset for \`${key}\`. User can activate on a new device.` });
     } catch (err) {
       await interaction.editReply({ content: '❌ Failed to reset machine.' });
+    }
+    return;
+  }
+
+  // ── /resetdevice ──────────────────────────────────────────────────────────
+  if (interaction.commandName === 'resetdevice') {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const hasPremiumRole = interaction.member.roles.cache.some(r => r.name === PREMIUM_ROLE);
+    if (!hasPremiumRole) return interaction.editReply({ content: '❌ You need the **Premium CT** role.' });
+
+    try {
+      const resp = await fetch(`${RAILWAY_URL}/api/license/user-reset-hwid`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BOT_SECRET}` },
+        body: JSON.stringify({ discordUserId: interaction.user.id }),
+      });
+      const data = await resp.json();
+      if (data.cooldown) return interaction.editReply({ content: `⏳ ${data.error}` });
+      if (!resp.ok || data.error) return interaction.editReply({ content: `❌ ${data.error || 'Failed.'}` });
+
+      const embed = new EmbedBuilder()
+        .setColor(GREEN)
+        .setTitle('✅ Device Unlinked')
+        .setDescription('Your license has been unlinked from your previous machine.\n\n**To reactivate:**\n1. Open Jonin CT on your machine\n2. Enter your license key (get it again with `/getkey`)\n3. Click **Activate**')
+        .setFooter({ text: '7-day cooldown between resets.' });
+
+      try {
+        await interaction.user.send({ embeds: [embed] });
+        await interaction.editReply({ content: '✅ Device unlinked! Check your DMs for instructions.' });
+      } catch {
+        await interaction.editReply({ embeds: [embed] });
+      }
+    } catch (err) {
+      await interaction.editReply({ content: '❌ Failed. Try again or contact support.' });
     }
     return;
   }
