@@ -77,12 +77,26 @@ router.post('/generate', async (req, res) => {
     const { discordUserId, discordUsername, expiresAt } = req.body;
     if (!discordUserId) return res.status(400).json({ error: 'discordUserId is required' });
 
-    // If user already has a key, return the existing one
-    const existing = await query('SELECT key FROM license_keys WHERE discord_user_id = $1', [discordUserId]);
-    if (existing.rows.length > 0) {
-      return res.json({ key: existing.rows[0].key, existing: true });
+    // Return existing ACTIVE key if one exists
+    const activeKey = await query(
+      'SELECT key FROM license_keys WHERE discord_user_id = $1 AND active = TRUE ORDER BY created_at DESC LIMIT 1',
+      [discordUserId]
+    );
+    if (activeKey.rows.length > 0) {
+      return res.json({ key: activeKey.rows[0].key, existing: true });
     }
 
+    // No active key — check if there's an inactive one and reactivate it
+    const inactiveKey = await query(
+      'SELECT id, key FROM license_keys WHERE discord_user_id = $1 AND active = FALSE ORDER BY created_at DESC LIMIT 1',
+      [discordUserId]
+    );
+    if (inactiveKey.rows.length > 0) {
+      await query('UPDATE license_keys SET active = TRUE WHERE id = $1', [inactiveKey.rows[0].id]);
+      return res.json({ key: inactiveKey.rows[0].key, existing: true, reactivated: true });
+    }
+
+    // No key at all — create new one
     const result = await query(
       'INSERT INTO license_keys (discord_user_id, discord_username, expires_at) VALUES ($1, $2, $3) RETURNING key',
       [discordUserId, discordUsername || null, expiresAt || null]
