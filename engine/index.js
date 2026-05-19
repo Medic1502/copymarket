@@ -782,6 +782,17 @@ async function checkHighPricePositions(user, wallet) {
         const bid = await getCachedTokenBid(tokenId);
         if (bid < 0.99) continue;
 
+        // Skip if entry price was already high — trader intentionally bought at 99¢
+        // (e.g. very high confidence bet). Auto-sell is only for positions that resolved
+        // after being bought at a lower price.
+        const entryPrice = shares > 0 ? parseFloat(pos.usdc_spent) / shares : 0;
+        if (entryPrice >= 0.90) {
+          logger.info('Auto-sell skipped: entry price already high (intentional bet)', {
+            userId: user.id, entryPrice: entryPrice.toFixed(3), bid, conditionId: pos.condition_id.slice(0, 10),
+          });
+          continue;
+        }
+
         const posKey = `${pos.condition_id}_${pos.outcome}`;
         logger.trade('Auto-sell: bid hit 99¢', {
           userId: user.id, conditionId: pos.condition_id.slice(0, 10),

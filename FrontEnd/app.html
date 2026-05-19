@@ -1306,8 +1306,9 @@ async function loadOpenPositions(traders) {
             const nameHtml   = name
               ? '<a href="' + link + '" target="_blank" style="color:var(--text);text-decoration:none;font-weight:600" onclick="event.stopPropagation()">' + name + ' ↗</a>'
               : '<a href="' + link + '" target="_blank" style="color:var(--text2);text-decoration:none;font-family:monospace;font-size:11px" onclick="event.stopPropagation()">' + (p.condition_id||'').slice(0,14) + '... ↗</a>';
+            const entryFrac  = sharesN > 0 ? parseFloat(p.usdc_spent) / sharesN : 0;
             const liveSpan   = p.token_id
-              ? '<span data-price-token="' + p.token_id + '" data-condition-id="' + p.condition_id + '" data-outcome="' + (p.outcome||'Yes').replace(/"/g,'') + '" style="color:var(--text3)">—</span>'
+              ? '<span data-price-token="' + p.token_id + '" data-condition-id="' + p.condition_id + '" data-outcome="' + (p.outcome||'Yes').replace(/"/g,'') + '" data-entry="' + entryFrac.toFixed(4) + '" style="color:var(--text3)">—</span>'
               : '<span style="color:var(--text3)">—</span>';
             const cid = p.condition_id.replace(/'/g, '');
             const out = (p.outcome||'Yes').replace(/'/g, '');
@@ -1537,8 +1538,11 @@ async function refreshPositionPrices() {
 
       const conditionId = el.dataset.conditionId;
       const outcome     = el.dataset.outcome;
+      const entryPx     = parseFloat(el.dataset.entry || 0);
       const key         = conditionId + '_' + outcome;
-      if (conditionId && outcome && !window._resolving.has(key) && (price >= 0.99 || price <= 0.01)) {
+      // Skip auto-resolve if entry price was already >= 90¢ (intentional high-confidence bet)
+      const isHighEntryBet = entryPx >= 0.90;
+      if (conditionId && outcome && !window._resolving.has(key) && !isHighEntryBet && (price >= 0.99 || price <= 0.01)) {
         window._resolving.add(key);
         api('POST', '/dashboard/positions/' + encodeURIComponent(conditionId) + '/' + encodeURIComponent(outcome) + '/resolve')
           .then(() => { window._resolving.delete(key); _historyLoaded = false; loadDashboard(); })
