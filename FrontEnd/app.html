@@ -1462,9 +1462,9 @@ async function shareWin(marketName, outcome, pnlStr, invested) {
   ctx.fillStyle = '#fff';
   ctx.fillText(outcome, L + 16, outY + 23);
 
-  // Profit amount — green gradient
-  const amount = pnlStr.replace('+', '').replace('-', '');
-  const profY = outY + 160;
+  // Profit amount — strip +/- and $ so we control display
+  const amount = pnlStr.replace(/[+\-$]/g, '');
+  const profY = outY + 210;  // more space between outcome pill and profit
   ctx.font = 'bold 140px system-ui,sans-serif';
   if (ctx.measureText('$' + amount).width > maxTW + 80) ctx.font = 'bold 100px system-ui,sans-serif';
   const profGrad = ctx.createLinearGradient(L, profY - 120, L, profY);
@@ -1473,18 +1473,19 @@ async function shareWin(marketName, outcome, pnlStr, invested) {
   ctx.fillStyle = profGrad;
   ctx.fillText('$' + amount, L, profY);
 
-  // PROFIT label
+  // PROFIT label — more space below profit number
   ctx.fillStyle = 'rgba(255,255,255,.35)';
   ctx.font = '700 18px system-ui,sans-serif';
   ctx.letterSpacing = '0.2em';
-  ctx.fillText('PROFIT', L, profY + 36);
+  ctx.fillText('PROFIT', L, profY + 54);
   ctx.letterSpacing = '0';
 
   // INVESTED / ROI boxes
   const pnlNum = parseFloat(amount) * (pnlStr.startsWith('-') ? -1 : 1);
-  const roi = invested > 0 ? ((pnlNum / invested) * 100) : 0;
+  const investedNum = parseFloat(invested) || 0;
+  const roi = investedNum > 0 ? (pnlNum / investedNum) * 100 : 0;
   const roiStr = (roi >= 0 ? '+' : '') + roi.toFixed(1) + '%';
-  const bxY = profY + 70, bxH = 90, bxW = 230, bxGap = 16;
+  const bxY = profY + 80, bxH = 90, bxW = 230, bxGap = 16;
 
   [0, 1].forEach(i => {
     const bx = L + i * (bxW + bxGap);
