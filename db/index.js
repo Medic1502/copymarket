@@ -194,24 +194,35 @@ async function getRecentTrades(userId, limit = 20) {
 }
 
 async function getDashboardStats(userId) {
-  const posRes = await query(
-    `SELECT
-       COALESCE(SUM(resolved_pnl), 0)                                                 AS total_pnl,
-       COALESCE(SUM(resolved_pnl) FILTER (WHERE updated_at::date = CURRENT_DATE), 0)  AS today_pnl,
-       COUNT(*) FILTER (WHERE resolved_outcome='WON')                                 AS wins,
-       COUNT(*) FILTER (WHERE resolved_outcome='LOST')                                AS losses,
-       COUNT(*) FILTER (WHERE resolved_outcome IS NOT NULL)                           AS resolved_count
-     FROM bot_positions WHERE user_id=$1 AND resolved_outcome IS NOT NULL`,
-    [userId]
-  );
-  const row    = posRes.rows[0];
+  const [resolvedRes, openRes] = await Promise.all([
+    query(
+      `SELECT
+         COALESCE(SUM(resolved_pnl), 0)                                                AS total_pnl,
+         COALESCE(SUM(resolved_pnl) FILTER (WHERE updated_at::date = CURRENT_DATE), 0) AS today_pnl,
+         COUNT(*) FILTER (WHERE resolved_outcome='WON')                                AS wins,
+         COUNT(*) FILTER (WHERE resolved_outcome='LOST')                               AS losses,
+         COUNT(*) FILTER (WHERE resolved_outcome IS NOT NULL)                          AS resolved_count
+       FROM bot_positions WHERE user_id=$1 AND resolved_outcome IS NOT NULL`,
+      [userId]
+    ),
+    query(
+      `SELECT
+         COALESCE(SUM(usdc_spent), 0) AS open_invested,
+         json_agg(json_build_object('token_id', token_id, 'shares', shares)) AS positions
+       FROM bot_positions WHERE user_id=$1 AND shares > 0`,
+      [userId]
+    ),
+  ]);
+  const row    = resolvedRes.rows[0];
   const wins   = parseInt(row.wins)   || 0;
   const losses = parseInt(row.losses) || 0;
   const winRate = wins + losses > 0 ? Math.round((wins / (wins + losses)) * 100) : null;
   return {
-    totalPnl:      parseFloat(row.total_pnl)    || 0,
-    todayPnl:      parseFloat(row.today_pnl)    || 0,
-    resolvedCount: parseInt(row.resolved_count) || 0,
+    totalPnl:      parseFloat(row.total_pnl)          || 0,
+    todayPnl:      parseFloat(row.today_pnl)          || 0,
+    resolvedCount: parseInt(row.resolved_count)       || 0,
+    openInvested:  parseFloat(openRes.rows[0].open_invested) || 0,
+    openPositions: openRes.rows[0].positions || [],
     winRate,
   };
 }
