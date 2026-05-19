@@ -36,83 +36,83 @@ const client = new Client({
   ],
 });
 
-// â”€â”€ EMBEDS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── EMBEDS ────────────────────────────────────────────────────────────────────
 
 function welcomeEmbed(member) {
   return new EmbedBuilder()
     .setColor(BLUE)
-    .setTitle('ðŸ‘‹ Welcome to Jonin CT!')
-    .setDescription(`Hey ${member}, glad to have you here!\n\nJonin CT is a **Polymarket trading suite** â€” check any trader's stats for free, or go premium and copy their trades automatically.`)
+    .setTitle('👋 Welcome to Jonin CT!')
+    .setDescription(`Hey ${member}, glad to have you here!\n\nJonin CT is a **Polymarket trading suite** — check any trader's stats for free, or go premium and copy their trades automatically.`)
     .addFields(
       {
-        name: 'ðŸ†“ Free â€” Wallet Checker',
+        name: '🆓 Free — Wallet Checker',
         value: 'Paste any Polymarket wallet address and instantly see their **P&L, win rate, trade history and open positions**. No account needed.',
         inline: false
       },
       {
-        name: 'âš¡ Premium CT â€” Copy Trading',
-        value: 'Found a trader worth following? Let Jonin CT **automatically copy every trade they make** â€” proportional to your budget, 24/7, hands-free.',
+        name: '⚡ Premium CT — Copy Trading',
+        value: 'Found a trader worth following? Let Jonin CT **automatically copy every trade they make** — proportional to your budget, 24/7, hands-free.',
         inline: false
       },
       {
-        name: 'ðŸ“Œ Get started',
-        value: '> ðŸ” Use the free wallet checker in <#wallet-checker>\n> ðŸ’Ž Get **Premium CT** to unlock copy trading\n> ðŸ”‘ Type `/getkey` to receive your license key\n> ðŸ“¥ Download the app from <#downloads>',
+        name: '📌 Get started',
+        value: '> 🔍 Use the free wallet checker in <#wallet-checker>\n> 💎 Get **Premium CT** to unlock copy trading\n> 🔑 Type `/getkey` to receive your license key\n> 📥 Download the app from <#downloads>',
         inline: false
       }
     )
-    .setFooter({ text: 'Jonin CT â€” Copy. Track. Win.' })
+    .setFooter({ text: 'Jonin CT — Copy. Track. Win.' })
     .setTimestamp();
 }
 
 function howItWorksEmbed() {
   return new EmbedBuilder()
     .setColor(BLUE)
-    .setTitle('âš™ï¸ How Jonin CT Works')
+    .setTitle('⚙️ How Jonin CT Works')
     .setDescription('Jonin CT runs on our servers 24/7 and monitors Polymarket in real time. Here\'s exactly what happens under the hood.')
     .addFields(
       {
-        name: 'ðŸ“¡ Real-time position monitoring',
+        name: '📡 Real-time position monitoring',
         value: 'The bot continuously polls the Polymarket CLOB API every **15 seconds**, watching the open positions of every trader you follow. It detects the moment a trader opens or closes a position.',
         inline: false
       },
       {
-        name: 'âš¡ Instant trade execution',
+        name: '⚡ Instant trade execution',
         value: 'The moment a signal is detected, the bot places an order on your behalf directly through the **Polymarket CLOB (Central Limit Order Book)**. Your order is signed with your private key and submitted on-chain on Polygon.',
         inline: false
       },
       {
-        name: 'ðŸ“Š Proportional sizing',
-        value: 'If a trader bets 10% of their portfolio, Jonin CT bets the same % of yours. You set the percentage or a fixed amount â€” the bot scales every trade accordingly. You never over-expose yourself.',
+        name: '📊 Proportional sizing',
+        value: 'If a trader bets 10% of their portfolio, Jonin CT bets the same % of yours. You set the percentage or a fixed amount — the bot scales every trade accordingly. You never over-expose yourself.',
         inline: false
       },
       {
-        name: 'ðŸ”’ Fully isolated wallets',
+        name: '🔒 Fully isolated wallets',
         value: 'Every user has their own **dedicated Polygon wallet** generated and encrypted on our servers. Your funds never mix with other users. Your key, your wallet, your trades.',
         inline: false
       },
       {
-        name: 'ðŸ¤ Shared polling â€” efficient by design',
+        name: '🤝 Shared polling — efficient by design',
         value: 'If 100 users follow the same trader, Jonin CT makes **one API call** to Polymarket instead of 100. This keeps the system fast, avoids rate limits, and scales to hundreds of users without slowdown.',
         inline: false
       },
       {
-        name: 'ðŸ›¡ï¸ Filters & safety controls',
+        name: '🛡️ Filters & safety controls',
         value: 'You can filter by: minimum/maximum bet size, share price range, market category, and follow mode (all buys vs first entry only). The bot only copies trades that match your exact settings.',
         inline: false
       },
       {
-        name: 'âš ï¸ Risk notice',
+        name: '⚠️ Risk notice',
         value: 'Prediction market trading involves risk of capital loss. Past performance of any trader does not guarantee future results. Only trade with funds you can afford to lose.',
         inline: false
       }
     )
-    .setFooter({ text: 'Jonin CT â€” Copy. Track. Win.' });
+    .setFooter({ text: 'Jonin CT — Copy. Track. Win.' });
 }
 
 function getRulesEmbed() {
   return new EmbedBuilder()
     .setColor(BLUE)
-    .setTitle('ðŸ“‹ Server Rules')
+    .setTitle('📋 Server Rules')
     .setDescription('Please read and follow these rules to keep the community clean and helpful.')
     .addFields(
       { name: '1. Be respectful', value: 'No harassment, hate speech or personal attacks. Treat everyone with respect.', inline: false },
@@ -128,171 +128,171 @@ function getRulesEmbed() {
 function setupGuideEmbed() {
   return new EmbedBuilder()
     .setColor(BLUE)
-    .setTitle('ðŸ› ï¸ Setup Guide â€” Jonin CT')
+    .setTitle('🛠️ Setup Guide — Jonin CT')
     .setDescription('Follow these steps to get Jonin CT running and your first trader copied.')
     .addFields(
       {
-        name: 'Step 1 â€” Get your license key',
+        name: 'Step 1 — Get your license key',
         value: 'Type `/getkey` in <#get-key>. The bot will DM you your personal license key. You need the **Premium CT** role to do this.',
         inline: false
       },
       {
-        name: 'Step 2 â€” Download the app',
-        value: 'Go to <#downloads> and download the latest **Jonin CT Setup**. Run the installer â€” it takes under 30 seconds.',
+        name: 'Step 2 — Download the app',
+        value: 'Go to <#downloads> and download the latest **Jonin CT Setup**. Run the installer — it takes under 30 seconds.',
         inline: false
       },
       {
-        name: 'Step 3 â€” Activate',
+        name: 'Step 3 — Activate',
         value: 'Open Jonin CT. Paste your license key from the DM and click **Activate**. The app connects to our servers and logs you in automatically.',
         inline: false
       },
       {
-        name: 'Step 4 â€” Fund your wallet',
+        name: 'Step 4 — Fund your wallet',
         value: 'Go to the **Wallet** tab. Copy your deposit address and send **USDC on Polygon** to it.\n\n> Minimum to start copying: **$5 USDC**\n> Also works with Moonpay (buy by card directly)',
         inline: false
       },
       {
-        name: 'Step 5 â€” Add a trader',
-        value: 'Go to **My Traders** â†’ click **+ Add trader**. Paste the wallet address of a top Polymarket trader. Set your copy mode and click **Add trader**.',
+        name: 'Step 5 — Add a trader',
+        value: 'Go to **My Traders** → click **+ Add trader**. Paste the wallet address of a top Polymarket trader. Set your copy mode and click **Add trader**.',
         inline: false
       },
       {
-        name: 'Step 6 â€” Start copying',
+        name: 'Step 6 — Start copying',
         value: 'Click **Resume** next to the trader. Jonin CT will now copy every trade they make in real time. You can monitor everything from the dashboard.',
         inline: false
       },
       {
-        name: 'â“ Need help?',
+        name: '❓ Need help?',
         value: 'Open a ticket in <#support> and an admin will assist you.',
         inline: false
       }
     )
-    .setFooter({ text: 'Jonin CT â€” Copy. Track. Win.' });
+    .setFooter({ text: 'Jonin CT — Copy. Track. Win.' });
 }
 
 function howToJoinEmbed() {
   return new EmbedBuilder()
     .setColor(GREEN)
-    .setTitle('ðŸ’Ž How to Get Premium CT')
+    .setTitle('💎 How to Get Premium CT')
     .setDescription('Premium CT gives you full access to the Jonin CT copy trading platform. Here\'s how to get it.')
     .addFields(
       {
-        name: '1ï¸âƒ£  Purchase a subscription',
+        name: '1️⃣  Purchase a subscription',
         value: 'Buy the **Premium CT** plan through our payment link. Once payment is confirmed you will be assigned the **Premium CT** role on this server automatically.',
         inline: false
       },
       {
-        name: '2ï¸âƒ£  Get your license key',
-        value: 'Once you have the role, type `/getkey` in <#get-key>. The bot sends your personal key via DM. Keep it private â€” it\'s tied to your machine.',
+        name: '2️⃣  Get your license key',
+        value: 'Once you have the role, type `/getkey` in <#get-key>. The bot sends your personal key via DM. Keep it private — it\'s tied to your machine.',
         inline: false
       },
       {
-        name: '3ï¸âƒ£  Download & activate',
+        name: '3️⃣  Download & activate',
         value: 'Download the app from <#downloads>, paste your license key and click **Activate**. Setup takes under 2 minutes.',
         inline: false
       },
       {
-        name: 'âœ… What you get',
-        value: '> âš¡ Automated 24/7 copy trading\n> ðŸ“Š Real-time P&L dashboard\n> ðŸ” Free wallet checker\n> ðŸ›¡ï¸ Your own isolated wallet\n> ðŸ”” Trade notifications\n> ðŸ’¬ Priority support',
+        name: '✅ What you get',
+        value: '> ⚡ Automated 24/7 copy trading\n> 📊 Real-time P&L dashboard\n> 🔍 Free wallet checker\n> 🛡️ Your own isolated wallet\n> 🔔 Trade notifications\n> 💬 Priority support',
         inline: false
       },
       {
-        name: 'ðŸ”„ Switching machines?',
+        name: '🔄 Switching machines?',
         value: 'Use `/shufflekey` to get a new key. Your old key is invalidated. One key per account, one machine at a time.',
         inline: false
       },
       {
-        name: 'â“ Questions?',
+        name: '❓ Questions?',
         value: 'Ask in <#support> or DM an admin. We\'re here to help.',
         inline: false
       }
     )
-    .setFooter({ text: 'Jonin CT â€” Copy. Track. Win.' });
+    .setFooter({ text: 'Jonin CT — Copy. Track. Win.' });
 }
 
-const DOWNLOAD_VERSION = '1.0.6';
-const DOWNLOAD_LINK = 'https://github.com/Medic1502/copymarket/releases/download/v1.0.6/Jonin-CT-Setup-1.3';
+const DOWNLOAD_VERSION = '1.3.0';
+const DOWNLOAD_LINK = 'https://github.com/Medic1502/copymarket/releases/download/v1.3.0/Jonin-CT-Setup-1.3.0.exe';
 
 function supportEmbed() {
   return new EmbedBuilder()
     .setColor(BLUE)
-    .setTitle('ðŸŽ« Jonin CT Support')
+    .setTitle('🎫 Jonin CT Support')
     .setDescription('Need help? Our team is here for you.\n\nClick the button below to open a private support ticket. An admin will respond as soon as possible.')
     .addFields(
-      { name: 'ðŸ“‹ Before opening a ticket', value: '> Check <#how-it-works> and <#setup-guide> first\n> Make sure you have read the <#rules>\n> Include your license key and a description of the issue', inline: false },
-      { name: 'â±ï¸ Response time', value: 'Usually within a few hours. Tickets are handled in order.', inline: false }
+      { name: '📋 Before opening a ticket', value: '> Check <#how-it-works> and <#setup-guide> first\n> Make sure you have read the <#rules>\n> Include your license key and a description of the issue', inline: false },
+      { name: '⏱️ Response time', value: 'Usually within a few hours. Tickets are handled in order.', inline: false }
     )
-    .setFooter({ text: 'Jonin CT Support â€” Copy. Track. Win.' });
+    .setFooter({ text: 'Jonin CT Support — Copy. Track. Win.' });
 }
 
 function walletCheckerEmbed() {
   return new EmbedBuilder()
     .setColor(BLUE)
-    .setTitle('ðŸ” Free Polymarket Wallet Checker')
-    .setDescription('Check the performance of **any Polymarket trader** for free â€” no account needed.\n\nUse our **Jonin Wallet Checker** bot in <#wallet-checker> to instantly see their stats.')
+    .setTitle('🔍 Free Polymarket Wallet Checker')
+    .setDescription('Check the performance of **any Polymarket trader** for free — no account needed.\n\nUse our **Jonin Wallet Checker** bot in <#wallet-checker> to instantly see their stats.')
     .addFields(
       {
-        name: 'ðŸ“Š What you get',
-        value: '> ðŸ’° Total P&L (profit/loss)\n> ðŸ“Š Win rate\n> ðŸ”„ Number of trades\n> ðŸ’µ Total volume traded\n> ðŸ“Œ Open positions\n> âš¡ Recent activity',
+        name: '📊 What you get',
+        value: '> 💰 Total P&L (profit/loss)\n> 📊 Win rate\n> 🔄 Number of trades\n> 💵 Total volume traded\n> 📌 Open positions\n> ⚡ Recent activity',
         inline: false
       },
       {
-        name: 'â–¶ï¸ How to use',
-        value: '1. Go to <#wallet-checker>\n2. Type `/check wallet:0x...` with any Polymarket wallet address\n3. Get instant stats â€” only you can see the result',
+        name: '▶️ How to use',
+        value: '1. Go to <#wallet-checker>\n2. Type `/check wallet:0x...` with any Polymarket wallet address\n3. Get instant stats — only you can see the result',
         inline: false
       },
       {
-        name: 'ðŸ† Where to find top traders',
+        name: '🏆 Where to find top traders',
         value: 'Visit the [Polymarket Leaderboard](https://polymarket.com/leaderboard) to find wallet addresses of top performers.',
         inline: false
       },
       {
-        name: 'âš¡ Found a good trader?',
+        name: '⚡ Found a good trader?',
         value: 'Copy their trades automatically with **Premium CT**. Get your license key with `/getkey` and start copying in minutes.',
         inline: false
       }
     )
-    .setFooter({ text: 'Jonin CT â€” Copy. Track. Win.' });
+    .setFooter({ text: 'Jonin CT — Copy. Track. Win.' });
 }
 
 function downloadEmbed() {
   return new EmbedBuilder()
     .setColor(GREEN)
-    .setTitle(`ðŸ“¥ Jonin CT v${DOWNLOAD_VERSION} â€” Download`)
-    .setDescription(`ðŸ”— **[Click here to download Jonin CT Setup v${DOWNLOAD_VERSION}](${DOWNLOAD_LINK})**`)
+    .setTitle(`📥 Jonin CT v${DOWNLOAD_VERSION} — Download`)
+    .setDescription(`🔗 **[Click here to download Jonin CT Setup v${DOWNLOAD_VERSION}](${DOWNLOAD_LINK})**`)
     .addFields(
       {
-        name: 'ðŸ’» Installation',
-        value: '1. Click the link above to download\n2. Run the installer\n3. If Windows SmartScreen appears â†’ **More info â†’ Run anyway**\n4. Open Jonin CT and enter your license key from `/getkey`',
+        name: '💻 Installation',
+        value: '1. Click the link above to download\n2. Run the installer\n3. If Windows SmartScreen appears → **More info → Run anyway**\n4. Open Jonin CT and enter your license key from `/getkey`',
         inline: false
       },
       {
-        name: 'ðŸ”‘ Don\'t have a key?',
+        name: '🔑 Don\'t have a key?',
         value: 'Type `/getkey` in <#get-key> to receive your personal license key via DM.',
         inline: false
       }
     )
-    .setFooter({ text: `Jonin CT v${DOWNLOAD_VERSION} â€” Windows x64` })
+    .setFooter({ text: `Jonin CT v${DOWNLOAD_VERSION} — Windows x64` })
     .setTimestamp();
 }
 
 function getKeyInfoEmbed() {
   return new EmbedBuilder()
     .setColor(GREEN)
-    .setTitle('ðŸ”‘ How to Get Your License Key')
+    .setTitle('🔑 How to Get Your License Key')
     .setDescription('Follow these steps to activate Jonin CT on your machine.')
     .addFields(
-      { name: 'Step 1 â€” Make sure you have the role', value: 'You need the **Premium CT** role. Purchase a subscription to receive it.', inline: false },
-      { name: 'Step 2 â€” Request your key', value: 'Type `/getkey` in this channel. The bot will send your key via **DM** (only you can see it).', inline: false },
-      { name: 'Step 3 â€” Download the app', value: 'Go to <#downloads> and download the latest **Jonin CT Setup** installer.', inline: false },
-      { name: 'Step 4 â€” Activate', value: 'Open the app â†’ paste your key â†’ click **Activate**. You\'re in.', inline: false },
-      { name: 'ðŸ”„ Switching machines?', value: 'Use `/shufflekey` to get a new key. Your old key becomes invalid.', inline: false },
-      { name: 'â“ Problems?', value: 'Open a ticket in <#support> and an admin will help you.', inline: false }
+      { name: 'Step 1 — Make sure you have the role', value: 'You need the **Premium CT** role. Purchase a subscription to receive it.', inline: false },
+      { name: 'Step 2 — Request your key', value: 'Type `/getkey` in this channel. The bot will send your key via **DM** (only you can see it).', inline: false },
+      { name: 'Step 3 — Download the app', value: 'Go to <#downloads> and download the latest **Jonin CT Setup** installer.', inline: false },
+      { name: 'Step 4 — Activate', value: 'Open the app → paste your key → click **Activate**. You\'re in.', inline: false },
+      { name: '🔄 Switching machines?', value: 'Use `/shufflekey` to get a new key. Your old key becomes invalid.', inline: false },
+      { name: '❓ Problems?', value: 'Open a ticket in <#support> and an admin will help you.', inline: false }
     )
     .setFooter({ text: 'One key per Discord account. Keys are tied to one machine at a time.' });
 }
 
-// â”€â”€ COMMANDS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── COMMANDS ──────────────────────────────────────────────────────────────────
 
 async function registerCommands() {
   const commands = [
@@ -303,7 +303,7 @@ async function registerCommands() {
 
     new SlashCommandBuilder()
       .setName('shufflekey')
-      .setDescription('Generate a new license key â€” invalidates your old one (24h cooldown)')
+      .setDescription('Generate a new license key — invalidates your old one (24h cooldown)')
       .toJSON(),
 
     new SlashCommandBuilder()
@@ -382,17 +382,17 @@ async function registerCommands() {
   const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
   const guildId = process.env.DISCORD_GUILD_ID;
   if (guildId) {
-    // Guild commands â€” instant, only on this server
+    // Guild commands — instant, only on this server
     await rest.put(Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, guildId), { body: commands });
     console.log('Slash commands registered to guild (instant).');
   } else {
-    // Global commands â€” up to 1h propagation
+    // Global commands — up to 1h propagation
     await rest.put(Routes.applicationCommands(process.env.DISCORD_CLIENT_ID), { body: commands });
     console.log('Slash commands registered globally.');
   }
 }
 
-// â”€â”€ EVENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── EVENTS ────────────────────────────────────────────────────────────────────
 
 client.once('clientReady', async () => {
   console.log(`Jonin CT Bot online as ${client.user.tag}`);
@@ -413,7 +413,7 @@ client.on('guildMemberAdd', async (member) => {
   if (welcomeChannel) {
     try {
       await welcomeChannel.send({
-        content: `ðŸŽ‰ Welcome to the server, ${member}!`,
+        content: `🎉 Welcome to the server, ${member}!`,
         embeds: [welcomeEmbed(member)],
       });
     } catch {}
@@ -429,7 +429,7 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
     if (hadRole === hasRole) return; // no role change
 
     if (hadRole && !hasRole) {
-      // Lost Premium CT â€” revoke license
+      // Lost Premium CT — revoke license
       await fetch(`${RAILWAY_URL}/api/license/revoke-by-discord`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BOT_SECRET}` },
@@ -440,13 +440,13 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
         await newMember.send({ embeds: [
           new EmbedBuilder()
             .setColor(RED)
-            .setTitle('âŒ Jonin CT License Deactivated')
+            .setTitle('❌ Jonin CT License Deactivated')
             .setDescription(`Your **Premium CT** subscription has ended and your license has been deactivated.\n\nThe Jonin CT app will stop working on your next restart.\n\n**To restore access:** renew your subscription and type \`/getkey\` again.`)
-            .setFooter({ text: 'Jonin CT â€” Copy. Track. Win.' })
+            .setFooter({ text: 'Jonin CT — Copy. Track. Win.' })
         ]});
       } catch {}
     } else if (!hadRole && hasRole) {
-      // Gained Premium CT â€” reactivate license
+      // Gained Premium CT — reactivate license
       await fetch(`${RAILWAY_URL}/api/license/reactivate-by-discord`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BOT_SECRET}` },
@@ -457,9 +457,9 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
         await newMember.send({ embeds: [
           new EmbedBuilder()
             .setColor(GREEN)
-            .setTitle('âœ… Jonin CT License Reactivated')
+            .setTitle('✅ Jonin CT License Reactivated')
             .setDescription(`Your **Premium CT** role has been restored and your license is active again.\n\nType \`/getkey\` to get your key and reopen the app.`)
-            .setFooter({ text: 'Jonin CT â€” Copy. Track. Win.' })
+            .setFooter({ text: 'Jonin CT — Copy. Track. Win.' })
         ]});
       } catch {}
     }
@@ -471,14 +471,14 @@ client.on('guildMemberUpdate', async (oldMember, newMember) => {
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
 
-  // â”€â”€ /getkey â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── /getkey ──────────────────────────────────────────────────────────────
   if (interaction.commandName === 'getkey') {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const hasPremiumRole = interaction.member.roles.cache.some(r => r.name === PREMIUM_ROLE);
     if (!hasPremiumRole) {
       return interaction.editReply({
-        content: 'âŒ You need the **Premium CT** role to get a license key.\nPurchase a subscription to receive this role.',
+        content: '❌ You need the **Premium CT** role to get a license key.\nPurchase a subscription to receive this role.',
       });
     }
 
@@ -493,34 +493,34 @@ client.on('interactionCreate', async (interaction) => {
 
       const embed = new EmbedBuilder()
         .setColor(data.existing ? BLUE : GREEN)
-        .setTitle(data.existing ? 'ðŸ”‘ Your License Key' : 'ðŸŽ‰ License Key Generated!')
+        .setTitle(data.existing ? '🔑 Your License Key' : '🎉 License Key Generated!')
         .setDescription(data.existing
-          ? 'This is your existing license key. Keep it private â€” it\'s tied to your machine after first use.'
+          ? 'This is your existing license key. Keep it private — it\'s tied to your machine after first use.'
           : 'Your key has been generated! Follow the steps below to activate Jonin CT.')
         .addFields(
           { name: 'License Key', value: `\`\`\`${data.key}\`\`\``, inline: false },
-          { name: 'How to activate', value: '1. Download the app from #downloads\n2. Open Jonin CT\n3. Paste your key â†’ click **Activate**', inline: false }
+          { name: 'How to activate', value: '1. Download the app from #downloads\n2. Open Jonin CT\n3. Paste your key → click **Activate**', inline: false }
         )
-        .setFooter({ text: 'âš ï¸ Never share this key. It locks to your machine on first use.' });
+        .setFooter({ text: '⚠️ Never share this key. It locks to your machine on first use.' });
 
       try {
         await interaction.user.send({ embeds: [embed] });
-        await interaction.editReply({ content: 'âœ… Your license key has been sent to your DMs!' });
+        await interaction.editReply({ content: '✅ Your license key has been sent to your DMs!' });
       } catch {
-        await interaction.editReply({ content: `âœ… Your key (enable DMs next time):\n\`\`\`${data.key}\`\`\`` });
+        await interaction.editReply({ content: `✅ Your key (enable DMs next time):\n\`\`\`${data.key}\`\`\`` });
       }
     } catch (err) {
       console.error('/getkey error:', err);
-      await interaction.editReply({ content: 'âŒ Failed to generate key. Try again or contact support.' });
+      await interaction.editReply({ content: '❌ Failed to generate key. Try again or contact support.' });
     }
     return;
   }
 
-  // â”€â”€ /shufflekey â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── /shufflekey ───────────────────────────────────────────────────────────
   if (interaction.commandName === 'shufflekey') {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const hasPremiumRole = interaction.member.roles.cache.some(r => r.name === PREMIUM_ROLE);
-    if (!hasPremiumRole) return interaction.editReply({ content: 'âŒ You need the **Premium CT** role.' });
+    if (!hasPremiumRole) return interaction.editReply({ content: '❌ You need the **Premium CT** role.' });
 
     try {
       const resp = await fetch(`${RAILWAY_URL}/api/license/shuffle`, {
@@ -529,34 +529,34 @@ client.on('interactionCreate', async (interaction) => {
         body: JSON.stringify({ discordUserId: interaction.user.id }),
       });
       const data = await resp.json();
-      if (data.cooldown) return interaction.editReply({ content: `â³ ${data.error}` });
-      if (!resp.ok || data.error) return interaction.editReply({ content: `âŒ ${data.error || 'Failed.'}` });
+      if (data.cooldown) return interaction.editReply({ content: `⏳ ${data.error}` });
+      if (!resp.ok || data.error) return interaction.editReply({ content: `❌ ${data.error || 'Failed.'}` });
 
       const embed = new EmbedBuilder()
         .setColor(BLUE)
-        .setTitle('ðŸ”„ New Key Generated')
+        .setTitle('🔄 New Key Generated')
         .setDescription('Your old key has been invalidated. Use the new key below.')
         .addFields({ name: 'New License Key', value: `\`\`\`${data.key}\`\`\``, inline: false })
         .setFooter({ text: 'Open the app and enter your new key to activate.' });
 
       try {
         await interaction.user.send({ embeds: [embed] });
-        await interaction.editReply({ content: 'âœ… New key sent to your DMs!' });
+        await interaction.editReply({ content: '✅ New key sent to your DMs!' });
       } catch {
-        await interaction.editReply({ content: `âœ… New key:\n\`\`\`${data.key}\`\`\`` });
+        await interaction.editReply({ content: `✅ New key:\n\`\`\`${data.key}\`\`\`` });
       }
     } catch (err) {
-      await interaction.editReply({ content: 'âŒ Failed. Try again.' });
+      await interaction.editReply({ content: '❌ Failed. Try again.' });
     }
     return;
   }
 
-  // â”€â”€ /setup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── /setup ────────────────────────────────────────────────────────────────
   if (interaction.commandName === 'setup') {
     const type = interaction.options.getString('type');
 
     try {
-      await interaction.reply({ content: 'â³ Posting...', flags: MessageFlags.Ephemeral });
+      await interaction.reply({ content: '⏳ Posting...', flags: MessageFlags.Ephemeral });
       const ch = await interaction.guild.channels.fetch(interaction.channelId);
 
       if (type === 'howitworks' || type === 'all') await ch.send({ embeds: [howItWorksEmbed()] });
@@ -571,7 +571,7 @@ client.on('interactionCreate', async (interaction) => {
         console.log('Sending support embed...');
         const openBtn = new ButtonBuilder()
           .setCustomId('open_ticket')
-          .setLabel('ðŸŽ« Open a Ticket')
+          .setLabel('🎫 Open a Ticket')
           .setStyle(1);
         const row = new ActionRowBuilder().addComponents(openBtn);
         await ch.send({ embeds: [supportEmbed()], components: [row] });
@@ -581,15 +581,15 @@ client.on('interactionCreate', async (interaction) => {
       if (type === 'getkey' || type === 'all') await ch.send({ embeds: [getKeyInfoEmbed()] });
       if (type === 'welcome')                   await ch.send({ embeds: [welcomeEmbed(interaction.member)] });
 
-      await interaction.editReply({ content: 'âœ… Done!' });
+      await interaction.editReply({ content: '✅ Done!' });
     } catch (err) {
       console.error('Setup error:', err.message);
-      try { await interaction.editReply({ content: `âŒ Error: ${err.message}` }); } catch {}
+      try { await interaction.editReply({ content: `❌ Error: ${err.message}` }); } catch {}
     }
     return;
   }
 
-  // â”€â”€ /announce â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── /announce ─────────────────────────────────────────────────────────────
   if (interaction.commandName === 'announce') {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const title   = interaction.options.getString('title');
@@ -606,14 +606,14 @@ client.on('interactionCreate', async (interaction) => {
 
     try {
       await interaction.channel.send({ content: '@everyone', embeds: [embed] });
-      await interaction.editReply({ content: 'âœ… Announcement sent!' });
+      await interaction.editReply({ content: '✅ Announcement sent!' });
     } catch (err) {
-      await interaction.editReply({ content: `âŒ Failed: ${err.message}` });
+      await interaction.editReply({ content: `❌ Failed: ${err.message}` });
     }
     return;
   }
 
-  // â”€â”€ /postdownload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── /postdownload ─────────────────────────────────────────────────────────
   if (interaction.commandName === 'postdownload') {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const version   = interaction.options.getString('version');
@@ -622,36 +622,36 @@ client.on('interactionCreate', async (interaction) => {
 
     const embed = new EmbedBuilder()
       .setColor(GREEN)
-      .setTitle(`ðŸ“¥ Jonin CT v${version} â€” Download`)
-      .setDescription(`The latest version of **Jonin CT Desktop** is now available.\n\nðŸ”— **[Download Jonin CT Setup v${version}](${link})**`)
+      .setTitle(`📥 Jonin CT v${version} — Download`)
+      .setDescription(`The latest version of **Jonin CT Desktop** is now available.\n\n🔗 **[Download Jonin CT Setup v${version}](${link})**`)
       .addFields(
         {
-          name: 'ðŸ’» Windows Installation',
-          value: '1. Click the download link above\n2. Run the installer\n3. If Windows SmartScreen appears â†’ click **More info â†’ Run anyway**\n4. Open Jonin CT and enter your license key',
+          name: '💻 Windows Installation',
+          value: '1. Click the download link above\n2. Run the installer\n3. If Windows SmartScreen appears → click **More info → Run anyway**\n4. Open Jonin CT and enter your license key',
           inline: false
         }
       );
 
     if (changelog) {
-      embed.addFields({ name: `âœ¨ What's new in v${version}`, value: changelog, inline: false });
+      embed.addFields({ name: `✨ What's new in v${version}`, value: changelog, inline: false });
     }
 
     embed.addFields({
-      name: 'ðŸ”‘ Don\'t have a key yet?',
+      name: '🔑 Don\'t have a key yet?',
       value: 'Type `/getkey` in <#get-key> to receive your personal license key.',
       inline: false
-    }).setFooter({ text: 'Jonin CT â€” Copy. Track. Win.' }).setTimestamp();
+    }).setFooter({ text: 'Jonin CT — Copy. Track. Win.' }).setTimestamp();
 
     try {
       await interaction.channel.send({ embeds: [embed] });
-      await interaction.editReply({ content: 'âœ… Download message posted!' });
+      await interaction.editReply({ content: '✅ Download message posted!' });
     } catch (err) {
-      await interaction.editReply({ content: `âŒ Failed: ${err.message}` });
+      await interaction.editReply({ content: `❌ Failed: ${err.message}` });
     }
     return;
   }
 
-  // â”€â”€ /revokekey â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── /revokekey ────────────────────────────────────────────────────────────
   if (interaction.commandName === 'revokekey') {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const key = interaction.options.getString('key');
@@ -662,14 +662,14 @@ client.on('interactionCreate', async (interaction) => {
         body: JSON.stringify({ key }),
       });
       if (!resp.ok) throw new Error(`Server ${resp.status}`);
-      await interaction.editReply({ content: `âœ… Key \`${key}\` revoked.` });
+      await interaction.editReply({ content: `✅ Key \`${key}\` revoked.` });
     } catch (err) {
-      await interaction.editReply({ content: 'âŒ Failed to revoke key.' });
+      await interaction.editReply({ content: '❌ Failed to revoke key.' });
     }
     return;
   }
 
-  // â”€â”€ /resetmachine â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── /resetmachine ─────────────────────────────────────────────────────────
   if (interaction.commandName === 'resetmachine') {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const key = interaction.options.getString('key');
@@ -680,18 +680,18 @@ client.on('interactionCreate', async (interaction) => {
         body: JSON.stringify({ key }),
       });
       if (!resp.ok) throw new Error(`Server ${resp.status}`);
-      await interaction.editReply({ content: `âœ… Machine reset for \`${key}\`. User can activate on a new device.` });
+      await interaction.editReply({ content: `✅ Machine reset for \`${key}\`. User can activate on a new device.` });
     } catch (err) {
-      await interaction.editReply({ content: 'âŒ Failed to reset machine.' });
+      await interaction.editReply({ content: '❌ Failed to reset machine.' });
     }
     return;
   }
 
-  // â”€â”€ /resetdevice â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── /resetdevice ──────────────────────────────────────────────────────────
   if (interaction.commandName === 'resetdevice') {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const hasPremiumRole = interaction.member.roles.cache.some(r => r.name === PREMIUM_ROLE);
-    if (!hasPremiumRole) return interaction.editReply({ content: 'âŒ You need the **Premium CT** role.' });
+    if (!hasPremiumRole) return interaction.editReply({ content: '❌ You need the **Premium CT** role.' });
 
     try {
       const resp = await fetch(`${RAILWAY_URL}/api/license/user-reset-hwid`, {
@@ -700,29 +700,29 @@ client.on('interactionCreate', async (interaction) => {
         body: JSON.stringify({ discordUserId: interaction.user.id }),
       });
       const data = await resp.json();
-      if (data.cooldown) return interaction.editReply({ content: `â³ ${data.error}` });
-      if (!resp.ok || data.error) return interaction.editReply({ content: `âŒ ${data.error || 'Failed.'}` });
+      if (data.cooldown) return interaction.editReply({ content: `⏳ ${data.error}` });
+      if (!resp.ok || data.error) return interaction.editReply({ content: `❌ ${data.error || 'Failed.'}` });
 
       const embed = new EmbedBuilder()
         .setColor(GREEN)
-        .setTitle('âœ… Device Unlinked')
+        .setTitle('✅ Device Unlinked')
         .setDescription('Your license has been unlinked from your previous machine.\n\n**To reactivate:**\n1. Open Jonin CT on your machine\n2. Enter your license key (get it again with `/getkey`)\n3. Click **Activate**')
         .setFooter({ text: '7-day cooldown between resets.' });
 
       try {
         await interaction.user.send({ embeds: [embed] });
-        await interaction.editReply({ content: 'âœ… Device unlinked! Check your DMs for instructions.' });
+        await interaction.editReply({ content: '✅ Device unlinked! Check your DMs for instructions.' });
       } catch {
         await interaction.editReply({ embeds: [embed] });
       }
     } catch (err) {
-      await interaction.editReply({ content: 'âŒ Failed. Try again or contact support.' });
+      await interaction.editReply({ content: '❌ Failed. Try again or contact support.' });
     }
     return;
   }
 });
 
-// â”€â”€ TICKET BUTTONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── TICKET BUTTONS ────────────────────────────────────────────────────────────
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isButton()) return;
 
@@ -735,7 +735,7 @@ client.on('interactionCreate', async (interaction) => {
       c => c.name === `ticket-${interaction.user.username.toLowerCase()}` && !c.archived
     );
     if (existing) {
-      return interaction.editReply({ content: `âŒ You already have an open ticket: ${existing}` });
+      return interaction.editReply({ content: `❌ You already have an open ticket: ${existing}` });
     }
 
     try {
@@ -761,23 +761,23 @@ client.on('interactionCreate', async (interaction) => {
       }
 
       const closeRow = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('close_ticket').setLabel('ðŸ”’ Close Ticket').setStyle(ButtonStyle.Danger)
+        new ButtonBuilder().setCustomId('close_ticket').setLabel('🔒 Close Ticket').setStyle(ButtonStyle.Danger)
       );
 
       const ticketEmbed = new EmbedBuilder()
         .setColor(BLUE)
-        .setTitle('ðŸŽ« Support Ticket')
+        .setTitle('🎫 Support Ticket')
         .setDescription(`Hey ${interaction.user}! An admin will be with you shortly.\n\nPlease describe your issue in as much detail as possible:`)
         .addFields(
-          { name: 'ðŸ“‹ Helpful info to include', value: '> Your license key (first 8 characters)\n> What you were trying to do\n> Any error messages you saw', inline: false }
+          { name: '📋 Helpful info to include', value: '> Your license key (first 8 characters)\n> What you were trying to do\n> Any error messages you saw', inline: false }
         )
         .setFooter({ text: 'Click "Close Ticket" when your issue is resolved.' });
 
       await ticketChannel.send({ content: `${interaction.user}`, embeds: [ticketEmbed], components: [closeRow] });
-      await interaction.editReply({ content: `âœ… Your ticket has been opened: ${ticketChannel}` });
+      await interaction.editReply({ content: `✅ Your ticket has been opened: ${ticketChannel}` });
     } catch (err) {
       console.error('Ticket open error:', err);
-      await interaction.editReply({ content: 'âŒ Failed to create ticket. Make sure I have Manage Channels permission.' });
+      await interaction.editReply({ content: '❌ Failed to create ticket. Make sure I have Manage Channels permission.' });
     }
     return;
   }
@@ -789,7 +789,7 @@ client.on('interactionCreate', async (interaction) => {
 
     const closeEmbed = new EmbedBuilder()
       .setColor(RED)
-      .setTitle('ðŸ”’ Ticket Closed')
+      .setTitle('🔒 Ticket Closed')
       .setDescription(`Closed by ${interaction.user}. This channel will be deleted in 5 seconds.`)
       .setTimestamp();
 
@@ -803,5 +803,3 @@ client.on('error', (err) => console.error('Discord client error:', err.message))
 process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err?.message));
 
 client.login(process.env.DISCORD_BOT_TOKEN);
-
-

@@ -62,7 +62,7 @@ WriteUtf8NoBom "package.json" $content
 Write-Host " [2/4] Updating Discord bot download link..."
 $botFile = "..\discord-bot\index.js"
 if (Test-Path $botFile) {
-    $content = Get-Content $botFile -Raw
+    $content = [System.IO.File]::ReadAllText((Resolve-Path $botFile).Path, [System.Text.Encoding]::UTF8)
     $content = $content -replace "DOWNLOAD_VERSION = '[^']+'", "DOWNLOAD_VERSION = '$newVer'"
     $content = $content -replace 'releases/download/v[\d\.]+/', "releases/download/v$newVer/"
     $content = $content -replace 'Jonin-CT-Setup-[\d\.]+\.exe', "Jonin-CT-Setup-$newVer.exe"
