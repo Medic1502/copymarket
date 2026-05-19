@@ -1241,8 +1241,9 @@ async function loadOpenPositions(traders) {
             const cid = p.condition_id.replace(/'/g, '');
             const out = (p.outcome||'Yes').replace(/'/g, '');
             const mktName  = (name || p.condition_id || '').replace(/'/g, "\\'");
+            const invested = parseFloat(p.usdc_spent || 0);
             const shareBtn = isWin
-              ? '<button onclick="event.stopPropagation();shareWin(\'' + mktName + '\',\'' + out + '\',\'' + pnlStr + '\')" style="background:none;border:none;color:var(--text3);cursor:pointer;padding:0 2px;flex-shrink:0;display:flex;align-items:center" title="Share this win"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>'
+              ? '<button onclick="event.stopPropagation();shareWin(\'' + mktName + '\',\'' + out + '\',\'' + pnlStr + '\',' + invested.toFixed(2) + ')" style="background:none;border:none;color:var(--text3);cursor:pointer;padding:0 2px;flex-shrink:0;display:flex;align-items:center" title="Share this win"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>'
               : '';
             return '<div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:6px;padding:6px 10px;font-size:12px">' +
               badge +
@@ -1262,7 +1263,7 @@ async function loadOpenPositions(traders) {
   } catch {}
 }
 
-async function shareWin(marketName, outcome, pnlStr) {
+async function shareWin(marketName, outcome, pnlStr, invested) {
   const W = 1080, H = 1080;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
@@ -1330,12 +1331,36 @@ async function shareWin(marketName, outcome, pnlStr) {
   ctx.fillText(mkt, W/2, 520);
 
   // Outcome pill
+  ctx.font = 'bold 18px system-ui,sans-serif';
   const outcomeW = ctx.measureText(outcome).width + 40;
   ctx.fillStyle = 'rgba(147,197,253,.12)';
   rr(W/2 - outcomeW/2, 538, outcomeW, 38, 19); ctx.fill();
   ctx.fillStyle = '#93C5FD';
-  ctx.font = 'bold 18px system-ui,sans-serif';
   ctx.fillText(outcome, W/2, 562);
+
+  // Stats row: Invested | ROI
+  const pnlNum = parseFloat((pnlStr || '0').replace(/[^0-9.-]/g, '')) * (pnlStr.startsWith('-') ? -1 : 1);
+  const roi = invested > 0 ? ((pnlNum / invested) * 100) : 0;
+  const roiStr = (roi >= 0 ? '+' : '') + roi.toFixed(1) + '%';
+
+  // Two stat boxes
+  const boxY = 610, boxH = 72, boxW = 360, gap = 20;
+  const box1X = W/2 - boxW - gap/2;
+  const box2X = W/2 + gap/2;
+  [box1X, box2X].forEach(x => {
+    ctx.fillStyle = 'rgba(255,255,255,.05)';
+    rr(x, boxY, boxW, boxH, 10); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 1;
+    rr(x, boxY, boxW, boxH, 10); ctx.stroke();
+  });
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.font = '13px system-ui,sans-serif';
+  ctx.fillText('INVESTED', box1X + boxW/2, boxY + 22);
+  ctx.fillText('ROI', box2X + boxW/2, boxY + 22);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 26px system-ui,sans-serif';
+  ctx.fillText('$' + (invested||0).toFixed(2), box1X + boxW/2, boxY + 54);
+  ctx.fillStyle = roi >= 0 ? '#22C55E' : '#ef4444';
+  ctx.fillText(roiStr, box2X + boxW/2, boxY + 54);
 
   // Load logo
   const logoImg = new Image();
@@ -1344,31 +1369,30 @@ async function shareWin(marketName, outcome, pnlStr) {
 
   // Bottom branding card
   ctx.fillStyle = 'rgba(255,255,255,.04)';
-  rr(120, 680, W-240, 130, 16); ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.lineWidth = 1;
-  rr(120, 680, W-240, 130, 16); ctx.stroke();
+  rr(100, 720, W-200, 160, 16); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1;
+  rr(100, 720, W-200, 160, 16); ctx.stroke();
 
   // Logo
   if (logoImg.complete && logoImg.naturalHeight > 0) {
-    ctx.drawImage(logoImg, W/2 - 26, 698, 52, 52);
+    ctx.drawImage(logoImg, W/2 - 24, 733, 48, 48);
   } else {
-    // Fallback: draw gradient circle with J
-    const lg = ctx.createLinearGradient(W/2-26, 698, W/2+26, 750);
+    const lg = ctx.createLinearGradient(W/2-24, 733, W/2+24, 781);
     lg.addColorStop(0, '#2563EB'); lg.addColorStop(1, '#06B6D4');
-    ctx.fillStyle = lg; ctx.beginPath(); ctx.arc(W/2, 724, 26, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 22px system-ui,sans-serif';
-    ctx.fillText('J', W/2, 731);
+    ctx.fillStyle = lg; ctx.beginPath(); ctx.arc(W/2, 757, 24, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 20px system-ui,sans-serif';
+    ctx.fillText('J', W/2, 764);
   }
 
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 22px system-ui,sans-serif';
-  ctx.fillText('Jonin CT', W/2, 778);
-  ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.font = '16px system-ui,sans-serif';
-  ctx.fillText('Copy trading • Powered by Polymarket', W/2, 802);
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 20px system-ui,sans-serif';
+  ctx.fillText('Jonin CT', W/2, 804);
 
-  // Bottom tagline
-  ctx.fillStyle = 'rgba(255,255,255,.18)';
-  ctx.font = '15px system-ui,sans-serif';
-  ctx.fillText('joninct.com', W/2, 870);
+  // Social handles
+  ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.font = '14px system-ui,sans-serif';
+  ctx.fillText('𝕏 @joninct   •   discord.gg/joninct', W/2, 828);
+
+  ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.font = '13px system-ui,sans-serif';
+  ctx.fillText('Automated copy trading • Powered by Polymarket', W/2, 858);
 
   // Download / share
   canvas.toBlob(async blob => {
