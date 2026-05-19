@@ -113,6 +113,12 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
 .table-head{display:grid;grid-template-columns:2.2fr 1.2fr 1.6fr 1fr 36px;gap:0;padding:10px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--border)}
 .th{font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em}
 .trader-row{display:grid;grid-template-columns:2.2fr 1.2fr 1.6fr 1fr 36px;gap:0;padding:13px 16px;border-bottom:1px solid var(--border);align-items:center;transition:background .1s;cursor:default}
+.status-toggle{background:none;border:1px solid;border-radius:5px;font-size:11.5px;font-weight:600;padding:4px 11px;cursor:pointer;white-space:nowrap;transition:opacity .15s}
+.status-toggle.st-active{color:var(--green);border-color:rgba(34,197,94,.35)}
+.status-toggle.st-active:hover{background:rgba(34,197,94,.08)}
+.status-toggle.st-paused{color:var(--text3);border-color:var(--border)}
+.status-toggle.st-paused:hover{background:rgba(255,255,255,.05);color:var(--text)}
+.status-toggle:disabled{opacity:.5;cursor:default}
 .trader-row:hover{background:rgba(255,255,255,.02)}
 .trader-row:last-child{border-bottom:none}
 .trader-cell{display:flex;align-items:center}
@@ -860,16 +866,33 @@ function filterTraders() {
   renderTradersHtml(filtered);
 }
 
-async function stopTrader(id) {
-  try { await api('POST', '/copy/stop', { id }); showAlert('dash-alert','Paused.','success'); loadDashboard(); }
-  catch(e) { showAlert('dash-alert', e.message); }
+async function stopTrader(id, btn) {
+  if (btn) { btn.textContent = '...'; btn.disabled = true; }
+  try {
+    await api('POST', '/copy/stop', { id });
+    if (btn) { btn.textContent = '● Paused'; btn.className = 'status-toggle st-paused'; btn.disabled = false; btn.onclick = (e) => { e.stopPropagation(); resumeTrader(id, btn); }; }
+    else loadDashboard();
+  } catch(e) {
+    if (btn) { btn.textContent = '● Copying'; btn.className = 'status-toggle st-active'; btn.disabled = false; }
+    showAlert('dash-alert', e.message);
+  }
 }
-async function resumeTrader(id) {
+async function resumeTrader(id, btn) {
+  if (btn) { btn.textContent = '⟳ Starting...'; btn.disabled = true; }
   try {
     const bal = await api('GET', '/wallet/balance');
-    if (bal.balance < 5) { showAlert('dash-alert', 'You need at least $5 USDC in your wallet to start copying. Please deposit first.'); return; }
-    await api('POST', '/copy/start', { id }); showAlert('dash-alert','Copy trading started.','success'); loadDashboard();
-  } catch(e) { showAlert('dash-alert', e.message); }
+    if (bal.balance < 5) {
+      if (btn) { btn.textContent = '● Paused'; btn.className = 'status-toggle st-paused'; btn.disabled = false; }
+      showAlert('dash-alert', 'You need at least $5 USDC in your wallet to start copying. Please deposit first.');
+      return;
+    }
+    await api('POST', '/copy/start', { id });
+    if (btn) { btn.textContent = '● Copying'; btn.className = 'status-toggle st-active'; btn.disabled = false; btn.onclick = (e) => { e.stopPropagation(); stopTrader(id, btn); }; }
+    else loadDashboard();
+  } catch(e) {
+    if (btn) { btn.textContent = '● Paused'; btn.className = 'status-toggle st-paused'; btn.disabled = false; }
+    showAlert('dash-alert', e.message);
+  }
 }
 async function deleteTrader(id) {
   if (!confirm('Remove this trader? This will stop copying them.')) return;
@@ -952,11 +975,9 @@ function renderTradersHtml(traders) {
     const modeText = t.copyMode === 'fixed' ? '$'+t.fixedAmount+' fixed' : (t.copyPercentage||10)+'% of bet';
     const cats = t.categories && t.categories.length ? t.categories.join(', ') : 'All';
     const statusHtml = t.isActive
-      ? '<span class="copying-badge"><span class="sdot-g"></span> Copying</span>'
-      : '<span class="paused-badge2"><span class="sdot-gr"></span> Paused</span>';
-    const actionRow = t.isActive
-      ? '<button class="dd-item" onclick="stopTrader(\''+t.id+'\');toggleMenu(\''+t.id+'\',null)">Pause</button>'
-      : '<button class="dd-item" onclick="resumeTrader(\''+t.id+'\');toggleMenu(\''+t.id+'\',null)">Resume</button>';
+      ? '<button class="status-toggle st-active" onclick="event.stopPropagation();stopTrader(\''+t.id+'\',this)">● Copying</button>'
+      : '<button class="status-toggle st-paused" onclick="event.stopPropagation();resumeTrader(\''+t.id+'\',this)">● Paused</button>';
+    const actionRow = '<button class="dd-item" onclick="editTraderById(\''+t.id+'\');toggleMenu(\''+t.id+'\',null)">Edit settings</button>';
 
     const expandPanel =
       '<div class="expand-panel" id="exp-'+t.id+'">' +
@@ -975,9 +996,6 @@ function renderTradersHtml(traders) {
           '<span>Wallet: <strong style="font-family:monospace">'+short+'</strong></span>' +
         '</div>' +
         '<div style="display:flex;gap:8px;margin-top:12px">' +
-          (t.isActive
-            ? '<button class="btn btn-sm btn-red" onclick="stopTrader(\''+t.id+'\')" style="width:auto">Pause</button>'
-            : '<button class="btn btn-sm btn-green" onclick="resumeTrader(\''+t.id+'\')" style="width:auto">Resume</button>') +
           '<button class="btn btn-sm" onclick="clearPositions()" style="width:auto">Clear positions</button>' +
           '<button class="btn btn-sm btn-red" onclick="deleteTrader(\''+t.id+'\')" style="width:auto">Remove trader</button>' +
         '</div>' +
@@ -992,7 +1010,6 @@ function renderTradersHtml(traders) {
         '<div class="trader-cell" onclick="event.stopPropagation()"><div class="menu-wrap"><button class="menu-btn" onclick="toggleMenu(\''+t.id+'\',this)">⋮</button>' +
           '<div class="dropdown" id="ddm-'+t.id+'">' +
             actionRow +
-            '<button class="dd-item" onclick="editTraderById(\''+t.id+'\');toggleMenu(\''+t.id+'\',null)">Edit settings</button>' +
             '<button class="dd-item danger" onclick="deleteTrader(\''+t.id+'\')">Remove</button>' +
           '</div></div></div>' +
       '</div>' + expandPanel;
