@@ -976,7 +976,7 @@ function renderTradersHtml(traders) {
     const label  = t.nickname || ('0x'+tw.slice(2,6)+'...'+tw.slice(-4));
     const init   = t.nickname ? t.nickname.slice(0,2).toUpperCase() : (tw.slice(2,4)||'?').toUpperCase();
     const pnl      = t.stats ? t.stats.totalPnl : 0;
-    const pnlStr   = (pnl>=0?'+':'') + '$' + Math.abs(pnl).toFixed(2);
+    const pnlStr   = (pnl>=0?'+':'-') + '$' + Math.abs(pnl).toFixed(2);
     const pnlCls   = pnl > 0 ? 'pnl-pos' : pnl < 0 ? 'pnl-neg' : 'pnl-neu';
     const trades   = t.stats ? t.stats.totalTrades : 0;
     const wins     = t.stats ? (t.stats.wins || 0) : 0;
@@ -1104,7 +1104,7 @@ async function loadOpenPositions(traders) {
           resolvedPos.map(p => {
             const isWin  = p.resolved_outcome === 'WON';
             const pnl    = parseFloat(p.resolved_pnl || 0);
-            const pnlStr = (pnl >= 0 ? '+' : '') + '$' + Math.abs(pnl).toFixed(2);
+            const pnlStr = (pnl >= 0 ? '+' : '-') + '$' + Math.abs(pnl).toFixed(2);
             const color  = isWin ? 'var(--green)' : 'var(--red)';
             const badge  = isWin
               ? '<span style="background:var(--green-dim);color:var(--green);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;flex-shrink:0">WIN</span>'
