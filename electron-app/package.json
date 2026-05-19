@@ -1,0 +1,63 @@
+{
+  "name": "jonin-ct",
+  "version": "1.2.0",
+  "description": "Jonin CT Desktop — Copy Top Polymarket Traders",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64",
+    "publish": "electron-builder --win --x64 --publish always"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0",
+    "electron-updater": "^6.8.3",
+    "node-fetch": "^2.7.0",
+    "node-machine-id": "^1.1.12"
+  },
+  "devDependencies": {
+    "electron": "^29.4.6",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.joninCT.desktop",
+    "productName": "Jonin CT",
+    "copyright": "© 2026 Jonin CT",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "preload-main.js",
+      "license.html",
+      "license.txt",
+      "icon.png"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icon.png"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Medic1502",
+      "repo": "copymarket"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": false,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Jonin CT"
+    }
+  }
+}

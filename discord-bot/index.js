@@ -210,8 +210,8 @@ function howToJoinEmbed() {
     .setFooter({ text: 'Jonin CT — Copy. Track. Win.' });
 }
 
-const DOWNLOAD_VERSION = '1.1.0';
-const DOWNLOAD_LINK = 'https://github.com/Medic1502/copymarket/releases/download/v1.1.0/Jonin-CT-Setup-1.1.0.exe';
+const DOWNLOAD_VERSION = '1.2.0';
+const DOWNLOAD_LINK = 'https://github.com/Medic1502/copymarket/releases/download/v1.2.0/Jonin-CT-Setup-1.2.0.exe';
 
 function supportEmbed() {
   return new EmbedBuilder()
