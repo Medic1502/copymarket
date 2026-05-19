@@ -353,7 +353,10 @@ router.post('/share-win', async (req, res, next) => {
     let discordTag = null;
     if (!anonymous) {
       const { query } = require('../../db/client');
-      const r = await query('SELECT discord_user_id, discord_username FROM license_keys WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1', [req.userId]);
+      const r = await query(
+        'SELECT discord_user_id, discord_username FROM license_keys WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1',
+        [req.userId]
+      );
       if (r.rows[0]?.discord_user_id) {
         discordTag = `<@${r.rows[0].discord_user_id}>`;
       } else if (r.rows[0]?.discord_username) {
@@ -365,14 +368,25 @@ router.post('/share-win', async (req, res, next) => {
       ? `🏆 ${discordTag} just made a winning trade on Polymarket with **Jonin CT**!`
       : `🏆 Someone just made a winning trade on Polymarket with **Jonin CT**!`;
 
-    // Send to Discord webhook via multipart form
-    const FormData = (await import('node-fetch')).FormData || null;
-    const boundary = '----FormBoundary' + Math.random().toString(36).slice(2);
+    // Build multipart manually — node-fetch v2 doesn't support Node 18 FormData
+    const boundary = `----JoninBoundary${Date.now().toString(36)}`;
+    const CRLF = '\r\n';
     const body = Buffer.concat([
-      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="content"\r\n\r\n${content}\r\n`),
-      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="jonin-ct-win.png"\r\nContent-Type: image/png\r\n\r\n`),
+      // payload_json part (message content)
+      Buffer.from(
+        `--${boundary}${CRLF}` +
+        `Content-Disposition: form-data; name="payload_json"${CRLF}` +
+        `Content-Type: application/json${CRLF}${CRLF}` +
+        `${JSON.stringify({ content, username: 'Jonin CT' })}${CRLF}`
+      ),
+      // file part — Discord expects files[0]
+      Buffer.from(
+        `--${boundary}${CRLF}` +
+        `Content-Disposition: form-data; name="files[0]"; filename="jonin-ct-win.png"${CRLF}` +
+        `Content-Type: image/png${CRLF}${CRLF}`
+      ),
       imgBuffer,
-      Buffer.from(`\r\n--${boundary}--\r\n`),
+      Buffer.from(`${CRLF}--${boundary}--${CRLF}`),
     ]);
 
     const resp = await fetch(webhookUrl, {
@@ -384,7 +398,8 @@ router.post('/share-win', async (req, res, next) => {
 
     if (!resp.ok) {
       const text = await resp.text();
-      return res.status(502).json({ error: 'Discord rejected the post.', detail: text.slice(0, 100) });
+      console.error('Discord webhook error:', resp.status, text.slice(0, 200));
+      return res.status(502).json({ error: `Discord error ${resp.status}`, detail: text.slice(0, 100) });
     }
 
     res.json({ ok: true, tagged: !!discordTag });

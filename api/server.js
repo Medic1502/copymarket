@@ -18,7 +18,7 @@ app.use(helmet({
   contentSecurityPolicy: false
 }));
 app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
