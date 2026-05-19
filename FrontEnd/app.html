@@ -1390,25 +1390,10 @@ async function loadOpenPositions(traders) {
 }
 
 async function shareWin(marketName, outcome, pnlStr, invested) {
-  const W = 1080, H = 1080;
+  const W = 1122, H = 1402;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
-
-  // Background gradient
-  const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, '#07101f'); bg.addColorStop(1, '#0b1a2e');
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-
-  // Subtle radial glow
-  const glow = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, 560);
-  glow.addColorStop(0, 'rgba(37,99,235,.13)'); glow.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
-
-  // Top gradient bar
-  const bar = ctx.createLinearGradient(0, 0, W, 0);
-  bar.addColorStop(0, '#2563EB'); bar.addColorStop(1, '#06B6D4');
-  ctx.fillStyle = bar; ctx.fillRect(0, 0, W, 7);
 
   // Helper: rounded rect
   function rr(x, y, w, h, r) {
@@ -1419,109 +1404,103 @@ async function shareWin(marketName, outcome, pnlStr, invested) {
     ctx.lineTo(x, y+r); ctx.arcTo(x, y, x+r, y, r); ctx.closePath();
   }
 
+  // Load template background
+  const tmpl = new Image();
+  await new Promise(r => { tmpl.onload = r; tmpl.onerror = r; tmpl.src = '/share-template.png'; if (tmpl.complete) r(); });
+  ctx.drawImage(tmpl, 0, 0, W, H);
+
+  // ── DYNAMIC CONTENT (left-aligned, top area) ─────────────────────────────
+  const L = 72; // left margin
+  ctx.textAlign = 'left';
+
   // WIN badge
-  ctx.fillStyle = 'rgba(34,197,94,.14)'; rr(W/2-72, 190, 144, 56, 28); ctx.fill();
-  ctx.strokeStyle = 'rgba(34,197,94,.5)'; ctx.lineWidth = 2; rr(W/2-72, 190, 144, 56, 28); ctx.stroke();
-  ctx.fillStyle = '#22C55E'; ctx.font = 'bold 22px system-ui,sans-serif';
-  ctx.textAlign = 'center'; ctx.fillText('✓  WIN', W/2, 226);
+  ctx.fillStyle = 'rgba(0,0,0,.35)';
+  rr(L, 148, 134, 46, 23); ctx.fill();
+  ctx.strokeStyle = '#22C55E'; ctx.lineWidth = 1.5;
+  rr(L, 148, 134, 46, 23); ctx.stroke();
+  ctx.fillStyle = '#22C55E'; ctx.font = 'bold 18px system-ui,sans-serif';
+  ctx.fillText('✓  WIN', L + 20, 178);
 
-  // P&L amount
-  const amount = pnlStr.replace('+', '');
-  ctx.fillStyle = '#22C55E';
-  ctx.font = 'bold 118px system-ui,sans-serif';
-  ctx.textAlign = 'center';
-  // Shrink if too long
-  const metrics = ctx.measureText(amount);
-  if (metrics.width > W - 80) ctx.font = 'bold 80px system-ui,sans-serif';
-  ctx.fillText(amount, W/2, 390);
-
-  // "PROFIT" label
-  ctx.fillStyle = 'rgba(255,255,255,.35)';
-  ctx.font = '500 20px system-ui,sans-serif';
-  ctx.letterSpacing = '0.15em';
-  ctx.fillText('PROFIT', W/2, 430);
-  ctx.letterSpacing = '0';
-
-  // Divider line
-  ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(120, 470); ctx.lineTo(W-120, 470); ctx.stroke();
-
-  // Market name
-  ctx.fillStyle = 'rgba(255,255,255,.82)';
-  ctx.font = '500 28px system-ui,sans-serif';
-  ctx.textAlign = 'center';
-  const maxW = W - 120;
-  let mkt = marketName;
-  ctx.font = '500 28px system-ui,sans-serif';
-  while (ctx.measureText(mkt).width > maxW && mkt.length > 20) mkt = mkt.slice(0, -4) + '...';
-  ctx.fillText(mkt, W/2, 520);
+  // Market name — split into two lines if needed (max width 580px before 3D logo)
+  const maxTW = 580;
+  ctx.fillStyle = 'rgba(255,255,255,.9)';
+  ctx.font = '600 42px system-ui,sans-serif';
+  let mktLine1 = marketName, mktLine2 = '';
+  if (ctx.measureText(mktLine1).width > maxTW) {
+    // Try to split at a colon or natural break
+    const colonIdx = mktLine1.indexOf(':');
+    if (colonIdx > 0 && colonIdx < mktLine1.length - 1) {
+      mktLine1 = marketName.slice(0, colonIdx + 1);
+      mktLine2 = marketName.slice(colonIdx + 1).trim();
+    } else {
+      // Split at last space before maxTW
+      const words = marketName.split(' ');
+      mktLine1 = '';
+      for (const w of words) {
+        if (ctx.measureText(mktLine1 + ' ' + w).width > maxTW) break;
+        mktLine1 += (mktLine1 ? ' ' : '') + w;
+      }
+      mktLine2 = marketName.slice(mktLine1.length).trim();
+    }
+    // Truncate line2 if still too long
+    while (mktLine2 && ctx.measureText(mktLine2).width > maxTW) mktLine2 = mktLine2.slice(0, -4) + '...';
+  }
+  ctx.font = '400 38px system-ui,sans-serif';
+  ctx.fillText(mktLine1, L, 258);
+  ctx.font = 'bold 38px system-ui,sans-serif';
+  const line2Y = mktLine2 ? 310 : 0;
+  if (mktLine2) ctx.fillText(mktLine2, L, line2Y);
 
   // Outcome pill
-  ctx.font = 'bold 18px system-ui,sans-serif';
-  const outcomeW = ctx.measureText(outcome).width + 40;
-  ctx.fillStyle = 'rgba(147,197,253,.12)';
-  rr(W/2 - outcomeW/2, 538, outcomeW, 38, 19); ctx.fill();
-  ctx.fillStyle = '#93C5FD';
-  ctx.fillText(outcome, W/2, 562);
+  const outY = mktLine2 ? 350 : 300;
+  ctx.font = 'bold 17px system-ui,sans-serif';
+  const outW = ctx.measureText(outcome).width + 32;
+  ctx.fillStyle = 'rgba(255,255,255,.08)';
+  rr(L, outY, outW, 36, 18); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.15)'; ctx.lineWidth = 1;
+  rr(L, outY, outW, 36, 18); ctx.stroke();
+  ctx.fillStyle = '#fff';
+  ctx.fillText(outcome, L + 16, outY + 23);
 
-  // Stats row: Invested | ROI
-  const pnlNum = parseFloat((pnlStr || '0').replace(/[^0-9.-]/g, '')) * (pnlStr.startsWith('-') ? -1 : 1);
+  // Profit amount — green gradient
+  const amount = pnlStr.replace('+', '').replace('-', '');
+  const profY = outY + 160;
+  ctx.font = 'bold 140px system-ui,sans-serif';
+  if (ctx.measureText('$' + amount).width > maxTW + 80) ctx.font = 'bold 100px system-ui,sans-serif';
+  const profGrad = ctx.createLinearGradient(L, profY - 120, L, profY);
+  profGrad.addColorStop(0, '#4ade80');
+  profGrad.addColorStop(1, '#16a34a');
+  ctx.fillStyle = profGrad;
+  ctx.fillText('$' + amount, L, profY);
+
+  // PROFIT label
+  ctx.fillStyle = 'rgba(255,255,255,.35)';
+  ctx.font = '700 18px system-ui,sans-serif';
+  ctx.letterSpacing = '0.2em';
+  ctx.fillText('PROFIT', L, profY + 36);
+  ctx.letterSpacing = '0';
+
+  // INVESTED / ROI boxes
+  const pnlNum = parseFloat(amount) * (pnlStr.startsWith('-') ? -1 : 1);
   const roi = invested > 0 ? ((pnlNum / invested) * 100) : 0;
   const roiStr = (roi >= 0 ? '+' : '') + roi.toFixed(1) + '%';
+  const bxY = profY + 70, bxH = 90, bxW = 230, bxGap = 16;
 
-  // Two stat boxes
-  const boxY = 610, boxH = 72, boxW = 360, gap = 20;
-  const box1X = W/2 - boxW - gap/2;
-  const box2X = W/2 + gap/2;
-  [box1X, box2X].forEach(x => {
-    ctx.fillStyle = 'rgba(255,255,255,.05)';
-    rr(x, boxY, boxW, boxH, 10); ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 1;
-    rr(x, boxY, boxW, boxH, 10); ctx.stroke();
+  [0, 1].forEach(i => {
+    const bx = L + i * (bxW + bxGap);
+    ctx.fillStyle = 'rgba(255,255,255,.06)';
+    rr(bx, bxY, bxW, bxH, 12); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.1)'; ctx.lineWidth = 1;
+    rr(bx, bxY, bxW, bxH, 12); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.4)';
+    ctx.font = '700 12px system-ui,sans-serif';
+    ctx.letterSpacing = '0.1em';
+    ctx.fillText(i === 0 ? 'INVESTED' : 'ROI', bx + 18, bxY + 26);
+    ctx.letterSpacing = '0';
+    ctx.fillStyle = i === 0 ? '#fff' : (roi >= 0 ? '#22C55E' : '#ef4444');
+    ctx.font = 'bold 34px system-ui,sans-serif';
+    ctx.fillText(i === 0 ? '$' + (invested||0).toFixed(2) : roiStr, bx + 18, bxY + 68);
   });
-  ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.font = '13px system-ui,sans-serif';
-  ctx.fillText('INVESTED', box1X + boxW/2, boxY + 22);
-  ctx.fillText('ROI', box2X + boxW/2, boxY + 22);
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 26px system-ui,sans-serif';
-  ctx.fillText('$' + (invested||0).toFixed(2), box1X + boxW/2, boxY + 54);
-  ctx.fillStyle = roi >= 0 ? '#22C55E' : '#ef4444';
-  ctx.fillText(roiStr, box2X + boxW/2, boxY + 54);
-
-  // Load logo — set handlers BEFORE src, check complete for cached case
-  const logoImg = new Image();
-  await new Promise(r => {
-    logoImg.onload = r; logoImg.onerror = r;
-    logoImg.src = '/logo.png';
-    if (logoImg.complete) r();
-  });
-
-  // Bottom branding card
-  ctx.fillStyle = 'rgba(255,255,255,.04)';
-  rr(100, 720, W-200, 160, 16); ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1;
-  rr(100, 720, W-200, 160, 16); ctx.stroke();
-
-  // Logo
-  if (logoImg.complete && logoImg.naturalHeight > 0) {
-    ctx.drawImage(logoImg, W/2 - 24, 733, 48, 48);
-  } else {
-    const lg = ctx.createLinearGradient(W/2-24, 733, W/2+24, 781);
-    lg.addColorStop(0, '#2563EB'); lg.addColorStop(1, '#06B6D4');
-    ctx.fillStyle = lg; ctx.beginPath(); ctx.arc(W/2, 757, 24, 0, Math.PI*2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 20px system-ui,sans-serif';
-    ctx.fillText('J', W/2, 764);
-  }
-
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 20px system-ui,sans-serif';
-  ctx.fillText('Jonin CT', W/2, 804);
-
-  // Social handles
-  // Social handles — Twitter big, Discord smaller
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 32px system-ui,sans-serif';
-  ctx.fillText('𝕏 @joninct', W/2, 832);
-  ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.font = '15px system-ui,sans-serif';
-  ctx.fillText('discord.gg/joninct  •  Powered by Polymarket', W/2, 860);
 
   // Show share modal
   const imgDataUrl = canvas.toDataURL('image/png');
