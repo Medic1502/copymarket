@@ -1195,10 +1195,15 @@ async function loadOpenPositions(traders) {
               : '<a href="' + link + '" target="_blank" style="color:var(--text2);text-decoration:none;font-family:monospace;font-size:11px" onclick="event.stopPropagation()">' + (p.condition_id||'').slice(0,14) + '... ↗</a>';
             const cid = p.condition_id.replace(/'/g, '');
             const out = (p.outcome||'Yes').replace(/'/g, '');
+            const mktName  = (name || p.condition_id || '').replace(/'/g, "\\'");
+            const shareBtn = isWin
+              ? '<button onclick="event.stopPropagation();shareWin(\'' + mktName + '\',\'' + out + '\',\'' + pnlStr + '\')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;line-height:1;padding:0 2px;flex-shrink:0" title="Share this win">📤</button>'
+              : '';
             return '<div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:6px;padding:6px 10px;font-size:12px">' +
               badge +
               '<span style="color:var(--text2);min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + nameHtml + ' <strong style="color:var(--blue-light)">' + (p.outcome||'Yes') + '</strong></span>' +
               '<span style="color:' + color + ';font-weight:600;flex-shrink:0">' + pnlStr + '</span>' +
+              shareBtn +
               '<button onclick="event.stopPropagation();deletePosition(\'' + cid + '\',\'' + out + '\')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px;flex-shrink:0" title="Remove">×</button>' +
               '</div>';
           }).join('') + '</div>';
@@ -1210,6 +1215,129 @@ async function loadOpenPositions(traders) {
     if (window._priceInterval) clearInterval(window._priceInterval);
     window._priceInterval = setInterval(refreshPositionPrices, 30000);
   } catch {}
+}
+
+async function shareWin(marketName, outcome, pnlStr) {
+  const W = 1080, H = 1080;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // Background gradient
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#07101f'); bg.addColorStop(1, '#0b1a2e');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  // Subtle radial glow
+  const glow = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, 560);
+  glow.addColorStop(0, 'rgba(37,99,235,.13)'); glow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+
+  // Top gradient bar
+  const bar = ctx.createLinearGradient(0, 0, W, 0);
+  bar.addColorStop(0, '#2563EB'); bar.addColorStop(1, '#06B6D4');
+  ctx.fillStyle = bar; ctx.fillRect(0, 0, W, 7);
+
+  // Helper: rounded rect
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y); ctx.lineTo(x+w-r, y); ctx.arcTo(x+w, y, x+w, y+r, r);
+    ctx.lineTo(x+w, y+h-r); ctx.arcTo(x+w, y+h, x+w-r, y+h, r);
+    ctx.lineTo(x+r, y+h); ctx.arcTo(x, y+h, x, y+h-r, r);
+    ctx.lineTo(x, y+r); ctx.arcTo(x, y, x+r, y, r); ctx.closePath();
+  }
+
+  // WIN badge
+  ctx.fillStyle = 'rgba(34,197,94,.14)'; rr(W/2-72, 190, 144, 56, 28); ctx.fill();
+  ctx.strokeStyle = 'rgba(34,197,94,.5)'; ctx.lineWidth = 2; rr(W/2-72, 190, 144, 56, 28); ctx.stroke();
+  ctx.fillStyle = '#22C55E'; ctx.font = 'bold 22px system-ui,sans-serif';
+  ctx.textAlign = 'center'; ctx.fillText('✓  WIN', W/2, 226);
+
+  // P&L amount
+  const amount = pnlStr.replace('+', '');
+  ctx.fillStyle = '#22C55E';
+  ctx.font = 'bold 118px system-ui,sans-serif';
+  ctx.textAlign = 'center';
+  // Shrink if too long
+  const metrics = ctx.measureText(amount);
+  if (metrics.width > W - 80) ctx.font = 'bold 80px system-ui,sans-serif';
+  ctx.fillText(amount, W/2, 390);
+
+  // "PROFIT" label
+  ctx.fillStyle = 'rgba(255,255,255,.35)';
+  ctx.font = '500 20px system-ui,sans-serif';
+  ctx.letterSpacing = '0.15em';
+  ctx.fillText('PROFIT', W/2, 430);
+  ctx.letterSpacing = '0';
+
+  // Divider line
+  ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(120, 470); ctx.lineTo(W-120, 470); ctx.stroke();
+
+  // Market name
+  ctx.fillStyle = 'rgba(255,255,255,.82)';
+  ctx.font = '500 28px system-ui,sans-serif';
+  ctx.textAlign = 'center';
+  const maxW = W - 120;
+  let mkt = marketName;
+  ctx.font = '500 28px system-ui,sans-serif';
+  while (ctx.measureText(mkt).width > maxW && mkt.length > 20) mkt = mkt.slice(0, -4) + '...';
+  ctx.fillText(mkt, W/2, 520);
+
+  // Outcome pill
+  const outcomeW = ctx.measureText(outcome).width + 40;
+  ctx.fillStyle = 'rgba(147,197,253,.12)';
+  rr(W/2 - outcomeW/2, 538, outcomeW, 38, 19); ctx.fill();
+  ctx.fillStyle = '#93C5FD';
+  ctx.font = 'bold 18px system-ui,sans-serif';
+  ctx.fillText(outcome, W/2, 562);
+
+  // Load logo
+  const logoImg = new Image();
+  logoImg.src = '/logo.png';
+  await new Promise(r => { logoImg.onload = r; logoImg.onerror = r; });
+
+  // Bottom branding card
+  ctx.fillStyle = 'rgba(255,255,255,.04)';
+  rr(120, 680, W-240, 130, 16); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.lineWidth = 1;
+  rr(120, 680, W-240, 130, 16); ctx.stroke();
+
+  // Logo
+  if (logoImg.complete && logoImg.naturalHeight > 0) {
+    ctx.drawImage(logoImg, W/2 - 26, 698, 52, 52);
+  } else {
+    // Fallback: draw gradient circle with J
+    const lg = ctx.createLinearGradient(W/2-26, 698, W/2+26, 750);
+    lg.addColorStop(0, '#2563EB'); lg.addColorStop(1, '#06B6D4');
+    ctx.fillStyle = lg; ctx.beginPath(); ctx.arc(W/2, 724, 26, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 22px system-ui,sans-serif';
+    ctx.fillText('J', W/2, 731);
+  }
+
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 22px system-ui,sans-serif';
+  ctx.fillText('Jonin CT', W/2, 778);
+  ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.font = '16px system-ui,sans-serif';
+  ctx.fillText('Copy trading • Powered by Polymarket', W/2, 802);
+
+  // Bottom tagline
+  ctx.fillStyle = 'rgba(255,255,255,.18)';
+  ctx.font = '15px system-ui,sans-serif';
+  ctx.fillText('joninct.com', W/2, 870);
+
+  // Download / share
+  canvas.toBlob(async blob => {
+    const file = new File([blob], 'jonin-ct-win.png', { type: 'image/png' });
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: 'I made ' + pnlStr + ' on Polymarket with Jonin CT!' }); return; }
+      catch(e) {}
+    }
+    // Fallback: open in new tab
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'jonin-ct-win.png'; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }, 'image/png');
 }
 
 async function deletePosition(conditionId, outcome) {
