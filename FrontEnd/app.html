@@ -926,6 +926,11 @@ async function clearResolvedPositions() {
   try { await api('DELETE', '/dashboard/positions/resolved'); showAlert('dash-alert','Resolved positions cleared.','success'); loadDashboard(); }
   catch(e) { showAlert('dash-alert', e.message); }
 }
+async function resetTraderStats(id) {
+  if (!confirm('Reset stats for this trader? This clears trade history and resolved positions — open positions are kept.')) return;
+  try { await api('POST', '/copy/config/' + id + '/reset-stats'); showAlert('dash-alert','Stats reset.','success'); loadDashboard(); }
+  catch(e) { showAlert('dash-alert', e.message); }
+}
 
 // ── RENDER TRADERS ────────────────────────────────────────────────────────────
 function renderTraders(config) {
@@ -1002,6 +1007,7 @@ function renderTradersHtml(traders) {
         '</div>' +
         '<div style="display:flex;gap:8px;margin-top:12px">' +
           '<button class="btn btn-sm" onclick="clearResolvedPositions()" style="width:auto">Clear resolved</button>' +
+          '<button class="btn btn-sm" onclick="resetTraderStats(\''+t.id+'\')" style="width:auto">Reset stats</button>' +
           '<button class="btn btn-sm btn-red" onclick="deleteTrader(\''+t.id+'\')" style="width:auto">Remove trader</button>' +
         '</div>' +
       '</div>';

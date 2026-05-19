@@ -113,6 +113,14 @@ router.delete('/config/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.post('/config/:id/reset-stats', async (req, res, next) => {
+  try {
+    await db.resetTraderStats(req.userId, req.params.id);
+    statsCache.delete(req.params.id);
+    res.json({ message: 'Stats reset.' });
+  } catch (err) { next(err); }
+});
+
 router.get('/status', async (req, res, next) => {
   try {
     const configs = await db.getCopyConfig(req.userId);

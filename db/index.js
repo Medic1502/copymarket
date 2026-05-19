@@ -286,6 +286,13 @@ async function clearResolvedPositions(userId) {
   await query('DELETE FROM bot_positions WHERE user_id=$1 AND resolved_outcome IS NOT NULL', [userId]);
 }
 
+async function resetTraderStats(userId, configId) {
+  await Promise.all([
+    query('DELETE FROM trades WHERE user_id=$1 AND config_id=$2', [userId, configId]),
+    query('DELETE FROM bot_positions WHERE user_id=$1 AND config_id=$2 AND resolved_outcome IS NOT NULL', [userId, configId]),
+  ]);
+}
+
 async function deleteCopyConfig(id, userId) {
   await query('DELETE FROM copy_configs WHERE id = $1 AND user_id = $2', [id, userId]);
 }
@@ -327,6 +334,6 @@ module.exports = {
   createWalletForUser, getWalletByUserId, getUSDCBalance,
   saveCopyConfig, updateCopyConfig, getCopyConfig, setActive, getAllActiveConfigs, deleteCopyConfig,
   saveTrade, resolveTradeOutcome, getRecentTrades, getDashboardStats, getTodayLoss, getTraderStats,
-  upsertBotPosition, deleteBotPosition, resolveBotPosition, deleteResolvedPosition, getBotPositions, getBotPositionsWithNames, clearBotPositions, clearResolvedPositions,
+  upsertBotPosition, deleteBotPosition, resolveBotPosition, deleteResolvedPosition, getBotPositions, getBotPositionsWithNames, clearBotPositions, clearResolvedPositions, resetTraderStats,
   encryptPrivateKey, decryptPrivateKey,
 };
