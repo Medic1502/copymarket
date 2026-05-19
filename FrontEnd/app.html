@@ -1197,7 +1197,7 @@ async function loadOpenPositions(traders) {
             const out = (p.outcome||'Yes').replace(/'/g, '');
             const mktName  = (name || p.condition_id || '').replace(/'/g, "\\'");
             const shareBtn = isWin
-              ? '<button onclick="event.stopPropagation();shareWin(\'' + mktName + '\',\'' + out + '\',\'' + pnlStr + '\')" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;line-height:1;padding:0 2px;flex-shrink:0" title="Share this win">📤</button>'
+              ? '<button onclick="event.stopPropagation();shareWin(\'' + mktName + '\',\'' + out + '\',\'' + pnlStr + '\')" style="background:none;border:none;color:var(--text3);cursor:pointer;padding:0 2px;flex-shrink:0;display:flex;align-items:center" title="Share this win"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>'
               : '';
             return '<div style="display:flex;align-items:center;gap:8px;background:var(--bg3);border-radius:6px;padding:6px 10px;font-size:12px">' +
               badge +
