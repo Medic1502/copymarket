@@ -148,7 +148,7 @@ async function migrate() {
       )
     `);
     await run(`ALTER TABLE license_keys ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id)`);
-    await run(`UPDATE copy_configs SET min_trader_bet=0, max_share_price=0.88, categories='{}' WHERE min_trader_bet > 0`);
+    // one-time cleanup removed — was resetting max_share_price=0.88 on every restart
 
     await run(`ALTER TABLE copy_configs ADD COLUMN IF NOT EXISTS max_position_size NUMERIC(12,2) DEFAULT NULL`);
 

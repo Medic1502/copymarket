@@ -99,7 +99,7 @@ async function saveCopyConfig(userId, { targetWallet, nickname, notes, copyMode,
   const res = await query(
     `INSERT INTO copy_configs (user_id, target_wallet, nickname, notes, copy_mode, copy_percentage, fixed_amount, min_trader_bet, max_trader_bet, categories, follow_mode, min_share_price, max_share_price, max_position_size)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
-    [userId, targetWallet, nickname||null, notes||null, copyMode||'percentage', copyPercentage||10, fixedAmount||10, minTraderBet||5, maxTraderBet||100000, categories||[], followMode||'all', minSharePrice||0.02, maxSharePrice||0.98, maxPositionSize||null]
+    [userId, targetWallet, nickname||null, notes||null, copyMode||'percentage', copyPercentage||10, fixedAmount||10, minTraderBet??5, maxTraderBet??100000, categories||[], followMode||'all', minSharePrice||0.02, maxSharePrice||0.98, maxPositionSize||null]
   );
   return res.rows[0];
 }
@@ -319,7 +319,7 @@ async function updateCopyConfig(id, userId, { nickname, notes, copyMode, copyPer
      min_share_price=$12, max_share_price=$13, max_position_size=$14, updated_at=NOW()
      WHERE id=$1 AND user_id=$2 RETURNING *`,
     [id, userId, nickname||null, notes||null, copyMode||'percentage', copyPercentage||10, fixedAmount||10,
-     minTraderBet||5, maxTraderBet||100000, categories||[], followMode||'all', minSharePrice||0.02, maxSharePrice||0.98,
+     minTraderBet??5, maxTraderBet??100000, categories||[], followMode||'all', minSharePrice||0.02, maxSharePrice||0.98,
      maxPositionSize||null]
   );
   return res.rows[0];
