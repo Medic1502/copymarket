@@ -286,7 +286,12 @@ div.expand-panel.closed{display:none !important}
     <button onclick="closeWelcome()" style="width:100%;background:linear-gradient(135deg,var(--blue),var(--cyan));border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;padding:12px;cursor:pointer;letter-spacing:.02em">
       Got it — let's go! 🚀
     </button>
-    <div style="text-align:center;margin-top:10px;font-size:11px;color:var(--text3)">You can always find help in the Discord server</div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text3)">
+        <input type="checkbox" id="welcome-dont-show" style="cursor:pointer">
+        Don't show this again
+      </label>
+    </div>
   </div>
 </div>
 
@@ -427,8 +432,40 @@ div.expand-panel.closed{display:none !important}
 
     <!-- ── TRADE HISTORY ───────────────────────────── -->
     <div id="tab-trades" class="tab-panel">
-      <div class="card" id="trades-list">
-        <div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading trades...</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+
+        <!-- Overall Stats -->
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="padding:14px 18px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--text3);text-transform:uppercase">Overall Stats</div>
+          <div id="th-overall" style="padding:6px 0">
+            <div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading...</div>
+          </div>
+        </div>
+
+        <!-- Calendar -->
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)">
+            <button onclick="calNav(-1)" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;padding:3px 10px;font-size:14px">‹</button>
+            <span id="cal-title" style="font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--text3);text-transform:uppercase">— —</span>
+            <button onclick="calNav(1)" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--text2);cursor:pointer;padding:3px 10px;font-size:14px">›</button>
+          </div>
+          <div id="cal-grid" style="padding:12px 14px">
+            <div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading...</div>
+          </div>
+          <div style="display:flex;gap:14px;justify-content:center;padding:8px 14px 12px;font-size:11px;color:var(--text3)">
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:rgba(34,197,94,.5);margin-right:4px"></span>Win day</span>
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:rgba(239,68,68,.4);margin-right:4px"></span>Loss day</span>
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:var(--bg3);margin-right:4px"></span>No trades</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Trades -->
+      <div class="card" style="padding:0;overflow:hidden">
+        <div style="padding:14px 18px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--text3);text-transform:uppercase">Recent Trades</div>
+        <div id="trades-list" style="padding:4px 0">
+          <div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading trades...</div>
+        </div>
       </div>
     </div>
 
@@ -572,7 +609,9 @@ let userName   = localStorage.getItem('cm_username') || null;
 
 function closeWelcome() {
   document.getElementById('welcome-overlay').style.display = 'none';
-  localStorage.setItem('cm_welcomed', '1');
+  if (document.getElementById('welcome-dont-show')?.checked) {
+    localStorage.setItem('cm_welcomed', '1');
+  }
 }
 function maybeShowWelcome() {
   if (!localStorage.getItem('cm_welcomed') && token) {
@@ -590,6 +629,7 @@ function navSwitch(key, el) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   const panel = document.getElementById('tab-' + key);
   if (panel) panel.classList.add('active');
+  if (key === 'trades') loadTradeHistory();
 }
 
 // kept for backward compat if called anywhere
@@ -1423,6 +1463,105 @@ async function refreshPositionPrices() {
       }
     }
   } catch {}
+}
+
+// ── TRADE HISTORY: OVERALL STATS + CALENDAR ───────────────────────────────────
+let _calYear = new Date().getFullYear();
+let _calMonth = new Date().getMonth(); // 0-indexed
+let _dailyData = []; // [{date, pnl, trades}]
+
+async function loadTradeHistory() {
+  try {
+    const data = await api('GET', '/dashboard/daily-stats');
+    _dailyData = data.daily || [];
+    renderOverallStats(data.overall);
+    renderCalendar();
+  } catch {}
+}
+
+function calNav(dir) {
+  _calMonth += dir;
+  if (_calMonth > 11) { _calMonth = 0; _calYear++; }
+  if (_calMonth < 0)  { _calMonth = 11; _calYear--; }
+  renderCalendar();
+}
+
+function renderOverallStats(o) {
+  if (!o) return;
+  const el = document.getElementById('th-overall');
+  if (!el) return;
+  const fmt = (v, plus) => {
+    if (v == null) return '—';
+    const s = (plus && v > 0 ? '+' : v < 0 ? '-' : '') + '$' + Math.abs(v).toFixed(2);
+    return s;
+  };
+  const pct = v => v != null ? v + '%' : '—';
+  const num = v => v != null ? v : '—';
+  const rows = [
+    ['TOTAL RESOLVED',  o.totalResolved,  null],
+    ['WIN RATE',        pct(o.winRate),    o.winRate >= 50 ? 'var(--green)' : 'var(--red)'],
+    ['TOTAL PROFIT',   fmt(o.totalProfit, true), 'var(--green)'],
+    ['TOTAL LOSS',     fmt(o.totalLoss,  false), 'var(--red)'],
+    ['NET PNL',        fmt(o.netPnl,     true),  o.netPnl >= 0 ? 'var(--green)' : 'var(--red)'],
+    ['BEST DAY',       fmt(o.bestDay,    true),  'var(--green)'],
+    ['WORST DAY',      fmt(o.worstDay,   false), 'var(--red)'],
+    ['PROFIT FACTOR',  o.profitFactor != null ? o.profitFactor : '—', null],
+    ['AVG TRADE',      fmt(o.avgTrade,   true),  o.avgTrade >= 0 ? 'var(--green)' : 'var(--red)'],
+  ];
+  el.innerHTML = rows.map(([label, val, color]) =>
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 18px;border-bottom:1px solid var(--border)">' +
+    '<span style="font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.05em">' + label + '</span>' +
+    '<span style="font-size:14px;font-weight:700;color:' + (color || 'var(--text)') + '">' + val + '</span>' +
+    '</div>'
+  ).join('').replace(/border-bottom[^"]+"\s*><\/div>$/, '"></div>');
+}
+
+function renderCalendar() {
+  const titleEl = document.getElementById('cal-title');
+  const gridEl  = document.getElementById('cal-grid');
+  if (!titleEl || !gridEl) return;
+
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  titleEl.textContent = months[_calMonth] + ' ' + _calYear;
+
+  // Build lookup: date string → pnl
+  const lookup = {};
+  _dailyData.forEach(d => { lookup[d.date] = d.pnl; });
+
+  const firstDay = new Date(_calYear, _calMonth, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(_calYear, _calMonth + 1, 0).getDate();
+  const today = new Date().toISOString().slice(0, 10);
+
+  let html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px">';
+  ['S','M','T','W','T','F','S'].forEach(d => {
+    html += '<div style="text-align:center;font-size:10px;font-weight:700;color:var(--text3);padding:2px 0">' + d + '</div>';
+  });
+  html += '</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">';
+
+  for (let i = 0; i < firstDay; i++) html += '<div></div>';
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = _calYear + '-' + String(_calMonth+1).padStart(2,'0') + '-' + String(day).padStart(2,'0');
+    const pnl = lookup[dateStr];
+    const isToday = dateStr === today;
+    const hasTrade = pnl != null;
+    const isWin = hasTrade && pnl > 0;
+    const isLoss = hasTrade && pnl < 0;
+
+    const bg = isWin  ? 'rgba(34,197,94,.18)'
+             : isLoss ? 'rgba(239,68,68,.15)'
+             : 'var(--bg3)';
+    const border = isToday ? '1px solid rgba(147,197,253,.5)' : isWin ? '1px solid rgba(34,197,94,.3)' : isLoss ? '1px solid rgba(239,68,68,.25)' : '1px solid var(--border)';
+    const pnlStr = hasTrade ? ((pnl > 0 ? '+' : '') + (Math.abs(pnl) >= 10 ? Math.round(pnl) : pnl.toFixed(1))) : '';
+    const pnlColor = isWin ? '#22C55E' : isLoss ? '#ef4444' : 'var(--text3)';
+
+    html += '<div style="background:' + bg + ';border:' + border + ';border-radius:6px;padding:5px 3px;text-align:center;min-height:44px;display:flex;flex-direction:column;justify-content:center">' +
+      '<div style="font-size:11px;font-weight:600;color:' + (isToday ? 'var(--blue-light)' : 'var(--text2)') + '">' + day + '</div>' +
+      (pnlStr ? '<div style="font-size:10px;font-weight:700;color:' + pnlColor + ';margin-top:1px">' + pnlStr + '</div>' : '') +
+      '</div>';
+  }
+  html += '</div>';
+  gridEl.innerHTML = html;
 }
 
 // ── RENDER TRADES ─────────────────────────────────────────────────────────────

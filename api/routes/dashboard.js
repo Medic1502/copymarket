@@ -30,6 +30,70 @@ router.get('/trades', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.get('/daily-stats', async (req, res, next) => {
+  try {
+    const { query } = require('../../db/client');
+
+    const [overallRes, dailyRes] = await Promise.all([
+      query(
+        `SELECT
+           COUNT(*) FILTER (WHERE resolved_outcome IS NOT NULL)               AS total_resolved,
+           COUNT(*) FILTER (WHERE resolved_outcome='WON')                     AS wins,
+           COUNT(*) FILTER (WHERE resolved_outcome='LOST')                    AS losses,
+           COALESCE(SUM(resolved_pnl) FILTER (WHERE resolved_pnl > 0), 0)    AS total_profit,
+           COALESCE(SUM(resolved_pnl) FILTER (WHERE resolved_pnl < 0), 0)    AS total_loss,
+           COALESCE(SUM(resolved_pnl), 0)                                     AS net_pnl,
+           COALESCE(AVG(resolved_pnl) FILTER (WHERE resolved_outcome IS NOT NULL), 0) AS avg_trade
+         FROM bot_positions WHERE user_id=$1 AND resolved_outcome IS NOT NULL`,
+        [req.userId]
+      ),
+      query(
+        `SELECT
+           DATE(updated_at) AS date,
+           SUM(resolved_pnl) AS pnl,
+           COUNT(*) AS trades
+         FROM bot_positions
+         WHERE user_id=$1 AND resolved_outcome IS NOT NULL
+         GROUP BY DATE(updated_at)
+         ORDER BY date DESC`,
+        [req.userId]
+      ),
+    ]);
+
+    const o = overallRes.rows[0];
+    const wins = parseInt(o.wins) || 0;
+    const losses = parseInt(o.losses) || 0;
+    const totalProfit = parseFloat(o.total_profit) || 0;
+    const totalLoss = parseFloat(o.total_loss) || 0;
+
+    const daily = dailyRes.rows.map(r => ({
+      date: r.date.toISOString().slice(0, 10),
+      pnl: parseFloat(r.pnl),
+      trades: parseInt(r.trades),
+    }));
+
+    const dailyPnls = daily.map(d => d.pnl);
+    const bestDay  = dailyPnls.length ? Math.max(...dailyPnls) : 0;
+    const worstDay = dailyPnls.length ? Math.min(...dailyPnls) : 0;
+
+    res.json({
+      overall: {
+        totalResolved: parseInt(o.total_resolved) || 0,
+        wins, losses,
+        winRate: wins + losses > 0 ? Math.round(wins / (wins + losses) * 100) : null,
+        totalProfit,
+        totalLoss,
+        netPnl: parseFloat(o.net_pnl) || 0,
+        bestDay,
+        worstDay,
+        profitFactor: totalLoss !== 0 ? parseFloat((totalProfit / Math.abs(totalLoss)).toFixed(2)) : null,
+        avgTrade: parseFloat(o.avg_trade) || 0,
+      },
+      daily,
+    });
+  } catch (err) { next(err); }
+});
+
 router.get('/positions', async (req, res, next) => {
   try {
     const positions = await db.getBotPositionsWithNames(req.userId);
