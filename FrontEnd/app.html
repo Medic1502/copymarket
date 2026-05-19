@@ -105,6 +105,11 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
 .btn-block{width:100%}
 .mode-btn{flex:1}
 .mode-btn.selected{background:var(--blue);color:#fff;border-color:var(--blue)}
+.cat-chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.cat-chip:hover{border-color:var(--blue);color:var(--text)}
+.cat-chip.on{background:rgba(37,99,235,.2);border-color:var(--blue);color:#93C5FD}
+.cat-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.cat-group-label{font-size:11px;font-weight:700;color:var(--text3);min-width:18px}
 
 /* ── TRADERS TABLE ────────────────────────────────── */
 .section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
@@ -429,6 +434,12 @@ div.expand-panel.closed{display:none !important}
             <span style="color:var(--text3);font-size:13px">¢</span>
           </div>
         </div>
+        <!-- Category filter -->
+        <div class="field">
+          <label>Market categories <span style="color:var(--text3);font-weight:400">(optional — empty = copy all)</span></label>
+          <div id="cat-chips" style="display:flex;flex-direction:column;gap:8px;margin-top:6px"></div>
+        </div>
+
         <input type="hidden" id="new-copy-mode" value="fixed">
         <input type="hidden" id="new-follow-mode" value="all">
         <input type="hidden" id="new-min-bet" value="0">
@@ -855,6 +866,57 @@ function toggleCat(el) {
   }
 }
 
+// ── CATEGORY CHIPS ────────────────────────────────────────────────────────────
+const CAT_GROUPS = [
+  { label: '🏈', name: 'Sports', chips: [
+    { id: 'nba',    label: 'NBA' },
+    { id: 'nfl',    label: 'NFL' },
+    { id: 'mlb',    label: 'MLB' },
+    { id: 'nhl',    label: 'NHL' },
+    { id: 'soccer', label: 'Soccer' },
+    { id: 'tennis', label: 'Tennis' },
+    { id: 'golf',   label: 'Golf' },
+    { id: 'mma',    label: 'MMA/UFC' },
+    { id: 'boxing', label: 'Boxing' },
+  ]},
+  { label: '🗳️', name: 'Politics', chips: [
+    { id: 'us-politics',   label: 'US Politics' },
+    { id: 'international', label: 'International' },
+  ]},
+  { label: '💰', name: 'Finance', chips: [
+    { id: 'crypto',   label: 'Crypto' },
+    { id: 'business', label: 'Business' },
+  ]},
+  { label: '🎭', name: 'Entertainment', chips: [
+    { id: 'entertainment', label: 'Pop Culture' },
+  ]},
+];
+
+function renderCatChips(selected) {
+  const container = document.getElementById('cat-chips');
+  if (!container) return;
+  const sel = new Set(selected || []);
+  container.innerHTML = CAT_GROUPS.map(g =>
+    `<div class="cat-group">
+      <span class="cat-group-label" title="${g.name}">${g.label}</span>
+      ${g.chips.map(c =>
+        `<button type="button" class="cat-chip${sel.has(c.id) ? ' on' : ''}" onclick="toggleCat('${c.id}',this)">${c.label}</button>`
+      ).join('')}
+    </div>`
+  ).join('');
+}
+
+function toggleCat(id, btn) {
+  btn.classList.toggle('on');
+}
+
+function getSelectedCats() {
+  return Array.from(document.querySelectorAll('#cat-chips .cat-chip.on')).map(b => {
+    const groups = CAT_GROUPS.flatMap(g => g.chips);
+    return groups.find(c => c.label === b.textContent || b.textContent.trim() === c.label)?.id;
+  }).filter(Boolean);
+}
+
 // ── COPY MODE ────────────────────────────────────────────────────────────────
 function setCopyMode(mode) {
   document.getElementById('new-copy-mode').value = mode;
@@ -893,6 +955,7 @@ function resetAddForm() {
   document.getElementById('new-max-position').value = '';
   document.getElementById('new-min-price').value = '';
   document.getElementById('new-max-price').value = '';
+  renderCatChips([]);
   setCopyMode('fixed');
   setFollowMode('all');
   document.getElementById('add-trader-btn').textContent = 'Start copying';
@@ -936,6 +999,7 @@ function editTrader(t) {
   document.getElementById('new-max-position').value = t.maxPositionSize != null ? t.maxPositionSize : '';
   document.getElementById('new-min-price').value = t.minSharePrice != null ? Math.round(t.minSharePrice * 100) : '';
   document.getElementById('new-max-price').value = t.maxSharePrice != null ? Math.round(t.maxSharePrice * 100) : '';
+  renderCatChips(t.categories || []);
   setFollowMode(t.followMode || 'all');
 
   const hdr = document.getElementById('add-form-title');
@@ -964,7 +1028,7 @@ async function saveEditTrader() {
     const _maxP = document.getElementById('new-max-price').value;
     const minSharePrice = _minP !== '' ? parseFloat(_minP) / 100 : null;
     const maxSharePrice = _maxP !== '' ? parseFloat(_maxP) / 100 : null;
-    await api('PUT', '/copy/config/' + _editingConfigId, { nickname, notes, copyMode, fixedAmount: fixedAmt, copyPercentage: copyPct, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode, minSharePrice, maxSharePrice, maxPositionSize });
+    await api('PUT', '/copy/config/' + _editingConfigId, { nickname, notes, copyMode, fixedAmount: fixedAmt, copyPercentage: copyPct, minTraderBet: 0, maxTraderBet: 100000, categories: getSelectedCats(), followMode, minSharePrice, maxSharePrice, maxPositionSize });
     document.getElementById('add-trader-form').classList.remove('open');
     resetAddForm();
     showAlert('dash-alert', 'Settings updated.', 'success');
@@ -997,7 +1061,7 @@ async function addTrader() {
     const _maxP = document.getElementById('new-max-price').value;
     const minSharePrice = _minP !== '' ? parseFloat(_minP) / 100 : null;
     const maxSharePrice = _maxP !== '' ? parseFloat(_maxP) / 100 : null;
-    await api('POST', '/copy/config', { targetWallet: wallet, nickname, notes, copyMode, fixedAmount: fixedAmt, copyPercentage: copyPct, minTraderBet: 0, maxTraderBet: 100000, categories: [], followMode, minSharePrice, maxSharePrice, maxPositionSize });
+    await api('POST', '/copy/config', { targetWallet: wallet, nickname, notes, copyMode, fixedAmount: fixedAmt, copyPercentage: copyPct, minTraderBet: 0, maxTraderBet: 100000, categories: getSelectedCats(), followMode, minSharePrice, maxSharePrice, maxPositionSize });
     document.getElementById('add-trader-form').classList.remove('open');
     document.getElementById('new-trader-wallet').value = '';
     document.getElementById('new-trader-nickname').value = '';

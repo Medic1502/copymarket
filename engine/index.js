@@ -56,6 +56,35 @@ async function getCachedTokenBid(tokenId) {
   return bid;
 }
 
+function marketMatchesCategories(market, categories) {
+  if (!categories || categories.length === 0) return true;
+  const cat = (market.category || '').toLowerCase();
+  const q   = (market.question || '').toLowerCase();
+  return categories.some(c => {
+    switch (c) {
+      // Sports subcategories — detected via question prefix
+      case 'nba':    return cat === 'sports' && (q.startsWith('nba:') || q.includes(' nba '));
+      case 'nfl':    return cat === 'sports' && (q.startsWith('nfl:') || q.includes(' nfl '));
+      case 'mlb':    return cat === 'sports' && (q.startsWith('mlb:') || q.includes(' mlb ') || q.includes('baseball'));
+      case 'nhl':    return cat === 'sports' && (q.startsWith('nhl:') || q.includes(' nhl ') || q.includes('hockey'));
+      case 'soccer': return cat === 'sports' && (q.includes('soccer') || q.includes(' mls') || q.includes('premier league') || q.includes('champions league') || q.includes('la liga') || q.includes('bundesliga') || q.includes('serie a'));
+      case 'tennis': return cat === 'sports' && (q.includes('tennis') || q.includes('atp') || q.includes('wta') || q.includes('wimbledon') || q.includes('open:'));
+      case 'golf':   return cat === 'sports' && (q.includes('golf') || q.includes('pga') || q.includes('masters'));
+      case 'mma':    return cat === 'sports' && (q.includes('ufc') || q.includes('mma') || q.includes('bellator'));
+      case 'boxing': return cat === 'sports' && q.includes('boxing');
+      // Politics
+      case 'us-politics':   return cat === 'us-current-affairs' || cat === 'politics';
+      case 'international': return cat === 'ukraine & russia' || cat === 'geopolitics' || cat === 'international';
+      // Finance
+      case 'crypto':   return cat === 'crypto';
+      case 'business': return cat === 'business' || cat === 'finance';
+      // Entertainment
+      case 'entertainment': return cat === 'pop-culture' || cat === 'art' || cat === 'awards';
+      default: return false;
+    }
+  });
+}
+
 async function getCachedMarket(conditionId) {
   const c = _marketCache[conditionId];
   if (c && Date.now() - c.ts < MARKET_TTL) return c.data;
@@ -474,6 +503,15 @@ async function processSignalForUser(user, wallet, signal, side) {
         }
         if (user.maxSharePrice != null && signal.price > user.maxSharePrice) {
           logger.info('Skip: price above max cc', { price: signal.price, max: user.maxSharePrice, conditionId: signal.conditionId?.slice(0,10) });
+          return;
+        }
+      }
+
+      // Category filter — uses Gamma market cache (4min TTL, shared across users)
+      if (user.categories && user.categories.length > 0) {
+        const market = await getCachedMarket(signal.conditionId);
+        if (market && !marketMatchesCategories(market, user.categories)) {
+          logger.info('Skip: category not in filter', { cats: user.categories, conditionId: signal.conditionId?.slice(0,10) });
           return;
         }
       }
