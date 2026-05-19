@@ -922,12 +922,14 @@ async function clearPositions() {
   catch(e) { showAlert('dash-alert', e.message); }
 }
 async function clearResolvedPositions() {
-  if (!confirm('Clear resolved (WIN/LOSS) positions from the list?')) return;
+  if (!confirm('Clear all WIN/LOSS positions from the list?\n\nOpen positions will NOT be affected.')) return;
+  if (!confirm('Are you sure? This cannot be undone.')) return;
   try { await api('DELETE', '/dashboard/positions/resolved'); showAlert('dash-alert','Resolved positions cleared.','success'); loadDashboard(); }
   catch(e) { showAlert('dash-alert', e.message); }
 }
 async function resetTraderStats(id) {
-  if (!confirm('Reset stats for this trader? This clears trade history and resolved positions — open positions are kept.')) return;
+  if (!confirm('Reset stats for this trader?\n\nThis will clear:\n• All trade history (copied count, P&L)\n• WIN/LOSS resolved positions\n\nOpen positions are kept.')) return;
+  if (!confirm('Are you sure? Stats cannot be recovered after reset.')) return;
   try { await api('POST', '/copy/config/' + id + '/reset-stats'); showAlert('dash-alert','Stats reset.','success'); loadDashboard(); }
   catch(e) { showAlert('dash-alert', e.message); }
 }
@@ -1256,10 +1258,10 @@ async function loadDashboard() {
 
     document.getElementById('stat-balance').textContent = bal != null ? '$' + bal.toFixed(2) : '—';
     const pnlEl = document.getElementById('stat-pnl');
-    pnlEl.textContent = (pnl>=0?'+':'') + '$' + Math.abs(pnl).toFixed(2);
+    pnlEl.textContent = (pnl>=0?'+':'-') + '$' + Math.abs(pnl).toFixed(2);
     pnlEl.className = 'stat-value ' + (pnl>=0?'pos':'neg');
     const todayEl = document.getElementById('stat-today');
-    todayEl.textContent = (today>=0?'+':'') + '$' + Math.abs(today).toFixed(2);
+    todayEl.textContent = (today>=0?'+':'-') + '$' + Math.abs(today).toFixed(2);
     todayEl.className = 'stat-value ' + (today>=0?'pos':'neg');
     document.getElementById('stat-winrate').textContent    = stats.winRate != null ? stats.winRate + '%' : '—';
     document.getElementById('stat-trades-sub').textContent = (stats.totalTrades||0) + ' trades';
