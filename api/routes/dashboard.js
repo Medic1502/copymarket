@@ -336,4 +336,59 @@ router.delete('/positions', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.post('/share-win', async (req, res, next) => {
+  try {
+    const { default: fetch } = await import('node-fetch');
+    const { imageData, anonymous } = req.body;
+    if (!imageData) return res.status(400).json({ error: 'No image data.' });
+
+    const webhookUrl = process.env.DISCORD_SHARE_WEBHOOK_URL;
+    if (!webhookUrl) return res.status(503).json({ error: 'Share webhook not configured.' });
+
+    // Convert base64 to buffer
+    const base64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const imgBuffer = Buffer.from(base64, 'base64');
+
+    // Get user's Discord info for tagging
+    let discordTag = null;
+    if (!anonymous) {
+      const { query } = require('../../db/client');
+      const r = await query('SELECT discord_user_id, discord_username FROM license_keys WHERE user_id=$1 ORDER BY created_at DESC LIMIT 1', [req.userId]);
+      if (r.rows[0]?.discord_user_id) {
+        discordTag = `<@${r.rows[0].discord_user_id}>`;
+      } else if (r.rows[0]?.discord_username) {
+        discordTag = `**${r.rows[0].discord_username}**`;
+      }
+    }
+
+    const content = discordTag
+      ? `🏆 ${discordTag} just made a winning trade on Polymarket with **Jonin CT**!`
+      : `🏆 Someone just made a winning trade on Polymarket with **Jonin CT**!`;
+
+    // Send to Discord webhook via multipart form
+    const FormData = (await import('node-fetch')).FormData || null;
+    const boundary = '----FormBoundary' + Math.random().toString(36).slice(2);
+    const body = Buffer.concat([
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="content"\r\n\r\n${content}\r\n`),
+      Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="jonin-ct-win.png"\r\nContent-Type: image/png\r\n\r\n`),
+      imgBuffer,
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]);
+
+    const resp = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+      body,
+      timeout: 15000,
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      return res.status(502).json({ error: 'Discord rejected the post.', detail: text.slice(0, 100) });
+    }
+
+    res.json({ ok: true, tagged: !!discordTag });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

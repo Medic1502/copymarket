@@ -238,6 +238,28 @@ div.expand-panel.closed{display:none !important}
 </head>
 <body>
 
+<!-- ══ SHARE MODAL ═══════════════════════════════════════════════════════════ -->
+<div id="share-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9998;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;max-width:420px;width:90%;box-shadow:0 24px 60px rgba(0,0,0,.5)">
+    <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px">Share your win 🏆</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:16px">Post to the Jonin CT Discord community</div>
+    <img id="share-preview" src="" style="width:100%;border-radius:8px;margin-bottom:16px;display:block">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button onclick="doDiscordShare(false)" id="share-tagged-btn" style="background:linear-gradient(135deg,#5865F2,#7289da);border:none;border-radius:8px;color:#fff;font-size:14px;font-weight:700;padding:11px;cursor:pointer">
+        🏷️ Share &amp; tag me in Discord
+      </button>
+      <button onclick="doDiscordShare(true)" id="share-anon-btn" style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;font-weight:600;padding:11px;cursor:pointer">
+        👤 Share anonymously
+      </button>
+      <button onclick="downloadShareImg()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text3);font-size:13px;padding:9px;cursor:pointer">
+        ⬇️ Download image only
+      </button>
+      <button onclick="closeShareModal()" style="background:none;border:none;color:var(--text3);font-size:13px;padding:4px;cursor:pointer">Cancel</button>
+    </div>
+    <div id="share-status" style="margin-top:10px;font-size:12px;text-align:center"></div>
+  </div>
+</div>
+
 <!-- ══ WELCOME MODAL ════════════════════════════════════════════════════════ -->
 <div id="welcome-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:32px 28px;max-width:440px;width:90%;position:relative;box-shadow:0 24px 60px rgba(0,0,0,.5)">
@@ -606,6 +628,44 @@ let token      = localStorage.getItem('cm_token') || null;
 let walletAddr = localStorage.getItem('cm_wallet') || null;
 let userEmail  = localStorage.getItem('cm_email')  || null;
 let userName   = localStorage.getItem('cm_username') || null;
+
+let _shareImgData = null;
+
+function showShareModal(imgDataUrl, pnlStr) {
+  _shareImgData = imgDataUrl;
+  document.getElementById('share-preview').src = imgDataUrl;
+  document.getElementById('share-status').textContent = '';
+  document.getElementById('share-modal').style.display = 'flex';
+}
+function closeShareModal() {
+  document.getElementById('share-modal').style.display = 'none';
+  _shareImgData = null;
+}
+function downloadShareImg() {
+  if (!_shareImgData) return;
+  const a = document.createElement('a');
+  a.href = _shareImgData; a.download = 'jonin-ct-win.png'; a.click();
+  closeShareModal();
+}
+async function doDiscordShare(anonymous) {
+  if (!_shareImgData) return;
+  const tagBtn  = document.getElementById('share-tagged-btn');
+  const anonBtn = document.getElementById('share-anon-btn');
+  const status  = document.getElementById('share-status');
+  tagBtn.disabled = true; anonBtn.disabled = true;
+  status.style.color = 'var(--text3)';
+  status.textContent = 'Posting to Discord...';
+  try {
+    const data = await api('POST', '/dashboard/share-win', { imageData: _shareImgData, anonymous });
+    status.style.color = 'var(--green)';
+    status.textContent = data.tagged ? '✅ Posted & tagged you in #wins!' : '✅ Posted anonymously to Discord!';
+    setTimeout(closeShareModal, 2500);
+  } catch(e) {
+    status.style.color = 'var(--red)';
+    status.textContent = '❌ ' + (e.message || 'Failed to post.');
+    tagBtn.disabled = false; anonBtn.disabled = false;
+  }
+}
 
 function closeWelcome() {
   document.getElementById('welcome-overlay').style.display = 'none';
@@ -1388,25 +1448,15 @@ async function shareWin(marketName, outcome, pnlStr, invested) {
   ctx.fillText('Jonin CT', W/2, 804);
 
   // Social handles
-  ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.font = '14px system-ui,sans-serif';
-  ctx.fillText('𝕏 @joninct   •   discord.gg/joninct', W/2, 828);
+  // Social handles — Twitter big, Discord smaller
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 32px system-ui,sans-serif';
+  ctx.fillText('𝕏 @joninct', W/2, 832);
+  ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.font = '15px system-ui,sans-serif';
+  ctx.fillText('discord.gg/joninct  •  Powered by Polymarket', W/2, 860);
 
-  ctx.fillStyle = 'rgba(255,255,255,.2)'; ctx.font = '13px system-ui,sans-serif';
-  ctx.fillText('Automated copy trading • Powered by Polymarket', W/2, 858);
-
-  // Download / share
-  canvas.toBlob(async blob => {
-    const file = new File([blob], 'jonin-ct-win.png', { type: 'image/png' });
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      try { await navigator.share({ files: [file], title: 'I made ' + pnlStr + ' on Polymarket with Jonin CT!' }); return; }
-      catch(e) {}
-    }
-    // Fallback: open in new tab
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'jonin-ct-win.png'; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
-  }, 'image/png');
+  // Show share modal
+  const imgDataUrl = canvas.toDataURL('image/png');
+  showShareModal(imgDataUrl, pnlStr);
 }
 
 async function deletePosition(conditionId, outcome) {
