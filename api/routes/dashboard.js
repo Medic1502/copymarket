@@ -257,6 +257,13 @@ router.delete('/positions/:conditionId/:outcome', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+router.delete('/positions/resolved', async (req, res, next) => {
+  try {
+    await db.clearResolvedPositions(req.userId);
+    res.json({ message: 'Resolved positions cleared.' });
+  } catch (err) { next(err); }
+});
+
 router.delete('/positions', async (req, res, next) => {
   try {
     await db.clearBotPositions(req.userId);

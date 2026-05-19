@@ -146,26 +146,30 @@ async function saveTrade(userId, trade) {
 }
 
 async function getTraderStats(configId) {
-  const res = await query(
-    `SELECT
-      COUNT(*)         FILTER (WHERE side='BUY'    AND status NOT IN ('FAILED','SKIPPED')) AS total_trades,
-      COALESCE(SUM(pnl) FILTER (WHERE side='REDEEM'), 0)                                  AS total_pnl,
-      COALESCE(SUM(size) FILTER (WHERE side='BUY' AND status NOT IN ('FAILED','SKIPPED')), 0) AS total_invested,
-      COUNT(*)         FILTER (WHERE side='REDEEM' AND pnl > 0)                            AS wins,
-      COUNT(*)         FILTER (WHERE side='REDEEM' AND pnl < 0)                            AS losses
-     FROM trades WHERE config_id = $1`,
+  // BUY trades for copy count + total invested
+  const tradesRes = await query(
+    `SELECT COUNT(*) AS total_trades, COALESCE(SUM(size), 0) AS total_invested
+     FROM trades WHERE config_id=$1 AND side='BUY' AND status NOT IN ('FAILED','SKIPPED')`,
     [configId]
   );
-  const row = res.rows[0];
-  const wins   = parseInt(row.wins)   || 0;
-  const losses = parseInt(row.losses) || 0;
+  // P&L from resolved bot_positions — always has correct config_id regardless of how position was resolved
+  const posRes = await query(
+    `SELECT
+       COALESCE(SUM(resolved_pnl), 0)                               AS total_pnl,
+       COUNT(*) FILTER (WHERE resolved_outcome='WON')                AS wins,
+       COUNT(*) FILTER (WHERE resolved_outcome='LOST')               AS losses
+     FROM bot_positions WHERE config_id=$1 AND resolved_outcome IS NOT NULL`,
+    [configId]
+  );
+  const wins   = parseInt(posRes.rows[0].wins)   || 0;
+  const losses = parseInt(posRes.rows[0].losses) || 0;
   return {
-    totalTrades:   parseInt(row.total_trades)    || 0,
-    totalPnl:      parseFloat(row.total_pnl)     || 0,
-    totalInvested: parseFloat(row.total_invested) || 0,
+    totalTrades:   parseInt(tradesRes.rows[0].total_trades)    || 0,
+    totalPnl:      parseFloat(posRes.rows[0].total_pnl)        || 0,
+    totalInvested: parseFloat(tradesRes.rows[0].total_invested) || 0,
     wins,
     losses,
-    winRate:       wins + losses > 0 ? Math.round(wins / (wins + losses) * 100) : null,
+    winRate: wins + losses > 0 ? Math.round(wins / (wins + losses) * 100) : null,
   };
 }
 
@@ -278,6 +282,10 @@ async function clearBotPositions(userId) {
   await query('DELETE FROM bot_positions WHERE user_id=$1', [userId]);
 }
 
+async function clearResolvedPositions(userId) {
+  await query('DELETE FROM bot_positions WHERE user_id=$1 AND resolved_outcome IS NOT NULL', [userId]);
+}
+
 async function deleteCopyConfig(id, userId) {
   await query('DELETE FROM copy_configs WHERE id = $1 AND user_id = $2', [id, userId]);
 }
@@ -319,6 +327,6 @@ module.exports = {
   createWalletForUser, getWalletByUserId, getUSDCBalance,
   saveCopyConfig, updateCopyConfig, getCopyConfig, setActive, getAllActiveConfigs, deleteCopyConfig,
   saveTrade, resolveTradeOutcome, getRecentTrades, getDashboardStats, getTodayLoss, getTraderStats,
-  upsertBotPosition, deleteBotPosition, resolveBotPosition, deleteResolvedPosition, getBotPositions, getBotPositionsWithNames, clearBotPositions,
+  upsertBotPosition, deleteBotPosition, resolveBotPosition, deleteResolvedPosition, getBotPositions, getBotPositionsWithNames, clearBotPositions, clearResolvedPositions,
   encryptPrivateKey, decryptPrivateKey,
 };

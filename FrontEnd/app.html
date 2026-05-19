@@ -921,6 +921,11 @@ async function clearPositions() {
   try { await api('DELETE', '/dashboard/positions'); showAlert('dash-alert','Positions cleared.','success'); loadDashboard(); }
   catch(e) { showAlert('dash-alert', e.message); }
 }
+async function clearResolvedPositions() {
+  if (!confirm('Clear resolved (WIN/LOSS) positions from the list?')) return;
+  try { await api('DELETE', '/dashboard/positions/resolved'); showAlert('dash-alert','Resolved positions cleared.','success'); loadDashboard(); }
+  catch(e) { showAlert('dash-alert', e.message); }
+}
 
 // ── RENDER TRADERS ────────────────────────────────────────────────────────────
 function renderTraders(config) {
@@ -996,7 +1001,7 @@ function renderTradersHtml(traders) {
           '<span>Wallet: <strong style="font-family:monospace">'+short+'</strong></span>' +
         '</div>' +
         '<div style="display:flex;gap:8px;margin-top:12px">' +
-          '<button class="btn btn-sm" onclick="clearPositions()" style="width:auto">Clear positions</button>' +
+          '<button class="btn btn-sm" onclick="clearResolvedPositions()" style="width:auto">Clear resolved</button>' +
           '<button class="btn btn-sm btn-red" onclick="deleteTrader(\''+t.id+'\')" style="width:auto">Remove trader</button>' +
         '</div>' +
       '</div>';
