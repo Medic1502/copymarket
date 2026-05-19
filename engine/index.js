@@ -23,7 +23,7 @@ async function makeViemSigner(privateKey) {
 const ALGORITHM = 'aes-256-gcm';
 const CLOB_BASE = 'https://clob.polymarket.com';
 const POLL_INTERVAL_MS = 15000;
-const REDEEM_INTERVAL_MS = 5 * 60 * 1000;
+const REDEEM_INTERVAL_MS = 60 * 1000;
 const CHAIN_ID = 137;
 
 const CTF_COLLATERAL_ADAPTER          = '0xAdA100Db00Ca00073811820692005400218FcE1f';

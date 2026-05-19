@@ -1148,9 +1148,10 @@ async function sellPosition(conditionId, outcome, btn) {
 
 async function refreshPositionPrices() {
   try {
-    const { prices } = await api('GET', '/dashboard/positions/prices');
+    const { prices, toResolve } = await api('GET', '/dashboard/positions/prices');
     if (!window._resolving) window._resolving = new Set();
 
+    // Update live price spans and auto-resolve positions with token_id at extremes
     document.querySelectorAll('[data-price-token]').forEach(el => {
       const tokenId    = el.dataset.priceToken;
       const price      = prices[tokenId];
@@ -1162,7 +1163,6 @@ async function refreshPositionPrices() {
         : price >= 0.50 ? 'var(--text2)'
         : 'var(--text3)';
 
-      // Auto-resolve when price hits 100¢ (WIN) or 0¢ (LOSS)
       const conditionId = el.dataset.conditionId;
       const outcome     = el.dataset.outcome;
       const key         = conditionId + '_' + outcome;
@@ -1173,6 +1173,17 @@ async function refreshPositionPrices() {
           .catch(() => window._resolving.delete(key));
       }
     });
+
+    // Auto-resolve old positions (no token_id) where Gamma confirms market is closed
+    for (const p of (toResolve || [])) {
+      const key = p.conditionId + '_' + p.outcome;
+      if (!window._resolving.has(key)) {
+        window._resolving.add(key);
+        api('POST', '/dashboard/positions/' + encodeURIComponent(p.conditionId) + '/' + encodeURIComponent(p.outcome) + '/resolve')
+          .then(() => { window._resolving.delete(key); loadDashboard(); })
+          .catch(() => window._resolving.delete(key));
+      }
+    }
   } catch {}
 }
 

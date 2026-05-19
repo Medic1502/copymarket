@@ -41,15 +41,16 @@ router.get('/positions/prices', async (req, res, next) => {
   try {
     const { default: fetch } = await import('node-fetch');
     const positions = await db.getBotPositions(req.userId);
-    const open = positions.filter(p => p.token_id && parseFloat(p.shares) > 0);
+    const allOpen   = positions.filter(p => parseFloat(p.shares) > 0);
+    const withToken = allOpen.filter(p => p.token_id);
+    const oldPos    = allOpen.filter(p => !p.token_id);
 
-    // Group by conditionId — one CLOB market fetch per unique market
+    // --- CLOB live prices for positions with token_id ---
     const byCondition = {};
-    for (const p of open) {
+    for (const p of withToken) {
       if (!byCondition[p.condition_id]) byCondition[p.condition_id] = [];
       byCondition[p.condition_id].push(p);
     }
-
     const prices = {};
     await Promise.all(Object.entries(byCondition).map(async ([conditionId, posList]) => {
       try {
@@ -57,17 +58,31 @@ router.get('/positions/prices', async (req, res, next) => {
         const market = await r.json();
         const tokens = market.tokens || [];
         for (const pos of posList) {
-          // Match by token_id first, then by outcome_index as fallback
           const token = tokens.find(t => t.token_id === pos.token_id)
             ?? (pos.outcome_index != null ? tokens[pos.outcome_index] : null);
-          if (token?.price != null) {
-            prices[pos.token_id] = parseFloat(token.price);
-          }
+          if (token?.price != null) prices[pos.token_id] = parseFloat(token.price);
         }
       } catch {}
     }));
 
-    res.json({ prices });
+    // --- Gamma closed-market check for old positions (no token_id) ---
+    const toResolve = [];
+    if (oldPos.length > 0) {
+      const uniqueConditions = [...new Set(oldPos.map(p => p.condition_id))];
+      await Promise.all(uniqueConditions.map(async (conditionId) => {
+        try {
+          const r = await fetch(`https://gamma-api.polymarket.com/markets?conditionIds=${conditionId}`, { timeout: 5000 });
+          const arr = await r.json();
+          if (Array.isArray(arr) && arr[0]?.closed) {
+            oldPos
+              .filter(p => p.condition_id === conditionId)
+              .forEach(p => toResolve.push({ conditionId: p.condition_id, outcome: p.outcome }));
+          }
+        } catch {}
+      }));
+    }
+
+    res.json({ prices, toResolve });
   } catch (err) { next(err); }
 });
 
