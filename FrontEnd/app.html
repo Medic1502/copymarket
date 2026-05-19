@@ -1065,7 +1065,8 @@ async function loadOpenPositions(traders) {
           openPos.map(p => {
             const usdc       = parseFloat(p.usdc_spent).toFixed(2);
             const sharesN    = parseFloat(p.shares);
-            const entryPrice = sharesN > 0 ? Math.round((parseFloat(p.usdc_spent) / sharesN) * 100) : 0;
+            const entryRaw   = sharesN > 0 ? (parseFloat(p.usdc_spent) / sharesN) * 100 : 0;
+            const entryPrice = entryRaw > 99 ? '~' + Math.round(entryRaw) : Math.round(entryRaw);
             const name       = p.market_name && p.market_name !== p.condition_id ? p.market_name : null;
             const link       = p.market_slug ? 'https://polymarket.com/event/' + p.market_slug : 'https://polymarket.com/event/' + p.condition_id;
             const nameHtml   = name
