@@ -176,7 +176,7 @@ div.expand-panel.closed{display:none !important}
 .form-section-label{font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px}
 
 /* ── TRADE ROWS ───────────────────────────────────── */
-.trade-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
+.trade-row{display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid var(--border)}
 .trade-row:last-child{border-bottom:none}
 .trade-name{flex:1;min-width:0}
 .trade-market{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1509,7 +1509,7 @@ function renderOverallStats(o) {
     ['TOTAL LOSS',      noData ? '—' : fmt(o.totalLoss,  false),  noData ? null : 'var(--red)'],
     ['NET PNL',         noData ? '—' : fmt(o.netPnl,     true),   noData ? null : o.netPnl >= 0 ? 'var(--green)' : 'var(--red)'],
     ['BEST DAY',        noData ? '—' : fmt(o.bestDay,    true),   noData ? null : 'var(--green)'],
-    ['WORST DAY',       noData ? '—' : fmt(o.worstDay,   false),  noData ? null : o.worstDay < 0 ? 'var(--red)' : 'var(--text)'],
+    ['WORST DAY',       noData ? '—' : fmt(o.worstDay,   true),   noData ? null : o.worstDay > 0 ? 'var(--green)' : o.worstDay < 0 ? 'var(--red)' : 'var(--text)'],
     ['PROFIT FACTOR',   o.profitFactor != null ? o.profitFactor : '—', null],
     ['AVG TRADE',       noData ? '—' : fmt(o.avgTrade,   true),   noData ? null : o.avgTrade >= 0 ? 'var(--green)' : 'var(--red)'],
   ];
