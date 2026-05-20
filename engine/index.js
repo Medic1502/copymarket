@@ -44,9 +44,11 @@ const userConfigCount = {}; // userId -> number of active configs
 const _tokenBidCache = {}; // tokenId -> { bid, ts }
 const _marketCache   = {}; // conditionId -> { data, ts }
 const _balanceCache  = {}; // walletAddress -> { balance, ts }
+const _payoutCache   = {}; // conditionId -> { resolved: bool, winnerIdx: 0|1|null, ts }
 const TOKEN_BID_TTL  = 20 * 1000;       // 20s — one fresh fetch per poll cycle
 const MARKET_TTL     = 4 * 60 * 1000;  // 4min — safe for closed-market detection
 const BALANCE_TTL    = 30 * 1000;      // 30s — fresh enough for trade decisions
+const PAYOUT_TTL     = 2 * 60 * 1000;  // 2min for unresolved; resolved entries cached forever
 
 async function getCachedTokenBid(tokenId) {
   const c = _tokenBidCache[tokenId];
@@ -93,6 +95,40 @@ async function getCachedMarket(conditionId) {
   const data = (Array.isArray(arr) && arr.length > 0) ? arr[0] : null;
   if (data) _marketCache[conditionId] = { data, ts: Date.now() };
   return data;
+}
+
+// On-chain resolution check via CTF payoutDenominator — authoritative, bypasses Gamma lag
+const CTF_ABI_PAYOUT = [
+  'function payoutDenominator(bytes32) view returns (uint256)',
+  'function payoutNumerators(bytes32, uint256) view returns (uint256)',
+];
+const CTF_ADDR = '0x4D97DCd97eC945f40cF65F87097ACe5EA0476045';
+
+async function getOnChainResolution(conditionId, provider) {
+  const cached = _payoutCache[conditionId];
+  if (cached) {
+    if (cached.resolved) return cached;                       // permanent once resolved
+    if (Date.now() - cached.ts < PAYOUT_TTL) return cached;  // unresolved: 2min TTL
+  }
+  try {
+    const ctf   = new ethers.Contract(CTF_ADDR, CTF_ABI_PAYOUT, provider);
+    const denom = await ctf.payoutDenominator(conditionId);
+    if (denom === 0n) {
+      _payoutCache[conditionId] = { resolved: false, winnerIdx: null, ts: Date.now() };
+      return _payoutCache[conditionId];
+    }
+    // Resolved — determine winner (binary market: index 0 or 1)
+    const [num0, num1] = await Promise.all([
+      ctf.payoutNumerators(conditionId, 0),
+      ctf.payoutNumerators(conditionId, 1),
+    ]);
+    const winnerIdx = num0 > 0n ? 0 : (num1 > 0n ? 1 : null);
+    _payoutCache[conditionId] = { resolved: true, winnerIdx, ts: Date.now() };
+    return _payoutCache[conditionId];
+  } catch (e) {
+    logger.warn('getOnChainResolution failed', { conditionId: conditionId?.slice(0, 10), error: e.message });
+    return { resolved: false, winnerIdx: null, ts: Date.now() };
+  }
 }
 
 async function getWalletBalanceCached(eoaAddress) {
@@ -622,31 +658,32 @@ async function checkAndRedeemPositions(user, wallet) {
         const conditionId = pos.condition_id;
 
         const market = await getCachedMarket(conditionId);
-        if (!market) continue;
 
-        // FIX: Gamma API uses "closed", not "resolved"
-        if (!market.closed) continue;
+        // Primary: Gamma closed flag. Fallback: on-chain payoutDenominator (authoritative, bypasses Gamma lag)
+        let onChainRes = null;
+        if (!market?.closed) {
+          onChainRes = await getOnChainResolution(conditionId, provider);
+          if (!onChainRes.resolved) continue; // not resolved by either source
+          logger.info('Market resolved on-chain but Gamma not updated yet', { conditionId: conditionId.slice(0, 10) });
+        }
 
-        // FIX: outcomePrices and clobTokenIds come as JSON strings, not arrays
-        const outcomePrices = typeof market.outcomePrices === 'string'
-          ? JSON.parse(market.outcomePrices)
-          : (market.outcomePrices || []);
-        const clobTokenIds = typeof market.clobTokenIds === 'string'
-          ? JSON.parse(market.clobTokenIds)
-          : (market.clobTokenIds || []);
+        const outcomePrices = market ? (
+          typeof market.outcomePrices === 'string' ? JSON.parse(market.outcomePrices) : (market.outcomePrices || [])
+        ) : [];
+        const clobTokenIds = market ? (
+          typeof market.clobTokenIds === 'string' ? JSON.parse(market.clobTokenIds) : (market.clobTokenIds || [])
+        ) : [];
 
-        // FIX: use outcome_index for winner detection, not string matching
-        // Fallback 1: match via saved token_id -> clobTokenIds
+        // Determine which outcome index we hold
+        // Priority: saved outcome_index → token_id match → on-chain CTF balance
         let ourIdx = pos.outcome_index;
         if (ourIdx == null && pos.token_id && clobTokenIds.length > 0) {
           const found = clobTokenIds.findIndex(tid => tid === pos.token_id);
           if (found >= 0) ourIdx = found;
         }
-        // Fallback 2 (old positions): check on-chain CTF ERC-1155 balances
-        // Polymarket CTF contract holds conditional tokens — balanceOf tells us which side we bought
         if (ourIdx == null && clobTokenIds.length >= 2) {
           const ctfAbi = ['function balanceOf(address,uint256) view returns (uint256)'];
-          const ctf = new ethers.Contract('0x4D97DCd97eC945f40cF65F87097ACe5EA0476045', ctfAbi, provider);
+          const ctf = new ethers.Contract(CTF_ADDR, ctfAbi, provider);
           const [bal0, bal1] = await Promise.all([
             ctf.balanceOf(depositAddr, BigInt(clobTokenIds[0])).catch(() => 0n),
             ctf.balanceOf(depositAddr, BigInt(clobTokenIds[1])).catch(() => 0n),
@@ -654,11 +691,18 @@ async function checkAndRedeemPositions(user, wallet) {
           if (bal0 > 0n) ourIdx = 0;
           else if (bal1 > 0n) ourIdx = 1;
           else {
-            // No balance on either side — already redeemed on-chain or never filled
+            // No balance — already redeemed or never filled; clean up
             logger.info('No CTF balance, cleaning up DB position', { conditionId: conditionId.slice(0, 10) });
-            const winnerIdx = outcomePrices.findIndex(p => parseFloat(p) >= 0.99);
-            const cleanPnl  = winnerIdx < 0 ? -parseFloat(pos.usdc_spent) : 0;
-            await db.resolveBotPosition(user.id, conditionId, pos.outcome, 'LOST', cleanPnl).catch(() => {});
+            // Use on-chain winner if available, otherwise fall back to Gamma prices
+            const onChain = onChainRes ?? await getOnChainResolution(conditionId, provider);
+            let cleanOutcome = 'LOST';
+            if (onChain.resolved && onChain.winnerIdx != null) {
+              // We don't know ourIdx (no balance), treat as LOST for cleanup
+            } else {
+              const winnerIdx = outcomePrices.findIndex(p => parseFloat(p) >= 0.99);
+              if (winnerIdx < 0) cleanOutcome = 'LOST';
+            }
+            await db.resolveBotPosition(user.id, conditionId, pos.outcome, cleanOutcome, -parseFloat(pos.usdc_spent)).catch(() => {});
             continue;
           }
         }
@@ -667,7 +711,21 @@ async function checkAndRedeemPositions(user, wallet) {
           continue;
         }
 
-        const isWinner  = Array.isArray(outcomePrices) && parseFloat(outcomePrices[ourIdx]) >= 0.99;
+        // Winner determination: on-chain payoutNumerators is authoritative (works for 99¢ traders too)
+        // Fall back to Gamma outcomePrices only if on-chain check wasn't done
+        let isWinner;
+        if (onChainRes?.resolved && onChainRes.winnerIdx != null) {
+          isWinner = onChainRes.winnerIdx === ourIdx;
+        } else if (onChainRes?.resolved && onChainRes.winnerIdx == null) {
+          // payoutDenominator was set but no clear winner (shouldn't happen in binary markets)
+          isWinner = Array.isArray(outcomePrices) && parseFloat(outcomePrices[ourIdx]) >= 0.99;
+        } else {
+          // Gamma path: check outcomePrices or fetch fresh on-chain to be safe
+          const fresh = await getOnChainResolution(conditionId, provider);
+          isWinner = fresh.resolved && fresh.winnerIdx != null
+            ? fresh.winnerIdx === ourIdx
+            : (Array.isArray(outcomePrices) && parseFloat(outcomePrices[ourIdx]) >= 0.99);
+        }
         const shares    = parseFloat(pos.shares);
         const usdcSpent = parseFloat(pos.usdc_spent);
         const pnl       = isWinner ? parseFloat((shares - usdcSpent).toFixed(4)) : -usdcSpent;
