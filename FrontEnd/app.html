@@ -1628,15 +1628,21 @@ async function shareWin(marketName, outcome, pnlStr, invested) {
   ctx.fillStyle = '#fff';
   ctx.fillText(outcome, L + 16, outY + 23);
 
-  // Profit amount — strip +/- and $
-  const amount = pnlStr.replace(/[+\-$]/g, '');
+  // Compute numbers
+  const pnlNet     = parseFloat(pnlStr.replace(/[+\-$]/g, '')) * (pnlStr.startsWith('-') ? -1 : 1);
+  const investedNum = parseFloat(invested) || 0;
+  const totalWon   = investedNum + pnlNet;           // total received = invested + net profit
+  const profitStr  = (pnlNet >= 0 ? '+' : '-') + '$' + Math.abs(pnlNet).toFixed(2);
+
+  // Big number = total received
+  const totalStr = '$' + totalWon.toFixed(2);
   const profY = outY + 220;
   let profFont = 'bold 170px system-ui,sans-serif';
   ctx.font = profFont;
-  if (ctx.measureText('$' + amount).width > maxTW + 100) profFont = 'bold 130px system-ui,sans-serif';
+  if (ctx.measureText(totalStr).width > maxTW + 100) profFont = 'bold 130px system-ui,sans-serif';
   ctx.font = profFont;
 
-  // Green glow effect
+  // Green glow
   ctx.save();
   ctx.shadowColor = '#22C55E';
   ctx.shadowBlur = 40;
@@ -1645,24 +1651,23 @@ async function shareWin(marketName, outcome, pnlStr, invested) {
   profGrad.addColorStop(0.5, '#4ade80');
   profGrad.addColorStop(1, '#16a34a');
   ctx.fillStyle = profGrad;
-  ctx.fillText('$' + amount, L, profY);
+  ctx.fillText(totalStr, L, profY);
   ctx.restore();
 
-  // PROFIT label — bigger, more space
+  // PROFIT label
   ctx.fillStyle = 'rgba(255,255,255,.45)';
   ctx.font = '700 26px system-ui,sans-serif';
   ctx.letterSpacing = '0.25em';
   ctx.fillText('PROFIT', L, profY + 68);
   ctx.letterSpacing = '0';
 
-  // INVESTED / ROI boxes — bigger
-  const pnlNum = parseFloat(amount) * (pnlStr.startsWith('-') ? -1 : 1);
-  const investedNum = parseFloat(invested) || 0;
-  const roi = investedNum > 0 ? (pnlNum / investedNum) * 100 : 0;
-  const roiStr = (roi >= 0 ? '+' : '') + roi.toFixed(1) + '%';
+  // INVESTED / PROFIT boxes
   const bxY = profY + 100, bxH = 110, bxW = 270, bxGap = 18;
+  const boxLabels = ['INVESTED', 'PROFIT'];
+  const boxValues = ['$' + investedNum.toFixed(2), profitStr];
+  const boxColors = ['#fff', pnlNet >= 0 ? '#22C55E' : '#ef4444'];
 
-  [0, 1].forEach(i => {
+  boxLabels.forEach((label, i) => {
     const bx = L + i * (bxW + bxGap);
     ctx.fillStyle = 'rgba(255,255,255,.07)';
     rr(bx, bxY, bxW, bxH, 14); ctx.fill();
@@ -1671,11 +1676,11 @@ async function shareWin(marketName, outcome, pnlStr, invested) {
     ctx.fillStyle = 'rgba(255,255,255,.45)';
     ctx.font = '700 14px system-ui,sans-serif';
     ctx.letterSpacing = '0.12em';
-    ctx.fillText(i === 0 ? 'INVESTED' : 'ROI', bx + 20, bxY + 32);
+    ctx.fillText(label, bx + 20, bxY + 32);
     ctx.letterSpacing = '0';
-    ctx.fillStyle = i === 0 ? '#fff' : (roi >= 0 ? '#22C55E' : '#ef4444');
+    ctx.fillStyle = boxColors[i];
     ctx.font = 'bold 42px system-ui,sans-serif';
-    ctx.fillText(i === 0 ? '$' + investedNum.toFixed(2) : roiStr, bx + 20, bxY + 84);
+    ctx.fillText(boxValues[i], bx + 20, bxY + 84);
   });
 
   // Show share modal
