@@ -60,9 +60,8 @@ function marketMatchesCategories(market, categories) {
   if (!categories || categories.length === 0) return true;
   const cat = (market.category || '').toLowerCase();
   const q   = (market.question || '').toLowerCase();
-  return categories.some(c => {
+  const matchId = c => {
     switch (c) {
-      // Sports subcategories — detected via question prefix
       case 'nba':    return cat === 'sports' && (q.startsWith('nba:') || q.includes(' nba '));
       case 'nfl':    return cat === 'sports' && (q.startsWith('nfl:') || q.includes(' nfl '));
       case 'mlb':    return cat === 'sports' && (q.startsWith('mlb:') || q.includes(' mlb ') || q.includes('baseball'));
@@ -72,17 +71,19 @@ function marketMatchesCategories(market, categories) {
       case 'golf':   return cat === 'sports' && (q.includes('golf') || q.includes('pga') || q.includes('masters'));
       case 'mma':    return cat === 'sports' && (q.includes('ufc') || q.includes('mma') || q.includes('bellator'));
       case 'boxing': return cat === 'sports' && q.includes('boxing');
-      // Politics
       case 'us-politics':   return cat === 'us-current-affairs' || cat === 'politics';
       case 'international': return cat === 'ukraine & russia' || cat === 'geopolitics' || cat === 'international';
-      // Finance
       case 'crypto':   return cat === 'crypto';
       case 'business': return cat === 'business' || cat === 'finance';
-      // Entertainment
       case 'entertainment': return cat === 'pop-culture' || cat === 'art' || cat === 'awards';
       default: return false;
     }
-  });
+  };
+  const whitelist = categories.filter(c => !c.startsWith('!'));
+  const blacklist = categories.filter(c => c.startsWith('!')).map(c => c.slice(1));
+  if (blacklist.length > 0 && blacklist.some(matchId)) return false;
+  if (whitelist.length > 0) return whitelist.some(matchId);
+  return true;
 }
 
 async function getCachedMarket(conditionId) {
