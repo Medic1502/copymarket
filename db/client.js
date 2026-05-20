@@ -181,6 +181,9 @@ async function migrate() {
       WHERE bp.condition_id = t.condition_id AND bp.market_name IS NULL
     `);
 
+    // Entry timestamp for positions (when bot first copied the trade)
+    await run(`ALTER TABLE bot_positions ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()`);
+
     // Backfill config_id on trades that were saved before the column existed
     await run(`
       UPDATE trades t
