@@ -1339,24 +1339,39 @@ function renderOpenPositions(traders, positions) {
       return new Date(b.created_at || 0) - new Date(a.created_at || 0);
     });
 
+    const COL = '1fr 126px 72px 72px 100px 50px';
+
     let html = '';
     if (openPos.length > 0) {
       const sortBtns = [['time','Time'],['invested','Traded'],['price','Price'],['towin','To Win']].map(([s, label]) => {
         const active = sort === s;
         return '<button onclick="event.stopPropagation();changePosSort(\'' + s + '\')" style="' +
-          'background:' + (active ? 'rgba(99,102,241,.2)' : 'transparent') + ';' +
-          'border:1px solid ' + (active ? 'rgba(99,102,241,.45)' : 'var(--border)') + ';' +
-          'color:' + (active ? 'var(--blue-light)' : 'var(--text3)') + ';' +
-          'font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;cursor:pointer;white-space:nowrap">' +
+          'background:' + (active ? 'var(--blue)' : 'transparent') + ';' +
+          'border:1px solid ' + (active ? 'var(--blue)' : 'var(--border)') + ';' +
+          'color:' + (active ? '#fff' : 'var(--text3)') + ';' +
+          'font-size:10.5px;font-weight:600;padding:3px 10px;border-radius:6px;cursor:pointer;white-space:nowrap;transition:all .15s">' +
           label + '</button>';
       }).join('');
 
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">' +
-        '<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Open Positions (' + openPos.length + ')</div>' +
-        '<div style="display:flex;gap:4px">' + sortBtns + '</div>' +
-        '</div>' +
-        '<div style="display:flex;flex-direction:column;gap:4px">' +
-        openPos.map(p => {
+      // Header bar
+      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:rgba(255,255,255,.03);border-radius:8px 8px 0 0;border:1px solid var(--border);border-bottom:none;margin-bottom:0">' +
+        '<span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em">Open Positions (' + openPos.length + ')</span>' +
+        '<div style="display:flex;gap:5px">' + sortBtns + '</div>' +
+        '</div>';
+
+      // Column labels
+      html += '<div style="display:grid;grid-template-columns:' + COL + ';padding:5px 10px;border:1px solid var(--border);border-bottom:1px solid var(--border);background:rgba(255,255,255,.015)">' +
+        '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">Market</div>' +
+        '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">AVG → NOW</div>' +
+        '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">Traded</div>' +
+        '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">To Win</div>' +
+        '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">Value</div>' +
+        '<div></div>' +
+        '</div>';
+
+      // Rows
+      html += '<div style="border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;overflow:hidden">' +
+        openPos.map((p, i) => {
           const usdc       = parseFloat(p.usdc_spent).toFixed(2);
           const sharesN    = parseFloat(p.shares);
           const entryRaw   = sharesN > 0 ? (parseFloat(p.usdc_spent) / sharesN) * 100 : 0;
@@ -1364,27 +1379,37 @@ function renderOpenPositions(traders, positions) {
           const name       = p.market_name && p.market_name !== p.condition_id ? p.market_name : null;
           const link       = p.market_slug ? 'https://polymarket.com/event/' + p.market_slug : 'https://polymarket.com/event/' + p.condition_id;
           const nameHtml   = name
-            ? '<a href="' + link + '" target="_blank" style="color:var(--text);text-decoration:none;font-weight:600" onclick="event.stopPropagation()">' + name + ' ↗</a>'
+            ? '<a href="' + link + '" target="_blank" style="color:var(--text);text-decoration:none;font-size:12.5px;font-weight:600;line-height:1.3" onclick="event.stopPropagation()">' + name + ' ↗</a>'
             : '<a href="' + link + '" target="_blank" style="color:var(--text2);text-decoration:none;font-family:monospace;font-size:11px" onclick="event.stopPropagation()">' + (p.condition_id||'').slice(0,14) + '... ↗</a>';
           const entryFrac  = sharesN > 0 ? parseFloat(p.usdc_spent) / sharesN : 0;
           const liveSpan   = p.token_id
-            ? '<span data-price-token="' + p.token_id + '" data-condition-id="' + p.condition_id + '" data-outcome="' + (p.outcome||'Yes').replace(/"/g,'') + '" data-entry="' + entryFrac.toFixed(4) + '" style="color:var(--text3)">—</span>'
+            ? '<span data-price-token="' + p.token_id + '" data-condition-id="' + p.condition_id + '" data-outcome="' + (p.outcome||'Yes').replace(/"/g,'') + '" data-entry="' + entryFrac.toFixed(4) + '" style="color:var(--text)">—</span>'
             : '<span style="color:var(--text3)">—</span>';
           const toWin      = sharesN.toFixed(2);
           const valueSpan  = p.token_id
-            ? '<span data-value-token="' + p.token_id + '" data-value-shares="' + sharesN + '" data-value-invested="' + usdc + '" style="display:flex;flex-direction:column;align-items:flex-end"><span style="font-weight:600;color:var(--text)">—</span></span>'
+            ? '<span data-value-token="' + p.token_id + '" data-value-shares="' + sharesN + '" data-value-invested="' + usdc + '" style="display:flex;flex-direction:column"><span style="font-size:13px;font-weight:700;color:var(--text)">—</span></span>'
             : '<span style="color:var(--text3)">—</span>';
-          const cid = p.condition_id.replace(/'/g, '');
-          const out = (p.outcome||'Yes').replace(/'/g, '');
-          const entryDate = p.created_at ? fmtDateTime(p.created_at) : '';
-          return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:6px;padding:6px 10px;font-size:12px;gap:8px" title="' + entryDate + '">' +
-            '<span style="background:var(--green-dim);color:var(--green);font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px;flex-shrink:0">OPEN</span>' +
-            '<span style="color:var(--text2);min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + nameHtml + ' <strong style="color:var(--blue-light)">' + (p.outcome||'Yes') + '</strong></span>' +
-            '<span style="color:var(--text3);font-size:11px;flex-shrink:0;white-space:nowrap">' + entryPrice + '¢ → ' + liveSpan + '</span>' +
-            '<span style="color:var(--text2);font-weight:600;flex-shrink:0" title="Traded">$' + usdc + '</span>' +
-            '<span style="color:var(--text2);flex-shrink:0" title="To Win">$' + toWin + '</span>' +
-            '<div style="flex-shrink:0;text-align:right;min-width:64px" title="Current value">' + valueSpan + '</div>' +
-            '<button onclick="event.stopPropagation();sellPosition(\'' + cid + '\',\'' + out + '\',this)" style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#ef4444;cursor:pointer;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;flex-shrink:0;white-space:nowrap" title="Sell position at market price">SELL</button>' +
+          const cid        = p.condition_id.replace(/'/g, '');
+          const out        = (p.outcome||'Yes').replace(/'/g, '');
+          const entryDate  = p.created_at ? fmtDateTime(p.created_at) : '';
+          const rowBg      = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,.015)';
+          const outcomePill= '<span style="display:inline-block;background:rgba(99,102,241,.18);color:var(--blue-light);font-size:10.5px;font-weight:600;padding:1px 7px;border-radius:20px;white-space:nowrap;margin-top:2px">' + (p.outcome||'Yes') + '</span>';
+          return '<div style="display:grid;grid-template-columns:' + COL + ';align-items:center;padding:8px 10px;background:' + rowBg + ';border-top:' + (i>0?'1px solid var(--border)':'none') + '" title="' + entryDate + '">' +
+            // Market col
+            '<div style="display:flex;align-items:flex-start;gap:7px;min-width:0">' +
+              '<span style="background:var(--green-dim);color:var(--green);font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:5px;flex-shrink:0;margin-top:2px">OPEN</span>' +
+              '<div style="min-width:0"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + nameHtml + '</div>' + outcomePill + '</div>' +
+            '</div>' +
+            // AVG → NOW
+            '<div style="font-size:12px;color:var(--text2);white-space:nowrap">' + entryPrice + '¢ → ' + liveSpan + '</div>' +
+            // TRADED
+            '<div style="font-size:13px;font-weight:600;color:var(--text)">$' + usdc + '</div>' +
+            // TO WIN
+            '<div style="font-size:13px;font-weight:600;color:var(--text)">$' + toWin + '</div>' +
+            // VALUE
+            '<div>' + valueSpan + '</div>' +
+            // SELL
+            '<div><button onclick="event.stopPropagation();sellPosition(\'' + cid + '\',\'' + out + '\',this)" style="background:#ef4444;border:none;color:#fff;cursor:pointer;font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:6px;white-space:nowrap;width:100%;transition:opacity .15s" onmouseover="this.style.opacity=.8" onmouseout="this.style.opacity=1">SELL</button></div>' +
             '</div>';
         }).join('') + '</div>';
     }
@@ -1638,8 +1663,8 @@ async function refreshPositionPrices() {
       const pnlColor = pnl >= 0 ? 'var(--green)' : 'var(--red)';
       const pnlSign  = pnl >= 0 ? '+' : '-';
       el.innerHTML =
-        '<span style="font-weight:600;color:var(--text)">$' + value.toFixed(2) + '</span>' +
-        '<span style="font-size:10px;color:' + pnlColor + '">' + pnlSign + '$' + Math.abs(pnl).toFixed(2) + ' (' + Math.abs(roi) + '%)</span>';
+        '<span style="font-size:13px;font-weight:700;color:var(--text)">$' + value.toFixed(2) + '</span>' +
+        '<span style="font-size:10.5px;color:' + pnlColor + ';margin-top:1px">' + pnlSign + '$' + Math.abs(pnl).toFixed(2) + ' (' + Math.abs(roi) + '%)</span>';
     });
 
     // Update Portfolio live value: sum of (shares × live_price) across all open positions
