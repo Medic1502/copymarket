@@ -1304,13 +1304,19 @@ function renderTradersHtml(traders) {
   loadOpenPositions(traders);
 }
 
-window._posSort = 'time';
+window._posSort    = 'time';
+window._posSortDir = 'desc';
 window._lastPositions = null;
 window._lastTraders   = null;
 window._livePrices    = {};
 
 function changePosSort(key) {
-  window._posSort = key;
+  if (window._posSort === key) {
+    window._posSortDir = window._posSortDir === 'desc' ? 'asc' : 'desc';
+  } else {
+    window._posSort    = key;
+    window._posSortDir = 'desc';
+  }
   if (window._lastPositions && window._lastTraders) {
     renderOpenPositions(window._lastTraders, window._lastPositions);
     refreshPositionPrices();
@@ -1328,44 +1334,50 @@ function renderOpenPositions(traders, positions) {
 
     // Sort open positions
     const sort = window._posSort || 'time';
+    const dir  = window._posSortDir === 'asc' ? 1 : -1;
     openPos.sort((a, b) => {
-      if (sort === 'invested') return parseFloat(b.usdc_spent) - parseFloat(a.usdc_spent);
-      if (sort === 'towin')    return parseFloat(b.shares) - parseFloat(a.shares);
+      if (sort === 'invested') return dir * (parseFloat(a.usdc_spent) - parseFloat(b.usdc_spent));
+      if (sort === 'towin')    return dir * (parseFloat(a.shares)     - parseFloat(b.shares));
       if (sort === 'price') {
         const pa = window._livePrices[a.token_id] ?? 0;
         const pb = window._livePrices[b.token_id] ?? 0;
-        return pb - pa;
+        return dir * (pa - pb);
       }
-      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+      if (sort === 'value') {
+        const va = parseFloat(a.shares) * (window._livePrices[a.token_id] ?? 0);
+        const vb = parseFloat(b.shares) * (window._livePrices[b.token_id] ?? 0);
+        return dir * (va - vb);
+      }
+      return dir * (new Date(a.created_at || 0) - new Date(b.created_at || 0));
     });
 
     const COL = '1fr 126px 72px 72px 100px 50px';
 
+    // Sort arrow helper
+    function colArrow(key) {
+      if (sort !== key) return '<svg width="9" height="9" viewBox="0 0 10 14" fill="none" style="vertical-align:middle;margin-left:3px;opacity:.45"><path d="M5 1v12M2 4l3-3 3 3M2 10l3 3 3-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      const up = window._posSortDir === 'asc';
+      return '<svg width="9" height="9" viewBox="0 0 10 14" fill="none" style="vertical-align:middle;margin-left:3px"><path d="' + (up ? 'M2 10l3 3 3-3M5 13V1' : 'M2 4l3-3 3 3M5 1v12') + '" stroke="var(--blue-light)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    }
+    function colHdr(key, label) {
+      const active = sort === key;
+      return '<button onclick="event.stopPropagation();changePosSort(\'' + key + '\')" style="background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;gap:1px;font-size:10px;font-weight:700;color:' + (active ? 'var(--text)' : 'var(--text3)') + ';text-transform:uppercase;letter-spacing:.07em;white-space:nowrap">' + label + colArrow(key) + '</button>';
+    }
+
     let html = '';
     if (openPos.length > 0) {
-      const sortBtns = [['time','Time'],['invested','Traded'],['price','Price'],['towin','To Win']].map(([s, label]) => {
-        const active = sort === s;
-        return '<button onclick="event.stopPropagation();changePosSort(\'' + s + '\')" style="' +
-          'background:' + (active ? 'var(--blue)' : 'transparent') + ';' +
-          'border:1px solid ' + (active ? 'var(--blue)' : 'var(--border)') + ';' +
-          'color:' + (active ? '#fff' : 'var(--text3)') + ';' +
-          'font-size:10.5px;font-weight:600;padding:3px 10px;border-radius:6px;cursor:pointer;white-space:nowrap;transition:all .15s">' +
-          label + '</button>';
-      }).join('');
-
-      // Header bar
-      html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:rgba(255,255,255,.03);border-radius:8px 8px 0 0;border:1px solid var(--border);border-bottom:none;margin-bottom:0">' +
+      // Header bar — title only, no pills
+      html += '<div style="padding:8px 10px;background:rgba(255,255,255,.03);border-radius:8px 8px 0 0;border:1px solid var(--border);border-bottom:none">' +
         '<span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em">Open Positions (' + openPos.length + ')</span>' +
-        '<div style="display:flex;gap:5px">' + sortBtns + '</div>' +
         '</div>';
 
-      // Column labels
+      // Clickable column labels with sort arrows
       html += '<div style="display:grid;grid-template-columns:' + COL + ';padding:5px 10px;border:1px solid var(--border);border-bottom:1px solid var(--border);background:rgba(255,255,255,.015)">' +
         '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">Market</div>' +
-        '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">AVG → NOW</div>' +
-        '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">Traded</div>' +
-        '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">To Win</div>' +
-        '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em">Value</div>' +
+        '<div>' + colHdr('price',    'AVG → NOW') + '</div>' +
+        '<div>' + colHdr('invested', 'Traded')    + '</div>' +
+        '<div>' + colHdr('towin',    'To Win')    + '</div>' +
+        '<div>' + colHdr('value',    'Value')     + '</div>' +
         '<div></div>' +
         '</div>';
 
