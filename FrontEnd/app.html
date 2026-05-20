@@ -108,6 +108,7 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
 .cat-chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
 .cat-chip:hover{border-color:var(--blue);color:var(--text)}
 .cat-chip.on{background:rgba(37,99,235,.2);border-color:var(--blue);color:#93C5FD}
+.cat-chip.blocked{background:rgba(239,68,68,.15);border-color:#EF4444;color:#FCA5A5}
 .cat-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .cat-group-label{font-size:11px;font-weight:700;color:var(--text3);min-width:18px}
 
@@ -868,26 +869,39 @@ const CAT_GROUPS = [
 function renderCatChips(selected) {
   const container = document.getElementById('cat-chips');
   if (!container) return;
-  const sel = new Set(selected || []);
+  const whitelist = new Set((selected || []).filter(c => !c.startsWith('!')));
+  const blacklist = new Set((selected || []).filter(c => c.startsWith('!')).map(c => c.slice(1)));
   container.innerHTML = CAT_GROUPS.map(g =>
     `<div class="cat-group">
       <span class="cat-group-label" title="${g.name}">${g.label}</span>
-      ${g.chips.map(c =>
-        `<button type="button" class="cat-chip${sel.has(c.id) ? ' on' : ''}" onclick="toggleCat('${c.id}',this)">${c.label}</button>`
-      ).join('')}
+      ${g.chips.map(c => {
+        const cls = whitelist.has(c.id) ? ' on' : blacklist.has(c.id) ? ' blocked' : '';
+        return `<button type="button" class="cat-chip${cls}" data-cat-id="${c.id}" onclick="toggleCat('${c.id}',this)">${c.label}</button>`;
+      }).join('')}
     </div>`
   ).join('');
 }
 
 function toggleCat(id, btn) {
-  btn.classList.toggle('on');
+  if (btn.classList.contains('blocked')) {
+    btn.classList.remove('blocked');
+  } else if (btn.classList.contains('on')) {
+    btn.classList.remove('on');
+    btn.classList.add('blocked');
+  } else {
+    btn.classList.add('on');
+  }
 }
 
 function getSelectedCats() {
-  return Array.from(document.querySelectorAll('#cat-chips .cat-chip.on')).map(b => {
-    const groups = CAT_GROUPS.flatMap(g => g.chips);
-    return groups.find(c => c.label === b.textContent || b.textContent.trim() === c.label)?.id;
-  }).filter(Boolean);
+  const result = [];
+  document.querySelectorAll('#cat-chips .cat-chip').forEach(btn => {
+    const id = btn.dataset.catId;
+    if (!id) return;
+    if (btn.classList.contains('on')) result.push(id);
+    else if (btn.classList.contains('blocked')) result.push('!' + id);
+  });
+  return result;
 }
 
 // ── COPY MODE ────────────────────────────────────────────────────────────────
@@ -1203,7 +1217,8 @@ function renderTradersHtml(traders) {
     const trades   = t.stats ? t.stats.totalTrades : 0;
     const wins     = t.stats ? (t.stats.wins || 0) : 0;
     const invested = t.stats ? '$' + t.stats.totalInvested.toFixed(2) : '$0.00';
-    const copiedWon = trades > 0 ? (trades + ' copied · ' + wins + ' won') : '—';
+    const traderWinRate = t.stats ? t.stats.winRate : null;
+    const copiedWon = trades > 0 ? (trades + ' copied · ' + (traderWinRate !== null ? traderWinRate + '% win rate' : '—')) : '—';
     const modeText = t.copyMode === 'fixed' ? '$'+t.fixedAmount+' fixed' : (t.copyPercentage||10)+'% of bet';
     const cats = t.categories && t.categories.length ? t.categories.join(', ') : 'All';
     const statusHtml = t.isActive
@@ -1216,7 +1231,7 @@ function renderTradersHtml(traders) {
         '<div class="expand-grid">' +
           '<div class="expand-stat"><div class="expand-stat-label">P&amp;L</div><div class="expand-stat-val ' + pnlCls + '">' + pnlStr + '</div></div>' +
           '<div class="expand-stat"><div class="expand-stat-label">Copied</div><div class="expand-stat-val">' + trades + '</div></div>' +
-          '<div class="expand-stat"><div class="expand-stat-label">Won</div><div class="expand-stat-val pnl-pos">' + wins + '</div></div>' +
+          '<div class="expand-stat"><div class="expand-stat-label">Win Rate</div><div class="expand-stat-val ' + (t.stats && t.stats.winRate != null ? (t.stats.winRate >= 50 ? 'pnl-pos' : 'pnl-neg') : '') + '">' + (t.stats && t.stats.winRate != null ? t.stats.winRate + '%' : '—') + '</div></div>' +
           '<div class="expand-stat"><div class="expand-stat-label">Total Invested</div><div class="expand-stat-val">' + invested + '</div></div>' +
         '</div>' +
         '<div id="pos-'+t.id+'" style="margin-bottom:12px"></div>' +
@@ -1312,9 +1327,11 @@ async function loadOpenPositions(traders) {
               : '<span style="color:var(--text3)">—</span>';
             const cid = p.condition_id.replace(/'/g, '');
             const out = (p.outcome||'Yes').replace(/'/g, '');
+            const entryDate = p.created_at ? fmtDateTime(p.created_at) : null;
             return '<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg3);border-radius:6px;padding:6px 10px;font-size:12px;gap:8px">' +
               '<span style="background:var(--green-dim);color:var(--green);font-size:10px;font-weight:700;padding:1px 6px;border-radius:20px;flex-shrink:0">OPEN</span>' +
               '<span style="color:var(--text2);min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + nameHtml + ' <strong style="color:var(--blue-light)">' + (p.outcome||'Yes') + '</strong></span>' +
+              (entryDate ? '<span style="color:var(--text3);font-size:10px;flex-shrink:0;white-space:nowrap">' + entryDate + '</span>' : '') +
               '<span style="color:var(--text3);font-size:11px;flex-shrink:0;white-space:nowrap">' + entryPrice + '¢ → ' + liveSpan + '</span>' +
               '<span style="color:var(--green);font-weight:600;flex-shrink:0">$' + usdc + '</span>' +
               '<button onclick="event.stopPropagation();sellPosition(\'' + cid + '\',\'' + out + '\',this)" style="background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#ef4444;cursor:pointer;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;flex-shrink:0;white-space:nowrap" title="Sell position at market price">SELL</button>' +
@@ -1717,7 +1734,7 @@ function renderTrades(trades) {
     const polyLink   = t.market_slug ? 'https://polymarket.com/event/' + t.market_slug : (t.condition_id ? 'https://polymarket.com/event/' + t.condition_id : null);
     const meta       = isSkip
       ? (t.skip_reason || 'Skipped')
-      : [spent, t.outcome, entryPrice ? 'entry: ' + entryPrice : null, timeAgo(t.created_at)].filter(Boolean).join(' · ');
+      : [spent, t.outcome, entryPrice ? 'entry: ' + entryPrice : null, fmtDateTime(t.created_at)].filter(Boolean).join(' · ');
     const mktName  = (t.market_name && t.market_name !== t.condition_id) ? t.market_name : (t.condition_id ? t.condition_id.slice(0,18)+'...' : '—');
     const linkIcon = polyLink ? ' <a href="' + polyLink + '" target="_blank" style="color:var(--blue-light);font-size:11px;vertical-align:middle" onclick="event.stopPropagation()">↗</a>' : '';
     return '<div class="trade-row">' + badge +
@@ -1850,6 +1867,14 @@ function timeAgo(ts) {
   if (d < 3600)  return Math.floor(d/60) + 'm ago';
   if (d < 86400) return Math.floor(d/3600) + 'h ago';
   return Math.floor(d/86400) + 'd ago';
+}
+
+function fmtDateTime(ts) {
+  const d = new Date(ts);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const h = d.getHours().toString().padStart(2,'0');
+  const m = d.getMinutes().toString().padStart(2,'0');
+  return months[d.getMonth()] + ' ' + d.getDate() + ', ' + h + ':' + m;
 }
 </script>
 </body>
