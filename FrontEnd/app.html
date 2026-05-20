@@ -213,6 +213,12 @@ div.expand-panel.closed{display:none !important}
 .alert-close{margin-left:auto;cursor:pointer;opacity:.6;background:none;border:none;color:inherit;font-size:16px}
 .spinner{width:15px;height:15px;border:2px solid rgba(255,255,255,.2);border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
 @keyframes spin{to{transform:rotate(360deg)}}
+@keyframes modalIn{from{opacity:0;transform:scale(.96) translateY(-10px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+@keyframes toastOut{to{opacity:0;transform:translateX(20px)}}
+#_app_modal{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.65);backdrop-filter:blur(4px)}
+#_app_modal .modal-box{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:26px 28px;max-width:420px;width:calc(100% - 48px);box-shadow:0 24px 64px rgba(0,0,0,.6);animation:modalIn .15s ease}
+#_app_toast{position:fixed;bottom:24px;right:24px;z-index:9001;background:var(--bg2);border-radius:12px;padding:14px 18px;display:flex;align-items:flex-start;gap:12px;box-shadow:0 8px 40px rgba(0,0,0,.5);animation:toastIn .2s ease;max-width:300px}
 
 /* ── UTIL ─────────────────────────────────────────── */
 .empty-state{text-align:center;padding:48px 20px}
@@ -686,6 +692,56 @@ function navSwitch(key, el) {
 // kept for backward compat if called anywhere
 function switchTab(key) { navSwitch(key, document.getElementById('nav-' + key)); }
 
+// ── CUSTOM MODAL & TOAST ─────────────────────────────────────────────────────
+function showConfirm({ title, body, confirmText = 'Confirm', danger = false }) {
+  return new Promise(resolve => {
+    const old = document.getElementById('_app_modal');
+    if (old) old.remove();
+    const overlay = document.createElement('div');
+    overlay.id = '_app_modal';
+    const btnStyle = danger
+      ? 'background:#ef4444;color:#fff;border:1px solid rgba(239,68,68,.5)'
+      : 'background:var(--blue);color:#fff;border:1px solid var(--blue)';
+    overlay.innerHTML =
+      '<div class="modal-box">' +
+        '<div style="font-size:15px;font-weight:700;margin-bottom:10px;color:var(--text)">' + title + '</div>' +
+        '<div style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:22px">' + body + '</div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+          '<button id="_mc" class="btn btn-sm">Cancel</button>' +
+          '<button id="_mo" class="btn btn-sm" style="' + btnStyle + ';padding:6px 16px;font-weight:600">' + confirmText + '</button>' +
+        '</div>' +
+      '</div>';
+    const close = r => { overlay.remove(); resolve(r); };
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(false); });
+    document.body.appendChild(overlay);
+    document.getElementById('_mc').onclick = () => close(false);
+    document.getElementById('_mo').onclick = () => close(true);
+    document.getElementById('_mo').focus();
+  });
+}
+
+function showToast(html, type = 'success') {
+  const old = document.getElementById('_app_toast');
+  if (old) { clearTimeout(old._timer); old.remove(); }
+  const toast = document.createElement('div');
+  toast.id = '_app_toast';
+  const isOk     = type === 'success';
+  const iconBg   = isOk ? 'rgba(34,197,94,.15)' : 'rgba(239,68,68,.15)';
+  const iconClr  = isOk ? 'var(--green)' : 'var(--red)';
+  const borderClr= isOk ? 'rgba(34,197,94,.3)' : 'rgba(239,68,68,.3)';
+  toast.style.borderColor = borderClr;
+  toast.innerHTML =
+    '<div style="width:32px;height:32px;border-radius:50%;background:' + iconBg + ';display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+      '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="' + (isOk ? 'M3 8l3.5 3.5L13 4' : 'M4 4l8 8M12 4l-8 8') + '" stroke="' + iconClr + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+    '</div>' +
+    '<div style="font-size:12.5px;line-height:1.5;color:var(--text)">' + html + '</div>';
+  document.body.appendChild(toast);
+  toast._timer = setTimeout(() => {
+    toast.style.animation = 'toastOut .3s ease forwards';
+    setTimeout(() => toast.remove(), 300);
+  }, 4500);
+}
+
 // ── ALERTS ──────────────────────────────────────────────────────────────────
 function showAlert(id, msg, type='error') {
   const c = document.getElementById(id);
@@ -1132,9 +1188,10 @@ async function resumeTrader(id, btn) {
   }
 }
 async function deleteTrader(id) {
-  if (!confirm('Remove this trader? This will stop copying them.')) return;
-  try { await api('DELETE', '/copy/config/' + id); showAlert('dash-alert','Trader removed.','success'); loadDashboard(); }
-  catch(e) { showAlert('dash-alert', e.message); }
+  const ok = await showConfirm({ title: 'Remove trader', body: 'This will stop copying this trader. Open positions are <strong>not sold</strong> — they remain on Polymarket.', confirmText: 'Remove', danger: true });
+  if (!ok) return;
+  try { await api('DELETE', '/copy/config/' + id); showToast('Trader removed.'); loadDashboard(); }
+  catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 function toggleRecover() {
   const f = document.getElementById('recover-form');
@@ -1154,21 +1211,22 @@ async function recoverDepositWallet() {
 }
 
 async function clearPositions() {
-  if (!confirm('Clear all open positions tracking? This does NOT sell anything on Polymarket — only removes the display.')) return;
-  try { await api('DELETE', '/dashboard/positions'); showAlert('dash-alert','Positions cleared.','success'); loadDashboard(); }
-  catch(e) { showAlert('dash-alert', e.message); }
+  const ok = await showConfirm({ title: 'Clear position tracking', body: 'Removes all positions from the display. Does <strong>not</strong> sell anything on Polymarket.', confirmText: 'Clear', danger: true });
+  if (!ok) return;
+  try { await api('DELETE', '/dashboard/positions'); showToast('Positions cleared.'); loadDashboard(); }
+  catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 async function clearResolvedPositions() {
-  if (!confirm('Clear all WIN/LOSS positions from the list?\n\nOpen positions will NOT be affected.')) return;
-  if (!confirm('Are you sure? This cannot be undone.')) return;
-  try { await api('DELETE', '/dashboard/positions/resolved'); showAlert('dash-alert','Resolved positions cleared.','success'); loadDashboard(); }
-  catch(e) { showAlert('dash-alert', e.message); }
+  const ok = await showConfirm({ title: 'Clear resolved positions', body: 'Removes all <strong>WIN / LOSS</strong> entries from the list. Open positions are not affected. This cannot be undone.', confirmText: 'Clear resolved', danger: true });
+  if (!ok) return;
+  try { await api('DELETE', '/dashboard/positions/resolved'); showToast('Resolved positions cleared.'); loadDashboard(); }
+  catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 async function resetTraderStats(id) {
-  if (!confirm('Reset stats for this trader?\n\nThis will clear:\n• All trade history (copied count, P&L)\n• WIN/LOSS resolved positions\n\nOpen positions are kept.')) return;
-  if (!confirm('Are you sure? Stats cannot be recovered after reset.')) return;
-  try { await api('POST', '/copy/config/' + id + '/reset-stats'); showAlert('dash-alert','Stats reset.','success'); loadDashboard(); }
-  catch(e) { showAlert('dash-alert', e.message); }
+  const ok = await showConfirm({ title: 'Reset trader stats', body: 'This will permanently clear:<br><br>• Trade history & P&L<br>• WIN / LOSS resolved positions<br><br>Open positions are kept. <strong>This cannot be undone.</strong>', confirmText: 'Reset stats', danger: true });
+  if (!ok) return;
+  try { await api('POST', '/copy/config/' + id + '/reset-stats'); showToast('Stats reset.'); loadDashboard(); }
+  catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 
 // ── RENDER TRADERS ────────────────────────────────────────────────────────────
@@ -1460,6 +1518,25 @@ function renderOpenPositions(traders, positions) {
     }
     el.innerHTML = html;
   });
+
+  // Pre-fill price and value spans from cache — eliminates flicker on re-render
+  if (window._livePrices) {
+    document.querySelectorAll('[data-price-token]').forEach(el => {
+      const price = window._livePrices[el.dataset.priceToken];
+      if (price == null) return;
+      el.textContent = Math.round(price * 100) + '¢';
+      el.style.color = price >= 0.99 ? 'var(--green)' : price >= 0.70 ? 'var(--blue-light)' : price >= 0.50 ? 'var(--text2)' : 'var(--text3)';
+    });
+    document.querySelectorAll('[data-value-token]').forEach(el => {
+      const price = window._livePrices[el.dataset.valueToken];
+      if (price == null) return;
+      const shares = parseFloat(el.dataset.valueShares), invested = parseFloat(el.dataset.valueInvested);
+      const value = shares * price, pnl = value - invested;
+      const roi = invested > 0 ? (pnl / invested * 100).toFixed(1) : '0.0';
+      const clr = pnl >= 0 ? 'var(--green)' : 'var(--red)', sign = pnl >= 0 ? '+' : '-';
+      el.innerHTML = '<span style="font-size:13px;font-weight:700;color:var(--text)">$' + value.toFixed(2) + '</span><span style="font-size:10.5px;color:' + clr + ';margin-top:1px">' + sign + '$' + Math.abs(pnl).toFixed(2) + ' (' + Math.abs(roi) + '%)</span>';
+    });
+  }
 }
 
 async function loadOpenPositions(traders) {
@@ -1614,18 +1691,30 @@ async function deletePosition(conditionId, outcome) {
 }
 
 async function sellPosition(conditionId, outcome, btn) {
-  if (!confirm('Sell "' + outcome + '" at current market price?')) return;
+  const ok = await showConfirm({
+    title: 'Sell position',
+    body: 'Sell <strong>' + outcome + '</strong> at current market price?<br><span style="color:var(--text3);font-size:12px">A market sell order will be placed immediately.</span>',
+    confirmText: 'Sell now',
+    danger: true,
+  });
+  if (!ok) return;
   const orig = btn.textContent;
   btn.textContent = '...';
   btn.disabled = true;
   try {
-    const data = await api('POST', '/dashboard/positions/' + encodeURIComponent(conditionId) + '/' + encodeURIComponent(outcome) + '/sell');
-    const pnlStr = (data.pnl >= 0 ? '+' : '') + '$' + Math.abs(data.pnl).toFixed(2);
-    const cents  = Math.round(data.price * 100);
-    alert('Sell order placed at ' + cents + '¢\nEstimated: ' + pnlStr + ' PnL\nOrder ID: ' + (data.orderId || 'N/A'));
+    const data   = await api('POST', '/dashboard/positions/' + encodeURIComponent(conditionId) + '/' + encodeURIComponent(outcome) + '/sell');
+    const pnl    = data.pnl != null ? data.pnl : 0;
+    const pnlStr = (pnl >= 0 ? '+' : '') + '$' + Math.abs(pnl).toFixed(2);
+    const cents  = data.price != null ? Math.round(data.price * 100) : '—';
+    const pnlClr = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    showToast(
+      '<strong>Sold at ' + cents + '¢</strong><br>' +
+      '<span style="color:' + pnlClr + ';font-weight:600">' + pnlStr + ' PnL</span>',
+      'success'
+    );
     loadDashboard();
   } catch(e) {
-    alert('Sell failed: ' + e.message);
+    showToast('<strong>Sell failed</strong><br>' + e.message, 'error');
     btn.textContent = orig;
     btn.disabled = false;
   }
