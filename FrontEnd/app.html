@@ -492,7 +492,10 @@ div.expand-panel.closed{display:none !important}
 
       <!-- Recent Trades -->
       <div class="card" style="padding:0;overflow:hidden">
-        <div style="padding:14px 18px;border-bottom:1px solid var(--border);font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--text3);text-transform:uppercase">Recent Trades</div>
+        <div style="padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">
+          <span style="font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--text3);text-transform:uppercase;white-space:nowrap">Recent Trades</span>
+          <input id="trade-search" type="text" placeholder="Search by market name..." oninput="filterTrades()" style="flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:5px 10px;outline:none">
+        </div>
         <div id="trades-list" style="padding:4px 0 0 0">
           <div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">Loading trades...</div>
         </div>
@@ -1171,6 +1174,11 @@ async function resetTraderStats(id) {
 // ── RENDER TRADERS ────────────────────────────────────────────────────────────
 function renderTraders(config) {
   _allTraders = (config && config.traders) ? config.traders : [];
+  _allTraders.sort((a, b) => {
+    const ta = a.stats && a.stats.lastTradeAt ? new Date(a.stats.lastTradeAt).getTime() : 0;
+    const tb = b.stats && b.stats.lastTradeAt ? new Date(b.stats.lastTradeAt).getTime() : 0;
+    return tb - ta;
+  });
   const container = document.getElementById('traders-list');
   if (!_allTraders.length) {
     renderTradersHtml([]);
@@ -1703,10 +1711,24 @@ function renderCalendar() {
 }
 
 // ── RENDER TRADES ─────────────────────────────────────────────────────────────
+let _allTrades = [];
+
+function filterTrades() {
+  const q = (document.getElementById('trade-search').value || '').toLowerCase().trim();
+  const filtered = q ? _allTrades.filter(t => (t.market_name || '').toLowerCase().includes(q)) : _allTrades;
+  renderTradesHtml(filtered);
+}
+
 function renderTrades(trades) {
+  _allTrades = trades || [];
+  renderTradesHtml(_allTrades);
+}
+
+function renderTradesHtml(trades) {
   const c = document.getElementById('trades-list');
   if (!trades || !trades.length) {
-    c.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:24px">No trades yet. Waiting for the trader to make a move.</div>';
+    const q = (document.getElementById('trade-search') || {}).value || '';
+    c.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:24px">' + (q ? 'No trades match "' + q + '".' : 'No trades yet. Waiting for the trader to make a move.') + '</div>';
     return;
   }
   c.innerHTML = trades.map(function(t) {
@@ -1748,7 +1770,7 @@ async function loadDashboard() {
   try {
     const [stats, tradesData, walletData, config] = await Promise.all([
       api('GET', '/dashboard/stats'),
-      api('GET', '/dashboard/trades?limit=20'),
+      api('GET', '/dashboard/trades?limit=100'),
       api('GET', '/wallet'),
       api('GET', '/copy/status'),
     ]);

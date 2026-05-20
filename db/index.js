@@ -152,7 +152,8 @@ async function getTraderStats(configId) {
        COALESCE(SUM(usdc_spent), 0)                                   AS total_invested,
        COALESCE(SUM(resolved_pnl), 0)                                 AS total_pnl,
        COUNT(*) FILTER (WHERE resolved_outcome='WON')                 AS wins,
-       COUNT(*) FILTER (WHERE resolved_outcome='LOST')                AS losses
+       COUNT(*) FILTER (WHERE resolved_outcome='LOST')                AS losses,
+       MAX(updated_at)                                                 AS last_trade_at
      FROM bot_positions WHERE config_id=$1 AND (shares > 0 OR resolved_outcome IS NOT NULL)`,
     [configId]
   );
@@ -165,7 +166,8 @@ async function getTraderStats(configId) {
     totalInvested: parseFloat(row.total_invested) || 0,
     wins,
     losses,
-    winRate: wins + losses > 0 ? Math.round(wins / (wins + losses) * 100) : null,
+    winRate:     wins + losses > 0 ? Math.round(wins / (wins + losses) * 100) : null,
+    lastTradeAt: row.last_trade_at || null,
   };
 }
 
