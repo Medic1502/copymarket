@@ -39,37 +39,44 @@ function log(tag, msg, extra = {}) {
 }
 
 // ── MARKET DISCOVERY via platform-wide trades ─────────────────────────────
-// data-api.polymarket.com/trades returns recent trades across ALL markets,
-// with market title and conditionId — this is how we find active Up/Down markets.
+// data-api.polymarket.com/trades returns recent trades across ALL markets.
+// We filter to trades within the last 10 minutes so we only discover
+// markets that are actually being traded RIGHT NOW, not yesterday's closed ones.
 let _mktCache   = [];
 let _mktCacheTs = 0;
-const MKT_TTL   = 30_000; // 30s cache
+const MKT_TTL         = 30_000;       // 30s cache
+const FRESH_WINDOW_MS = 10 * 60_000;  // only trades from last 10 minutes
 
 async function fetchActiveUpOrDownMarkets() {
   if (Date.now() - _mktCacheTs < MKT_TTL && _mktCache.length) return _mktCache;
 
-  const seen   = new Set();
-  const result = [];
+  const seen      = new Set();
+  const result    = [];
+  const cutoffMs  = Date.now() - FRESH_WINDOW_MS;
 
   try {
-    const data  = await apiFetch(`${DATA_BASE}/trades?limit=100`);
+    const data   = await apiFetch(`${DATA_BASE}/trades?limit=200`);
     const trades = Array.isArray(data) ? data : (data.data || data.trades || []);
 
     for (const t of trades) {
       const title       = t.title || t.market || t.marketName || t.question || '';
       const conditionId = t.conditionId || t.condition_id || t.market_id || null;
-
       if (!conditionId || !title.toLowerCase().includes('up or down')) continue;
+
+      // Only count trades from the last 10 minutes — skip stale/closed markets
+      const rawTs  = t.timestamp || t.createdAt || t.created_at || 0;
+      const tradeMs = rawTs < 1e11 ? rawTs * 1000 : rawTs; // seconds → ms if needed
+      if (tradeMs < cutoffMs) continue;
+
       if (seen.has(conditionId)) continue;
       seen.add(conditionId);
-
       result.push({ conditionId, title });
     }
   } catch (e) {
     log('discovery', 'trades fetch failed', { err: e.message.slice(0, 80) });
   }
 
-  log('discovery', `Found ${result.length} active Up or Down markets`);
+  log('discovery', `Found ${result.length} fresh Up or Down markets (last 10 min)`);
   _mktCache   = result;
   _mktCacheTs = Date.now();
   return result;
@@ -130,9 +137,9 @@ async function passesBookFilter(tokenId, minPrice) {
     const bestBid  = parseFloat(book.bids?.[0]?.price ?? 0);
     const askDepth = (book.asks || []).reduce((s, o) => s + parseFloat(o.size || 0), 0);
 
-    if (bestAsk < minPrice)                                  return { ok: false };
-    if (askDepth < 30)                                       return { ok: false };
-    if (bestBid > 0 && bestAsk > 0 && bestAsk - bestBid > 0.05) return { ok: false };
+    if (bestAsk < minPrice)                                  return { ok: false, reason: `ask ${bestAsk} < min ${minPrice}` };
+    if (askDepth < 30)                                       return { ok: false, reason: `depth ${askDepth.toFixed(0)} < 30` };
+    if (bestBid > 0 && bestAsk > 0 && bestAsk - bestBid > 0.03) return { ok: false, reason: `spread ${((bestAsk-bestBid)*100).toFixed(1)}¢ > 3¢` };
     return { ok: true, livePrice: bestAsk };
   } catch {
     return { ok: false };
@@ -358,12 +365,23 @@ async function globalPoll() {
 
     for (const { conditionId, title } of markets) {
       try {
+        const shortId = conditionId.slice(0, 10);
+        const label   = title.slice(0, 45);
+
         // ② Market info — once per market
         const mkt = await getMarketInfo(conditionId);
-        if (!mkt || mkt.closed) continue;
+        if (!mkt)        { log('skip', `${label} — no CLOB data`,    { id: shortId }); continue; }
+        if (mkt.closed)  { log('skip', `${label} — market closed`,   { id: shortId }); continue; }
 
         // ③ Time filter — once per market
-        if (!passesTimeFilter(mkt)) continue;
+        if (!passesTimeFilter(mkt)) {
+          const start   = mkt.game_start_time || mkt.startDate;
+          const end     = mkt.end_date_iso    || mkt.endDate;
+          const elapsed = start ? Math.round((Date.now() - new Date(start).getTime()) / 1000) : '?';
+          const remain  = end   ? Math.round((new Date(end).getTime() - Date.now()) / 1000) : '?';
+          log('skip', `${label} — time filter`, { id: shortId, elapsedS: elapsed, remainS: remain });
+          continue;
+        }
 
         const tokens = mkt.tokens || [];
         if (tokens.length < 2) continue;
@@ -374,17 +392,25 @@ async function globalPoll() {
         let targetToken = null;
 
         for (let i = 0; i < tokens.length; i++) {
-          if (parseFloat(tokens[i].price ?? 0) >= lowestMin) {
+          const p = parseFloat(tokens[i].price ?? 0);
+          if (p >= lowestMin) {
             targetIdx   = i;
             targetToken = tokens[i].token_id;
             break;
           }
         }
-        if (targetIdx < 0 || !targetToken) continue;
+        if (targetIdx < 0 || !targetToken) {
+          const prices = tokens.map(t => parseFloat(t.price ?? 0).toFixed(2)).join(' / ');
+          log('skip', `${label} — price below threshold`, { id: shortId, prices, min: lowestMin });
+          continue;
+        }
 
         // ⑤ Book filter — once per token
         const bookResult = await passesBookFilter(targetToken, lowestMin);
-        if (!bookResult.ok) continue;
+        if (!bookResult.ok) {
+          log('skip', `${label} — book filter: ${bookResult.reason}`, { id: shortId });
+          continue;
+        }
 
         // ⑥ Fan-out: place orders for all eligible users in parallel
         await Promise.all(activeUsers.map(([userId, sess]) => {
