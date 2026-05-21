@@ -922,9 +922,10 @@ function setAtStatus(running) {
     startBtn.style.display = 'none';
     stopBtn.style.display  = '';
   } else {
-    pill.className    = 'at-status-pill stopped';
-    txt.textContent   = 'STOPPED';
+    pill.className         = 'at-status-pill stopped';
+    txt.textContent        = 'STOPPED';
     startBtn.style.display = '';
+    startBtn.disabled      = false;
     stopBtn.style.display  = 'none';
   }
 }
