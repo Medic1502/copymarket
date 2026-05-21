@@ -916,9 +916,21 @@ function setAtStatus(running) {
   const txt      = document.getElementById('at-status-text');
   const startBtn = document.getElementById('at-start-btn');
   const stopBtn  = document.getElementById('at-stop-btn');
+  const amountInput = document.getElementById('at-amount');
+
+  // Lock/unlock amount input and asset chips
+  amountInput.disabled = running;
+  amountInput.style.opacity = running ? '0.45' : '';
+  amountInput.style.cursor  = running ? 'not-allowed' : '';
+  document.querySelectorAll('.at-asset-btn').forEach(b => {
+    b.disabled = running;
+    b.style.opacity = running ? '0.45' : '';
+    b.style.cursor  = running ? 'not-allowed' : '';
+  });
+
   if (running) {
-    pill.className    = 'at-status-pill running';
-    txt.textContent   = 'RUNNING';
+    pill.className         = 'at-status-pill running';
+    txt.textContent        = 'RUNNING';
     startBtn.style.display = 'none';
     stopBtn.style.display  = '';
   } else {
