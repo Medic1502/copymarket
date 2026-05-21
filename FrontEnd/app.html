@@ -62,6 +62,26 @@ body{color:var(--text);font-family:'Inter',-apple-system,sans-serif;font-size:14
 .stat-value.neg{color:var(--red)}
 .stat-sub{font-size:11px;color:var(--text3);margin-top:4px}
 
+/* ── AUTO TRADE ───────────────────────────────────── */
+.at-asset-btn{padding:5px 13px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);font-family:'Inter',sans-serif}
+.at-asset-btn:hover{border-color:rgba(37,99,235,.5);color:var(--text)}
+.at-asset-btn.active{background:rgba(37,99,235,.2);border-color:rgba(37,99,235,.5);color:var(--blue-light)}
+.at-dur-btn{padding:6px 16px;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;border:1px solid var(--border2);background:transparent;color:var(--text2);font-family:'Inter',sans-serif}
+.at-dur-btn:hover{color:var(--text)}
+.at-dur-btn.active{background:rgba(37,99,235,.18);border-color:rgba(37,99,235,.5);color:var(--blue-light)}
+.at-status-pill{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:.04em}
+.at-status-pill.running{background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.3);color:var(--green)}
+.at-status-pill.stopped{background:rgba(100,116,139,.1);border:1px solid rgba(100,116,139,.25);color:var(--text3)}
+.at-stat-mini{text-align:center;padding:14px}
+.at-stat-mini .val{font-size:22px;font-weight:700;letter-spacing:-.5px;color:var(--text);margin-bottom:3px}
+.at-stat-mini .lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text3)}
+.at-trade-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)}
+.at-trade-row:last-child{border-bottom:none}
+.at-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;letter-spacing:.04em;flex-shrink:0}
+.at-badge.win{background:var(--green-dim);color:var(--green)}
+.at-badge.loss{background:var(--red-dim);color:var(--red)}
+.at-badge.open{background:var(--blue-dim);color:var(--blue-light)}
+
 /* ── TABS ─────────────────────────────────────────── */
 .tab-nav{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px;gap:0}
 .tab-btn{padding:9px 18px;font-size:13.5px;font-weight:500;color:var(--text3);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif}
@@ -352,6 +372,10 @@ div.expand-panel.closed{display:none !important}
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
       My Traders
     </button>
+    <button class="nav-item" id="nav-autotrade" onclick="navSwitch('autotrade',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      Auto Trade
+    </button>
     <button class="nav-item" id="nav-trades" onclick="navSwitch('trades',this)">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
       Trade History
@@ -610,6 +634,108 @@ div.expand-panel.closed{display:none !important}
     </div>
 
 
+    <!-- ── AUTO TRADE ──────────────────────────────── -->
+    <div id="tab-autotrade" class="tab-panel">
+
+      <!-- Header -->
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Auto Trade
+          </div>
+          <div style="font-size:13px;color:var(--text2)">Ulazi automatski u 5-min kripto markete kad cijena dostigne target</div>
+        </div>
+        <div id="at-status-pill" class="at-status-pill stopped">
+          <span id="at-dot" style="width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block"></span>
+          <span id="at-status-text">STOPPED</span>
+        </div>
+      </div>
+
+      <!-- Mini stats -->
+      <div class="card" style="margin-bottom:14px;padding:0">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border)">
+          <div class="at-stat-mini" style="border-right:1px solid var(--border)">
+            <div class="val" id="at-s-trades">0</div><div class="lbl">Danas trejdova</div>
+          </div>
+          <div class="at-stat-mini" style="border-right:1px solid var(--border)">
+            <div class="val" id="at-s-wins">0</div><div class="lbl">Wins</div>
+          </div>
+          <div class="at-stat-mini" style="border-right:1px solid var(--border)">
+            <div class="val pos" id="at-s-pnl">$0.00</div><div class="lbl">P&amp;L danas</div>
+          </div>
+          <div class="at-stat-mini">
+            <div class="val" id="at-s-open">0</div><div class="lbl">Otvoreno</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Config -->
+      <div class="card" style="margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:16px">Konfiguracija</div>
+
+        <div class="two-col" style="margin-bottom:16px">
+          <div class="field">
+            <label>Iznos po trejdu ($)</label>
+            <input type="number" id="at-amount" value="10" min="1" step="1" placeholder="npr. 10">
+          </div>
+          <div class="field">
+            <label>Min cijena za ulaz (¢)</label>
+            <input type="number" id="at-min-price" value="97" min="90" max="99" step="1" placeholder="97">
+          </div>
+        </div>
+
+        <div class="field" style="margin-bottom:16px">
+          <label>Trajanje marketa</label>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button class="at-dur-btn active" id="at-dur-5" onclick="setAtDuration('5',this)">5-min</button>
+            <button class="at-dur-btn" id="at-dur-15" onclick="setAtDuration('15',this)">15-min</button>
+            <button class="at-dur-btn" id="at-dur-both" onclick="setAtDuration('both',this)">Oba</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Assets</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
+            <button class="at-asset-btn active" data-asset="BTC" onclick="toggleAtAsset(this)">BTC</button>
+            <button class="at-asset-btn active" data-asset="ETH" onclick="toggleAtAsset(this)">ETH</button>
+            <button class="at-asset-btn active" data-asset="XRP" onclick="toggleAtAsset(this)">XRP</button>
+            <button class="at-asset-btn active" data-asset="SOL" onclick="toggleAtAsset(this)">SOL</button>
+            <button class="at-asset-btn active" data-asset="BNB" onclick="toggleAtAsset(this)">BNB</button>
+            <button class="at-asset-btn active" data-asset="DOGE" onclick="toggleAtAsset(this)">DOGE</button>
+            <button class="at-asset-btn" data-asset="HYPE" onclick="toggleAtAsset(this)">Hyperliquid</button>
+          </div>
+        </div>
+
+        <div style="margin-top:20px;display:flex;gap:10px;align-items:center">
+          <button class="btn btn-primary" onclick="saveAtConfig()" id="at-save-btn">Sačuvaj</button>
+          <button class="btn btn-green" id="at-start-btn" onclick="startAutoTrade()">▶ Start</button>
+          <button class="btn" id="at-stop-btn" style="display:none;color:var(--red);border-color:rgba(239,68,68,.35)" onclick="stopAutoTrade()">■ Stop</button>
+          <span id="at-save-msg" style="font-size:12px;color:var(--green);display:none">Sačuvano ✓</span>
+        </div>
+      </div>
+
+      <!-- Filters info -->
+      <div class="card" style="margin-bottom:14px;background:rgba(37,99,235,.06);border-color:rgba(37,99,235,.2)">
+        <div style="font-size:11px;font-weight:700;color:var(--blue-light);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Aktivni filteri (auto)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;color:var(--text2)">
+          <div>✓ <strong style="color:var(--text)">Vreme u marketu</strong> — ulaz samo nakon 40% prozora (isključuje lažne rane signale)</div>
+          <div>✓ <strong style="color:var(--text)">Dubina knjige</strong> — mora biti ≥40 sharesa na ask strani</div>
+          <div>✓ <strong style="color:var(--text)">Spread</strong> — bid-ask spread ≤4¢ (detektuje manipulaciju)</div>
+          <div>✓ <strong style="color:var(--text)">Volumen</strong> — market mora imati min $200 prometa</div>
+        </div>
+      </div>
+
+      <!-- Recent trades -->
+      <div class="card">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">Nedavni auto-trejdovi</div>
+        <div id="at-trades-list">
+          <div style="color:var(--text3);font-size:13px;text-align:center;padding:28px 0">Nema trejdova još</div>
+        </div>
+      </div>
+
+    </div><!-- /tab-autotrade -->
+
   </div><!-- /content -->
 </main>
 
@@ -772,6 +898,148 @@ async function api(method, path, body) {
     throw new Error(data.error || 'Something went wrong.');
   }
   return data;
+}
+
+// ── AUTO TRADE ───────────────────────────────────────────────────────────────
+let _atRunning   = false;
+let _atDuration  = '5';
+let _atPollTimer = null;
+
+function setAtDuration(dur, btn) {
+  _atDuration = dur;
+  document.querySelectorAll('.at-dur-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+function toggleAtAsset(btn) {
+  btn.classList.toggle('active');
+}
+
+function getAtAssets() {
+  return Array.from(document.querySelectorAll('.at-asset-btn.active')).map(b => b.dataset.asset);
+}
+
+function setAtStatus(running) {
+  _atRunning = running;
+  const pill = document.getElementById('at-status-pill');
+  const txt  = document.getElementById('at-status-text');
+  const startBtn = document.getElementById('at-start-btn');
+  const stopBtn  = document.getElementById('at-stop-btn');
+  if (running) {
+    pill.className = 'at-status-pill running';
+    txt.textContent = 'RUNNING';
+    startBtn.style.display = 'none';
+    stopBtn.style.display  = '';
+  } else {
+    pill.className = 'at-status-pill stopped';
+    txt.textContent = 'STOPPED';
+    startBtn.style.display = '';
+    stopBtn.style.display  = 'none';
+  }
+}
+
+function renderAtTrades(trades) {
+  const el = document.getElementById('at-trades-list');
+  if (!trades || trades.length === 0) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:28px 0">Nema trejdova još</div>';
+    return;
+  }
+  el.innerHTML = trades.map(t => {
+    const badge  = t.status === 'WON' ? 'win' : t.status === 'LOST' ? 'loss' : 'open';
+    const label  = t.status === 'WON' ? 'WIN' : t.status === 'LOST' ? 'LOSS' : 'OPEN';
+    const pnlStr = t.pnl != null ? (t.pnl >= 0 ? '+$' : '-$') + Math.abs(t.pnl).toFixed(2) : '—';
+    const pnlCol = t.pnl > 0 ? 'var(--green)' : t.pnl < 0 ? 'var(--red)' : 'var(--text2)';
+    return `<div class="at-trade-row">
+      <span class="at-badge ${badge}">${label}</span>
+      <span style="flex:1;font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.marketName || '—'}</span>
+      <span style="font-size:12px;color:var(--text3);margin-right:10px;flex-shrink:0">${t.outcome || ''} · ${(t.price*100||0).toFixed(0)}¢</span>
+      <span style="font-size:13px;font-weight:600;color:${pnlCol};flex-shrink:0">${pnlStr}</span>
+    </div>`;
+  }).join('');
+}
+
+async function loadAtStatus() {
+  try {
+    const data = await api('GET', '/auto-trade/status');
+    setAtStatus(data.running);
+    if (data.config) {
+      document.getElementById('at-amount').value    = data.config.amount    || 10;
+      document.getElementById('at-min-price').value = data.config.minPrice  || 97;
+      _atDuration = data.config.duration || '5';
+      document.querySelectorAll('.at-dur-btn').forEach(b => b.classList.remove('active'));
+      const durEl = document.getElementById('at-dur-' + (_atDuration === 'both' ? 'both' : _atDuration));
+      if (durEl) durEl.classList.add('active');
+      if (data.config.assets) {
+        document.querySelectorAll('.at-asset-btn').forEach(b => {
+          b.classList.toggle('active', data.config.assets.includes(b.dataset.asset));
+        });
+      }
+    }
+    // stats
+    if (data.stats) {
+      document.getElementById('at-s-trades').textContent = data.stats.trades || 0;
+      document.getElementById('at-s-wins').textContent   = data.stats.wins   || 0;
+      const pnl = data.stats.pnl || 0;
+      const pnlEl = document.getElementById('at-s-pnl');
+      pnlEl.textContent = (pnl >= 0 ? '+$' : '-$') + Math.abs(pnl).toFixed(2);
+      pnlEl.className = 'val ' + (pnl >= 0 ? 'pos' : 'neg');
+      document.getElementById('at-s-open').textContent = data.stats.open || 0;
+    }
+    renderAtTrades(data.trades || []);
+  } catch {
+    // backend not yet wired — silent
+  }
+}
+
+async function saveAtConfig() {
+  const btn = document.getElementById('at-save-btn');
+  btn.disabled = true;
+  try {
+    await api('POST', '/auto-trade/config', {
+      amount:   parseFloat(document.getElementById('at-amount').value) || 10,
+      minPrice: parseFloat(document.getElementById('at-min-price').value) / 100 || 0.97,
+      duration: _atDuration,
+      assets:   getAtAssets(),
+    });
+    const msg = document.getElementById('at-save-msg');
+    msg.style.display = '';
+    setTimeout(() => msg.style.display = 'none', 2000);
+  } catch (e) {
+    showToast('Greška: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function startAutoTrade() {
+  try {
+    await saveAtConfig();
+    await api('POST', '/auto-trade/start');
+    setAtStatus(true);
+    showToast('Auto Trade started', 'success');
+    if (_atPollTimer) clearInterval(_atPollTimer);
+    _atPollTimer = setInterval(loadAtStatus, 15000);
+  } catch (e) {
+    showToast('Greška: ' + e.message, 'error');
+  }
+}
+
+async function stopAutoTrade() {
+  try {
+    await api('POST', '/auto-trade/stop');
+    setAtStatus(false);
+    showToast('Auto Trade stopped', 'success');
+    if (_atPollTimer) { clearInterval(_atPollTimer); _atPollTimer = null; }
+  } catch (e) {
+    showToast('Greška: ' + e.message, 'error');
+  }
+}
+
+// load status when tab is opened
+const _origNavSwitch = navSwitch;
+function navSwitch(key, el) {
+  _origNavSwitch(key, el);
+  if (key === 'autotrade') loadAtStatus();
 }
 
 // ── COPY / MISC ──────────────────────────────────────────────────────────────
@@ -1954,8 +2222,11 @@ function renderTradesHtml(trades) {
     const polyLink   = t.market_slug ? 'https://polymarket.com/event/' + t.market_slug : (t.condition_id ? 'https://polymarket.com/event/' + t.condition_id : null);
     const meta       = isSkip
       ? (t.skip_reason || 'Skipped')
-      : [spent, t.outcome, entryPrice ? 'entry: ' + entryPrice : null, fmtDateTime(t.created_at)].filter(Boolean).join(' · ');
-    const mktName  = (t.market_name && t.market_name !== t.condition_id) ? t.market_name : (t.condition_id ? t.condition_id.slice(0,18)+'...' : '—');
+      : isFail
+        ? [t.outcome, t.skip_reason ? t.skip_reason.slice(0, 60) : null, fmtDateTime(t.created_at)].filter(Boolean).join(' · ')
+        : [spent, t.outcome, entryPrice ? 'entry: ' + entryPrice : null, fmtDateTime(t.created_at)].filter(Boolean).join(' · ');
+    const isHexName = !t.market_name || t.market_name === t.condition_id || /^0x[0-9a-fA-F]{20,}$/.test(t.market_name);
+    const mktName   = (!isHexName) ? t.market_name : isFail ? 'Order failed' : (t.condition_id ? t.condition_id.slice(0,18)+'...' : '—');
     const linkIcon = polyLink ? ' <a href="' + polyLink + '" target="_blank" style="color:var(--blue-light);font-size:11px;vertical-align:middle" onclick="event.stopPropagation()">↗</a>' : '';
     return '<div class="trade-row">' + badge +
       '<div class="trade-name"><div class="trade-market">' + mktName + linkIcon + '</div><div class="trade-meta">' + meta + '</div></div>' +
