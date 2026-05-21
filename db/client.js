@@ -195,6 +195,41 @@ async function migrate() {
       WHERE t.config_id IS NULL
     `);
 
+    // ── Auto Trade tables ──────────────────────────────────────────────────
+    await run(`
+      CREATE TABLE IF NOT EXISTS auto_trade_configs (
+        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id    UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        amount     NUMERIC(12,2) NOT NULL DEFAULT 10,
+        min_price  NUMERIC(5,4)  NOT NULL DEFAULT 0.97,
+        duration   TEXT          NOT NULL DEFAULT '5',
+        assets     TEXT[]        NOT NULL DEFAULT '{BTC,ETH,XRP,SOL,BNB,DOGE}',
+        running    BOOLEAN       NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await run(`
+      CREATE TABLE IF NOT EXISTS auto_trade_positions (
+        id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id          UUID    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        condition_id     TEXT    NOT NULL,
+        outcome          TEXT    NOT NULL,
+        market_name      TEXT,
+        token_id         TEXT,
+        outcome_index    INTEGER,
+        price            NUMERIC(8,4),
+        shares           NUMERIC(16,6) NOT NULL DEFAULT 0,
+        usdc_spent       NUMERIC(12,4) NOT NULL DEFAULT 0,
+        resolved_outcome TEXT,
+        resolved_pnl     NUMERIC(12,4),
+        created_at       TIMESTAMPTZ DEFAULT NOW(),
+        updated_at       TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(user_id, condition_id, outcome)
+      )
+    `);
+    await run(`CREATE INDEX IF NOT EXISTS idx_at_pos_user ON auto_trade_positions(user_id)`);
+
     console.log('Database migration complete.');
   } catch (err) {
     console.error('Migration failed (server will continue):', err.message);

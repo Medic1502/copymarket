@@ -9,6 +9,7 @@ const path = require('path');
 const { getAllActiveConfigs } = require('../db');
 const { migrate, query } = require('../db/client');
 const { startCopyEngine } = require('../engine');
+const { restoreAutoTradeSessions } = require('../engine/auto-trade');
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use('/wallet', require('./routes/wallet'));
 app.use('/copy', require('./routes/copy'));
 app.use('/dashboard', require('./routes/dashboard'));
 app.use('/api/license', require('./routes/license'));
+app.use('/auto-trade', require('./routes/auto-trade'));
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', ts: new Date().toISOString() });
@@ -131,6 +133,7 @@ app.listen(PORT, '0.0.0.0', async () => {
   await migrate();
   await fixMissingMarketNames();
   await restoreActiveEngines();
+  await restoreAutoTradeSessions();
 });
 
 module.exports = app;
