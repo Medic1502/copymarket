@@ -812,7 +812,8 @@ function navSwitch(key, el) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   const panel = document.getElementById('tab-' + key);
   if (panel) panel.classList.add('active');
-  if (key === 'trades') loadTradeHistory();
+  if (key === 'trades')     loadTradeHistory();
+  if (key === 'autotrade')  loadAtStatus();
 }
 
 // kept for backward compat if called anywhere
@@ -1035,12 +1036,7 @@ async function stopAutoTrade() {
   }
 }
 
-// load status when tab is opened
-const _origNavSwitch = navSwitch;
-function navSwitch(key, el) {
-  _origNavSwitch(key, el);
-  if (key === 'autotrade') loadAtStatus();
-}
+// auto trade tab hook — patched into existing navSwitch below
 
 // ── COPY / MISC ──────────────────────────────────────────────────────────────
 function copyDashAddr() {
