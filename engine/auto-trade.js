@@ -19,8 +19,12 @@ const PUSD_ADDRESS           = '0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB';
 const CTF_COLLATERAL_ADAPTER = '0xAdA100Db00Ca00073811820692005400218FcE1f';
 const NEG_RISK_ADAPTER       = '0xadA2005600Dec949baf300f4C6120000bDB6eAab';
 
-// ── per-user session state ────────────────────────────────────────────────
-const sessions = {}; // userId → { pollTimer, redeemTimer, entered: Set }
+// ── session state ────────────────────────────────────────────────────────
+// One global poll loop shared across ALL active users.
+// Market discovery + market info + book filter run ONCE per cycle.
+// Only order placement is per-user (each user has their own wallet).
+const sessions = {}; // userId → { wallet, config, entered: Set, redeemTimer }
+let _globalPollTimer = null;
 
 // ── helpers ───────────────────────────────────────────────────────────────
 async function apiFetch(url) {
@@ -301,34 +305,76 @@ async function checkResolutions(userId, wallet) {
   }
 }
 
-// ── MAIN POLL LOOP ────────────────────────────────────────────────────────
-async function pollMarkets(userId, wallet, config) {
+// ── PLACE ORDER FOR ONE USER (called in parallel fan-out) ─────────────────
+async function placeForUser(userId, sess, conditionId, tokenId, tokenIdx, livePrice, mkt, title) {
   try {
+    const entryKey = `${conditionId}_${tokenIdx}`;
+    if (sess.entered.has(entryKey)) return;
+    if (livePrice < sess.config.minPrice) return;
+
+    // Balance check (per-user, not shared)
+    const walletData = await db.getWalletByUserId(userId);
+    const balance    = await db.getUSDCBalance(walletData.address).catch(() => 0);
+    if (balance < sess.config.amount) {
+      log('skip', 'Low balance', { userId, balance, needed: sess.config.amount });
+      return;
+    }
+
+    const { result, sharesSize, roundedPrice } = await placeFOKOrder(sess.wallet, tokenId, livePrice, sess.config.amount);
+
+    if (!result.orderID || result.status === 'CANCELLED') {
+      log('trade', 'FOK not matched', { userId, conditionId: conditionId.slice(0,10) });
+      return;
+    }
+
+    const outcomeLabel = mkt.tokens?.[tokenIdx]?.outcome || (tokenIdx === 0 ? 'Yes' : 'No');
+    await db.upsertAutoTradePosition(userId, {
+      conditionId,
+      outcome:      outcomeLabel,
+      marketName:   mkt.question || title,
+      tokenId,
+      outcomeIndex: tokenIdx,
+      price:        roundedPrice,
+      shares:       sharesSize,
+      usdcSpent:    sess.config.amount,
+    });
+
+    sess.entered.add(entryKey);
+    log('trade', 'FOK filled ✓', { userId, conditionId: conditionId.slice(0,10), shares: sharesSize, price: roundedPrice });
+  } catch (e) {
+    log('trade', 'FOK error', { userId, conditionId: conditionId.slice(0,10), err: e.message.slice(0,120) });
+  }
+}
+
+// ── GLOBAL POLL LOOP — runs ONCE for all active users ──────────────────────
+async function globalPoll() {
+  const activeUsers = Object.entries(sessions);
+  if (!activeUsers.length) return;
+
+  try {
+    // ① Discovery — one call for everyone
     const markets = await fetchActiveUpOrDownMarkets();
+    log('poll', `Scanning ${markets.length} markets for ${activeUsers.length} user(s)`);
 
     for (const { conditionId, title } of markets) {
       try {
-        // Asset filter
-        if (!passesAssetFilter(title, config.assets)) continue;
-
-        const sess = sessions[userId];
-
-        // Get full market info from CLOB (reliable by conditionId)
+        // ② Market info — once per market
         const mkt = await getMarketInfo(conditionId);
         if (!mkt || mkt.closed) continue;
 
-        // Time filter
+        // ③ Time filter — once per market
         if (!passesTimeFilter(mkt)) continue;
 
         const tokens = mkt.tokens || [];
         if (tokens.length < 2) continue;
 
-        // Find which token is at >= minPrice
+        // ④ Find token at minPrice (use lowest configured minPrice to be inclusive)
+        const lowestMin = Math.min(...activeUsers.map(([, s]) => s.config.minPrice));
         let targetIdx   = -1;
         let targetToken = null;
 
         for (let i = 0; i < tokens.length; i++) {
-          if (parseFloat(tokens[i].price ?? 0) >= config.minPrice) {
+          if (parseFloat(tokens[i].price ?? 0) >= lowestMin) {
             targetIdx   = i;
             targetToken = tokens[i].token_id;
             break;
@@ -336,62 +382,22 @@ async function pollMarkets(userId, wallet, config) {
         }
         if (targetIdx < 0 || !targetToken) continue;
 
-        // Dedup
-        const entryKey = `${conditionId}_${targetIdx}`;
-        if (sess?.entered?.has(entryKey)) continue;
+        // ⑤ Book filter — once per token
+        const bookResult = await passesBookFilter(targetToken, lowestMin);
+        if (!bookResult.ok) continue;
 
-        // Book depth + spread + live price check
-        const bookResult = await passesBookFilter(targetToken, config.minPrice);
-        if (!bookResult.ok) {
-          log('filter', 'Book filter failed', { conditionId: conditionId.slice(0,10) });
-          continue;
-        }
+        // ⑥ Fan-out: place orders for all eligible users in parallel
+        await Promise.all(activeUsers.map(([userId, sess]) => {
+          if (!passesAssetFilter(title, sess.config.assets)) return Promise.resolve();
+          return placeForUser(userId, sess, conditionId, targetToken, targetIdx, bookResult.livePrice, mkt, title);
+        }));
 
-        // Balance check
-        const walletData = await db.getWalletByUserId(userId);
-        const balance    = await db.getUSDCBalance(walletData.address).catch(() => 0);
-        if (balance < config.amount) {
-          log('skip', 'Insufficient balance', { userId, balance, needed: config.amount });
-          continue;
-        }
-
-        // All filters passed — place FOK
-        const livePrice = bookResult.livePrice;
-        log('trade', 'Placing FOK', {
-          userId, market: title.slice(0,50), price: livePrice, amount: config.amount,
-        });
-
-        try {
-          const { result, sharesSize, roundedPrice } = await placeFOKOrder(wallet, targetToken, livePrice, config.amount);
-
-          if (!result.orderID || result.status === 'CANCELLED') {
-            log('trade', 'FOK not matched — no liquidity', { conditionId: conditionId.slice(0,10) });
-            continue;
-          }
-
-          const outcomeLabel = tokens[targetIdx]?.outcome || (targetIdx === 0 ? 'Yes' : 'No');
-          await db.upsertAutoTradePosition(userId, {
-            conditionId,
-            outcome:      outcomeLabel,
-            marketName:   mkt.question || title,
-            tokenId:      targetToken,
-            outcomeIndex: targetIdx,
-            price:        roundedPrice,
-            shares:       sharesSize,
-            usdcSpent:    config.amount,
-          });
-
-          sess?.entered?.add(entryKey);
-          log('trade', 'FOK filled ✓', { userId, conditionId: conditionId.slice(0,10), shares: sharesSize, price: roundedPrice });
-        } catch (e) {
-          log('trade', 'FOK error', { conditionId: conditionId.slice(0,10), err: e.message.slice(0,120) });
-        }
       } catch (e) {
-        log('poll', 'market loop error', { conditionId: conditionId?.slice(0,10), err: e.message.slice(0,80) });
+        log('poll', 'market error', { conditionId: conditionId?.slice(0,10), err: e.message.slice(0,80) });
       }
     }
   } catch (e) {
-    log('poll', 'pollMarkets error', { err: e.message.slice(0,120) });
+    log('poll', 'globalPoll error', { err: e.message.slice(0,120) });
   }
 }
 
@@ -409,29 +415,49 @@ async function startAutoTrade(userId) {
   const wallet     = new ethers.Wallet(privateKey);
 
   sessions[userId] = {
+    wallet,
+    config: {
+      amount:   parseFloat(config.amount),
+      minPrice: parseFloat(config.min_price),
+      duration: config.duration,
+      assets:   config.assets,
+    },
     entered:     new Set(),
-    pollTimer:   setInterval(() => pollMarkets(userId, wallet, config).catch(
-                   e => log('poll', 'interval error', { err: e.message.slice(0,80) })), POLL_MS),
     redeemTimer: setInterval(() => checkResolutions(userId, wallet).catch(
                    e => log('redeem', 'interval error', { err: e.message.slice(0,80) })), REDEEM_MS),
   };
 
   await db.setAutoTradeRunning(userId, true);
-  log('session', 'started', { userId });
-  pollMarkets(userId, wallet, config).catch(() => {});
+  log('session', 'started', { userId, totalActive: Object.keys(sessions).length });
+
+  // Start the shared global poll loop if not already running
+  if (!_globalPollTimer) {
+    _globalPollTimer = setInterval(() => globalPoll().catch(
+      e => log('poll', 'global interval error', { err: e.message.slice(0,80) })
+    ), POLL_MS);
+    log('poll', 'Global poll loop started');
+    globalPoll().catch(() => {}); // immediate first run
+  }
 }
 
 async function stopAutoTrade(userId) {
   const sess = sessions[userId];
   if (sess) {
-    clearInterval(sess.pollTimer);
     clearInterval(sess.redeemTimer);
     delete sessions[userId];
+    const walletData = await db.getWalletByUserId(userId).catch(() => null);
+    if (walletData?.address) delete _clobClients[walletData.address];
   }
-  const walletData = await db.getWalletByUserId(userId).catch(() => null);
-  if (walletData?.address) delete _clobClients[walletData.address];
+
   await db.setAutoTradeRunning(userId, false);
-  log('session', 'stopped', { userId });
+  log('session', 'stopped', { userId, remaining: Object.keys(sessions).length });
+
+  // Stop global poll loop when no more active users
+  if (Object.keys(sessions).length === 0 && _globalPollTimer) {
+    clearInterval(_globalPollTimer);
+    _globalPollTimer = null;
+    log('poll', 'Global poll loop stopped — no active users');
+  }
 }
 
 function isRunning(userId) { return !!sessions[userId]; }
