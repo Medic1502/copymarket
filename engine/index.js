@@ -489,7 +489,8 @@ async function getClobClient(wallet) {
 
 // side: 'BUY' | 'SELL'
 // amount: USDC to spend (BUY), shares to sell (SELL)
-async function placeOrder(wallet, tokenId, side, price, amount) {
+// orderType: optional override ('GTC' | 'FOK'). Defaults to GTC.
+async function placeOrder(wallet, tokenId, side, price, amount, orderType) {
   const { Side, OrderType } = await getClobLib();
   const client = await getClobClient(wallet);
   const isBuy = side === 'BUY';
@@ -515,7 +516,8 @@ async function placeOrder(wallet, tokenId, side, price, amount) {
     { tickSize, negRisk }
   );
 
-  const result = await client.postOrder(order, OrderType.GTC);
+  const chosenType = orderType ?? OrderType.GTC;
+  const result = await client.postOrder(order, chosenType);
   if (result.errorMsg) throw new Error(`CLOB rejected: ${result.errorMsg}`);
   if (result.status && result.status >= 400) throw new Error(`CLOB error ${result.status}: ${JSON.stringify(result)}`);
   return result;
@@ -596,8 +598,22 @@ async function processSignalForUser(user, wallet, signal, side) {
       const marketName = market?.question || market?.title || market?.market_slug || signal.conditionId;
       const marketSlug = market?.market_slug || null;
 
-      logger.trade('Placing BUY', { userId: user.id, market: marketName.slice(0,40), price, usdc: usdcToSpend });
-      const result = await placeOrder(wallet, tokenId, 'BUY', price, usdcToSpend);
+      // High-price orders (≥95¢) use FOK: fills immediately at this price or cancels.
+      // GTC at 99¢ near market close sits unfilled then gets auto-cancelled by the CLOB —
+      // FOK surfaces that cancellation as an error here, preventing phantom positions.
+      const { OrderType: OT } = await getClobLib();
+      const chosenOrderType = price >= 0.95 ? OT.FOK : OT.GTC;
+      logger.trade('Placing BUY', { userId: user.id, market: marketName.slice(0,40), price, usdc: usdcToSpend, type: chosenOrderType });
+      const result = await placeOrder(wallet, tokenId, 'BUY', price, usdcToSpend, chosenOrderType);
+
+      // FOK: if CLOB accepted but didn't fill (no immediate match), treat as skip
+      if (chosenOrderType === OT.FOK && (!result.orderID || result.status === 'CANCELLED')) {
+        logger.info('FOK order not matched — no sell liquidity at this price, skipping', {
+          userId: user.id, price, conditionId: signal.conditionId?.slice(0,10),
+        });
+        return;
+      }
+
       logger.trade('BUY placed', { userId: user.id, orderId: result.orderID, status: result.status });
       const key = snapshotKey(signal);
       const prev = userBought[user.id]?.get(key) || { usdc: 0, shares: 0 };
@@ -639,9 +655,66 @@ async function processSignalForUser(user, wallet, signal, side) {
   } catch (err) {
     logger.error(`${side} failed`, { userId: user.id, conditionId: signal.conditionId, error: err.message });
     if (side === 'BUY') {
-      await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName: signal.conditionId, outcome: signal.outcome, side: 'BUY', size: 0, price: 0, orderId: null, filledSize: null, status: 'FAILED', skipReason: err.message.slice(0, 200), pnl: null, configId: user.configId }).catch(() => {});
+      const failMkt  = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
+      const failName = failMkt?.question || failMkt?.title || failMkt?.market_slug || signal.conditionId;
+      await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName: failName, outcome: signal.outcome, side: 'BUY', size: 0, price: 0, orderId: null, filledSize: null, status: 'FAILED', skipReason: err.message.slice(0, 200), pnl: null, configId: user.configId }).catch(() => {});
     }
   }
+}
+
+// Redeem a winning CTF position via EIP-712 batch (primary) or direct execute (fallback)
+async function redeemPositionOnChain(signer, depositAddr, conditionId, isNegRisk) {
+  const adapterAddr = isNegRisk ? NEG_RISK_CTF_COLLATERAL_ADAPTER : CTF_COLLATERAL_ADAPTER;
+  const adapterIface = new ethers.Interface([
+    'function redeemPositions(address collateralToken, bytes32 parentCollectionId, bytes32 conditionId, uint256[] indexSets)',
+  ]);
+  const redeemData = adapterIface.encodeFunctionData('redeemPositions', [
+    PUSD_ADDRESS,
+    '0x0000000000000000000000000000000000000000000000000000000000000000',
+    conditionId,
+    [1n, 2n],
+  ]);
+  const call = { target: adapterAddr, value: 0n, data: redeemData };
+
+  // Primary: EIP-712 batch via factory — same mechanism used for approvals
+  try {
+    const depositContract = new ethers.Contract(depositAddr, ['function nonce() view returns (uint256)'], signer.provider);
+    const nonce    = await depositContract.nonce();
+    const deadline = Math.floor(Date.now() / 1000) + 3600;
+    const domain   = { name: 'DepositWallet', version: '1', chainId: CHAIN_ID, verifyingContract: depositAddr };
+    const types    = {
+      Call:  [{ name: 'target', type: 'address' }, { name: 'value', type: 'uint256' }, { name: 'data', type: 'bytes' }],
+      Batch: [{ name: 'wallet', type: 'address' }, { name: 'nonce', type: 'uint256' }, { name: 'deadline', type: 'uint256' }, { name: 'calls', type: 'Call[]' }],
+    };
+    const message = { wallet: depositAddr, nonce: Number(nonce), deadline, calls: [call] };
+    const sig     = await signer.signTypedData(domain, types, message);
+    const encoded = ethers.AbiCoder.defaultAbiCoder().encode(
+      ['address','uint256','uint256','tuple(address target,uint256 value,bytes data)[]','bytes'],
+      [depositAddr, Number(nonce), deadline, [[call.target, call.value, call.data]], sig]
+    );
+    for (const sel of ['0x30d8f990','0xf59c8ac6','0x70558d06','0x8fc0307e']) {
+      try {
+        const tx = await signer.sendTransaction({ to: DEPOSIT_WALLET_FACTORY, data: sel + encoded.slice(2) });
+        await tx.wait();
+        return tx.hash;
+      } catch {}
+    }
+  } catch {}
+
+  // Fallback: direct execute/exec/call on deposit wallet
+  for (const fn of ['execute','exec','call']) {
+    try {
+      const iface = new ethers.Interface([`function ${fn}(address to, uint256 value, bytes data)`]);
+      const tx = await signer.sendTransaction({
+        to:   depositAddr,
+        data: iface.encodeFunctionData(fn, [adapterAddr, 0, redeemData]),
+      });
+      await tx.wait();
+      return tx.hash;
+    } catch {}
+  }
+
+  throw new Error('All redemption methods failed');
 }
 
 async function checkAndRedeemPositions(user, wallet) {
@@ -711,6 +784,24 @@ async function checkAndRedeemPositions(user, wallet) {
           continue;
         }
 
+        // Guard: verify we actually hold CTF tokens before recording any outcome.
+        // Limit orders near market close often go unfilled — order submits to CLOB but is
+        // cancelled when the market closes, so no tokens transfer and no USDC leaves the wallet.
+        if (clobTokenIds.length > ourIdx) {
+          const ctfGuardAbi = ['function balanceOf(address,uint256) view returns (uint256)'];
+          const ctfGuard = new ethers.Contract(CTF_ADDR, ctfGuardAbi, provider);
+          const ctfBal = await ctfGuard.balanceOf(depositAddr, BigInt(clobTokenIds[ourIdx])).catch(() => 0n);
+          if (ctfBal === 0n) {
+            logger.info('No CTF tokens — order unfilled (cancelled at market close), removing phantom position', {
+              userId: user.id, conditionId: conditionId.slice(0, 10), outcome: pos.outcome,
+            });
+            // pnl=0 because USDC was never spent (limit order never matched)
+            await db.resolveBotPosition(user.id, conditionId, pos.outcome, 'LOST', 0).catch(() => {});
+            if (userBought[user.id]) userBought[user.id].delete(`${conditionId}_${pos.outcome}`);
+            continue;
+          }
+        }
+
         // Winner determination: on-chain payoutNumerators is authoritative (works for 99¢ traders too)
         // Fall back to Gamma outcomePrices only if on-chain check wasn't done
         let isWinner;
@@ -765,51 +856,19 @@ async function checkAndRedeemPositions(user, wallet) {
 
         // Attempt on-chain redeem async (non-blocking) — only needed for winning positions
         if (isWinner) {
-          const adapterAddr = market.negRisk
-            ? NEG_RISK_CTF_COLLATERAL_ADAPTER
-            : CTF_COLLATERAL_ADAPTER;
-
-          const adapterIface = new ethers.Interface([
-            'function redeemPositions(address collateralToken, bytes32 parentCollectionId, bytes32 conditionId, uint256[] indexSets)',
-          ]);
-          const redeemCalldata = adapterIface.encodeFunctionData('redeemPositions', [
-            PUSD_ADDRESS,
-            '0x0000000000000000000000000000000000000000000000000000000000000000',
-            conditionId,
-            [1n, 2n],
-          ]);
-
-          const executeFns = [
-            'function execute(address to, uint256 value, bytes data)',
-            'function exec(address to, uint256 value, bytes data)',
-            'function call(address to, uint256 value, bytes data)',
-          ];
-
           ;(async () => {
-            // Check MATIC balance first — no gas = all txs will fail
             const maticBal = await provider.getBalance(signer.address).catch(() => 0n);
             if (maticBal < ethers.parseEther('0.001')) {
-              logger.warn('On-chain redeem skipped: EOA has insufficient MATIC for gas', {
+              logger.warn('On-chain redeem skipped: insufficient MATIC for gas', {
                 userId: user.id, eoaAddress: signer.address, maticBal: ethers.formatEther(maticBal),
               });
               return;
             }
-            for (const fn of executeFns) {
-              const iface  = new ethers.Interface([fn]);
-              const fnName = fn.split('(')[0].split(' ')[1];
-              try {
-                const tx = await signer.sendTransaction({
-                  to:   depositAddr,
-                  data: iface.encodeFunctionData(fnName, [adapterAddr, 0, redeemCalldata]),
-                });
-                await tx.wait();
-                logger.trade('On-chain redeem confirmed', {
-                  userId: user.id, txHash: tx.hash, conditionId: conditionId.slice(0, 10),
-                });
-                break;
-              } catch (e) {
-                logger.warn('On-chain redeem attempt failed', { fn: fnName, error: e.message.slice(0, 200) });
-              }
+            try {
+              const txHash = await redeemPositionOnChain(signer, depositAddr, conditionId, market?.negRisk);
+              logger.trade('On-chain redeem confirmed', { userId: user.id, txHash, conditionId: conditionId.slice(0, 10) });
+            } catch (e) {
+              logger.warn('On-chain redeem failed', { userId: user.id, conditionId: conditionId.slice(0, 10), error: e.message.slice(0, 200) });
             }
           })().catch(e => logger.warn('Async redeem error', { error: e.message.slice(0, 200) }));
         }
@@ -921,11 +980,10 @@ async function startCopyEngine(user, targetWallet) {
     logger.warn('Could not load positions', { userId: user.id, error: err.message });
   }
 
-  // Decrypt key and approve USDC - fully isolated per user wallet
+  // Decrypt key — deposit wallet handles its own approvals via relay service, EOA approvals not needed
   const privateKey = decryptPrivateKey(user.encryptedPrivateKey);
   const wallet = new ethers.Wallet(privateKey);
-  // Skip EOA approvals for POLY_1271 — deposit wallet handles its own approvals via polymarket.com
-  ensureApprovals(wallet).catch(e => logger.warn('Approval warning', { error: e.message.slice(0,60) }));
+  approvedWallets.add(wallet.address); // mark as ready; deposit wallet manages its own allowances
 
   // Start redemption checker (once per user across all their configs)
   configToUserId[user.configId] = user.id;
@@ -991,7 +1049,7 @@ async function startCopyEngine(user, targetWallet) {
 
           // Process signals for EACH user independently - fully isolated
           for (const [, { user: u, wallet: w }] of poll.users) {
-            if (!approvedWallets.has(w.address)) ensureApprovals(w).catch(() => {});
+            if (!approvedWallets.has(w.address)) approvedWallets.add(w.address);
             // Cached balance — 30s TTL prevents N calls per poll when no new activity
             const bal = await getWalletBalanceCached(u.walletAddress);
             if (bal < 1) {
