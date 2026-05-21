@@ -637,100 +637,101 @@ div.expand-panel.closed{display:none !important}
     <!-- ── AUTO TRADE ──────────────────────────────── -->
     <div id="tab-autotrade" class="tab-panel">
 
-      <!-- Header -->
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px">
+      <!-- Header row -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
         <div>
-          <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:8px">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <div style="font-size:18px;font-weight:700;color:var(--text);margin-bottom:3px;display:flex;align-items:center;gap:8px">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
             Auto Trade
           </div>
-          <div style="font-size:13px;color:var(--text2)">Ulazi automatski u 5-min kripto markete kad cijena dostigne target</div>
+          <div style="font-size:12.5px;color:var(--text2)">Automatically trades high-confidence crypto markets all day</div>
         </div>
         <div id="at-status-pill" class="at-status-pill stopped">
-          <span id="at-dot" style="width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block"></span>
+          <span style="width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block"></span>
           <span id="at-status-text">STOPPED</span>
         </div>
       </div>
 
-      <!-- Mini stats -->
+      <!-- Stats row -->
       <div class="card" style="margin-bottom:14px;padding:0">
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border)">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr)">
           <div class="at-stat-mini" style="border-right:1px solid var(--border)">
-            <div class="val" id="at-s-trades">0</div><div class="lbl">Danas trejdova</div>
+            <div class="val" id="at-s-trades">0</div><div class="lbl">Trades today</div>
           </div>
           <div class="at-stat-mini" style="border-right:1px solid var(--border)">
             <div class="val" id="at-s-wins">0</div><div class="lbl">Wins</div>
           </div>
           <div class="at-stat-mini" style="border-right:1px solid var(--border)">
-            <div class="val pos" id="at-s-pnl">$0.00</div><div class="lbl">P&amp;L danas</div>
+            <div class="val" id="at-s-pnl">$0.00</div><div class="lbl">P&amp;L today</div>
           </div>
           <div class="at-stat-mini">
-            <div class="val" id="at-s-open">0</div><div class="lbl">Otvoreno</div>
+            <div class="val" id="at-s-open">0</div><div class="lbl">Open</div>
           </div>
         </div>
       </div>
 
-      <!-- Config -->
+      <!-- Config card -->
       <div class="card" style="margin-bottom:14px">
-        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:16px">Konfiguracija</div>
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:18px">Configuration</div>
 
-        <div class="two-col" style="margin-bottom:16px">
-          <div class="field">
-            <label>Iznos po trejdu ($)</label>
-            <input type="number" id="at-amount" value="10" min="1" step="1" placeholder="npr. 10">
-          </div>
-          <div class="field">
-            <label>Min cijena za ulaz (¢)</label>
-            <input type="number" id="at-min-price" value="97" min="90" max="99" step="1" placeholder="97">
-          </div>
-        </div>
-
-        <div class="field" style="margin-bottom:16px">
-          <label>Trajanje marketa</label>
-          <div style="display:flex;gap:8px;margin-top:6px">
-            <button class="at-dur-btn active" id="at-dur-5" onclick="setAtDuration('5',this)">5-min</button>
-            <button class="at-dur-btn" id="at-dur-15" onclick="setAtDuration('15',this)">15-min</button>
-            <button class="at-dur-btn" id="at-dur-both" onclick="setAtDuration('both',this)">Oba</button>
+        <!-- Amount -->
+        <div style="margin-bottom:20px">
+          <label>Amount per trade</label>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+            <div style="position:relative;flex:0 0 160px">
+              <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);font-weight:600;font-size:14px;pointer-events:none">$</span>
+              <input type="number" id="at-amount" value="10" min="1" step="1"
+                style="padding-left:26px;width:100%">
+            </div>
+            <span style="font-size:12px;color:var(--text3)">USDC per position</span>
           </div>
         </div>
 
-        <div class="field">
-          <label>Assets</label>
-          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
-            <button class="at-asset-btn active" data-asset="BTC" onclick="toggleAtAsset(this)">BTC</button>
-            <button class="at-asset-btn active" data-asset="ETH" onclick="toggleAtAsset(this)">ETH</button>
-            <button class="at-asset-btn active" data-asset="XRP" onclick="toggleAtAsset(this)">XRP</button>
-            <button class="at-asset-btn active" data-asset="SOL" onclick="toggleAtAsset(this)">SOL</button>
-            <button class="at-asset-btn active" data-asset="BNB" onclick="toggleAtAsset(this)">BNB</button>
-            <button class="at-asset-btn active" data-asset="DOGE" onclick="toggleAtAsset(this)">DOGE</button>
-            <button class="at-asset-btn" data-asset="HYPE" onclick="toggleAtAsset(this)">Hyperliquid</button>
+        <!-- Assets -->
+        <div style="margin-bottom:22px">
+          <label>Markets to watch</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">
+            <button class="at-asset-btn active" data-asset="BTC"  onclick="toggleAtAsset(this)">Bitcoin</button>
+            <button class="at-asset-btn active" data-asset="ETH"  onclick="toggleAtAsset(this)">Ethereum</button>
+            <button class="at-asset-btn active" data-asset="XRP"  onclick="toggleAtAsset(this)">XRP</button>
+            <button class="at-asset-btn active" data-asset="SOL"  onclick="toggleAtAsset(this)">Solana</button>
+            <button class="at-asset-btn active" data-asset="BNB"  onclick="toggleAtAsset(this)">BNB</button>
+            <button class="at-asset-btn active" data-asset="DOGE" onclick="toggleAtAsset(this)">Dogecoin</button>
+            <button class="at-asset-btn"        data-asset="HYPE" onclick="toggleAtAsset(this)">Hyperliquid</button>
           </div>
+          <div style="margin-top:8px;font-size:11.5px;color:var(--text3)">Select which crypto markets to monitor. At least one required.</div>
         </div>
 
-        <div style="margin-top:20px;display:flex;gap:10px;align-items:center">
-          <button class="btn btn-primary" onclick="saveAtConfig()" id="at-save-btn">Sačuvaj</button>
-          <button class="btn btn-green" id="at-start-btn" onclick="startAutoTrade()">▶ Start</button>
-          <button class="btn" id="at-stop-btn" style="display:none;color:var(--red);border-color:rgba(239,68,68,.35)" onclick="stopAutoTrade()">■ Stop</button>
-          <span id="at-save-msg" style="font-size:12px;color:var(--green);display:none">Sačuvano ✓</span>
+        <!-- Buttons -->
+        <div style="display:flex;gap:10px;align-items:center">
+          <button class="btn btn-green" id="at-start-btn" onclick="startAutoTrade()" style="min-width:90px">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Start
+          </button>
+          <button class="btn btn-red" id="at-stop-btn" style="display:none;min-width:90px" onclick="stopAutoTrade()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+            Stop
+          </button>
+          <span id="at-save-msg" style="font-size:12px;color:var(--green);display:none">Saved ✓</span>
         </div>
       </div>
 
-      <!-- Filters info -->
-      <div class="card" style="margin-bottom:14px;background:rgba(37,99,235,.06);border-color:rgba(37,99,235,.2)">
-        <div style="font-size:11px;font-weight:700;color:var(--blue-light);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px">Aktivni filteri (auto)</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;color:var(--text2)">
-          <div>✓ <strong style="color:var(--text)">Vreme u marketu</strong> — ulaz samo nakon 40% prozora (isključuje lažne rane signale)</div>
-          <div>✓ <strong style="color:var(--text)">Dubina knjige</strong> — mora biti ≥40 sharesa na ask strani</div>
-          <div>✓ <strong style="color:var(--text)">Spread</strong> — bid-ask spread ≤4¢ (detektuje manipulaciju)</div>
-          <div>✓ <strong style="color:var(--text)">Volumen</strong> — market mora imati min $200 prometa</div>
+      <!-- How it works -->
+      <div class="card" style="margin-bottom:14px;background:rgba(245,158,11,.04);border-color:rgba(245,158,11,.2)">
+        <div style="font-size:11px;font-weight:700;color:#F59E0B;text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px">How it works</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;color:var(--text2);line-height:1.6">
+          <div><span style="color:#F59E0B;font-weight:700">1.</span> Scans all 5 &amp; 15-min Up/Down crypto markets every 30s</div>
+          <div><span style="color:#F59E0B;font-weight:700">2.</span> Enters only when price ≥97¢ and market is well established</div>
+          <div><span style="color:#F59E0B;font-weight:700">3.</span> Smart filters: timing, order book depth, spread, volume</div>
+          <div><span style="color:#F59E0B;font-weight:700">4.</span> Fill-or-Kill orders — never creates phantom positions</div>
         </div>
       </div>
 
       <!-- Recent trades -->
       <div class="card">
-        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">Nedavni auto-trejdovi</div>
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:14px">Recent Trades</div>
         <div id="at-trades-list">
-          <div style="color:var(--text3);font-size:13px;text-align:center;padding:28px 0">Nema trejdova još</div>
+          <div style="color:var(--text3);font-size:13px;text-align:center;padding:28px 0">No trades yet — start the bot to begin</div>
         </div>
       </div>
 
@@ -902,38 +903,27 @@ async function api(method, path, body) {
 }
 
 // ── AUTO TRADE ───────────────────────────────────────────────────────────────
-let _atRunning   = false;
-let _atDuration  = '5';
 let _atPollTimer = null;
 
-function setAtDuration(dur, btn) {
-  _atDuration = dur;
-  document.querySelectorAll('.at-dur-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-}
-
-function toggleAtAsset(btn) {
-  btn.classList.toggle('active');
-}
+function toggleAtAsset(btn) { btn.classList.toggle('active'); }
 
 function getAtAssets() {
   return Array.from(document.querySelectorAll('.at-asset-btn.active')).map(b => b.dataset.asset);
 }
 
 function setAtStatus(running) {
-  _atRunning = running;
-  const pill = document.getElementById('at-status-pill');
-  const txt  = document.getElementById('at-status-text');
+  const pill     = document.getElementById('at-status-pill');
+  const txt      = document.getElementById('at-status-text');
   const startBtn = document.getElementById('at-start-btn');
   const stopBtn  = document.getElementById('at-stop-btn');
   if (running) {
-    pill.className = 'at-status-pill running';
-    txt.textContent = 'RUNNING';
+    pill.className    = 'at-status-pill running';
+    txt.textContent   = 'RUNNING';
     startBtn.style.display = 'none';
     stopBtn.style.display  = '';
   } else {
-    pill.className = 'at-status-pill stopped';
-    txt.textContent = 'STOPPED';
+    pill.className    = 'at-status-pill stopped';
+    txt.textContent   = 'STOPPED';
     startBtn.style.display = '';
     stopBtn.style.display  = 'none';
   }
@@ -941,19 +931,19 @@ function setAtStatus(running) {
 
 function renderAtTrades(trades) {
   const el = document.getElementById('at-trades-list');
-  if (!trades || trades.length === 0) {
-    el.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:28px 0">Nema trejdova još</div>';
+  if (!trades || !trades.length) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:28px 0">No trades yet — start the bot to begin</div>';
     return;
   }
   el.innerHTML = trades.map(t => {
     const badge  = t.status === 'WON' ? 'win' : t.status === 'LOST' ? 'loss' : 'open';
-    const label  = t.status === 'WON' ? 'WIN' : t.status === 'LOST' ? 'LOSS' : 'OPEN';
+    const label  = t.status === 'WON' ? 'WIN'  : t.status === 'LOST' ? 'LOSS' : 'OPEN';
     const pnlStr = t.pnl != null ? (t.pnl >= 0 ? '+$' : '-$') + Math.abs(t.pnl).toFixed(2) : '—';
     const pnlCol = t.pnl > 0 ? 'var(--green)' : t.pnl < 0 ? 'var(--red)' : 'var(--text2)';
     return `<div class="at-trade-row">
       <span class="at-badge ${badge}">${label}</span>
-      <span style="flex:1;font-size:12.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.marketName || '—'}</span>
-      <span style="font-size:12px;color:var(--text3);margin-right:10px;flex-shrink:0">${t.outcome || ''} · ${(t.price*100||0).toFixed(0)}¢</span>
+      <span style="flex:1;font-size:12.5px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.marketName||'—'}</span>
+      <span style="font-size:12px;color:var(--text3);margin-right:10px;flex-shrink:0">${t.outcome||''} · ${((t.price||0)*100).toFixed(0)}¢</span>
       <span style="font-size:13px;font-weight:600;color:${pnlCol};flex-shrink:0">${pnlStr}</span>
     </div>`;
   }).join('');
@@ -964,64 +954,49 @@ async function loadAtStatus() {
     const data = await api('GET', '/auto-trade/status');
     setAtStatus(data.running);
     if (data.config) {
-      document.getElementById('at-amount').value    = data.config.amount    || 10;
-      document.getElementById('at-min-price').value = data.config.minPrice  || 97;
-      _atDuration = data.config.duration || '5';
-      document.querySelectorAll('.at-dur-btn').forEach(b => b.classList.remove('active'));
-      const durEl = document.getElementById('at-dur-' + (_atDuration === 'both' ? 'both' : _atDuration));
-      if (durEl) durEl.classList.add('active');
+      document.getElementById('at-amount').value = data.config.amount || 10;
       if (data.config.assets) {
         document.querySelectorAll('.at-asset-btn').forEach(b => {
           b.classList.toggle('active', data.config.assets.includes(b.dataset.asset));
         });
       }
     }
-    // stats
     if (data.stats) {
-      document.getElementById('at-s-trades').textContent = data.stats.trades || 0;
-      document.getElementById('at-s-wins').textContent   = data.stats.wins   || 0;
-      const pnl = data.stats.pnl || 0;
+      document.getElementById('at-s-trades').textContent = data.stats.todayTrades || 0;
+      document.getElementById('at-s-wins').textContent   = data.stats.wins || 0;
+      const pnl   = data.stats.pnl || 0;
       const pnlEl = document.getElementById('at-s-pnl');
       pnlEl.textContent = (pnl >= 0 ? '+$' : '-$') + Math.abs(pnl).toFixed(2);
-      pnlEl.className = 'val ' + (pnl >= 0 ? 'pos' : 'neg');
+      pnlEl.className   = 'val ' + (pnl >= 0 ? 'pos' : 'neg');
       document.getElementById('at-s-open').textContent = data.stats.open || 0;
     }
     renderAtTrades(data.trades || []);
-  } catch {
-    // backend not yet wired — silent
-  }
-}
-
-async function saveAtConfig() {
-  const btn = document.getElementById('at-save-btn');
-  btn.disabled = true;
-  try {
-    await api('POST', '/auto-trade/config', {
-      amount:   parseFloat(document.getElementById('at-amount').value) || 10,
-      minPrice: parseFloat(document.getElementById('at-min-price').value) / 100 || 0.97,
-      duration: _atDuration,
-      assets:   getAtAssets(),
-    });
-    const msg = document.getElementById('at-save-msg');
-    msg.style.display = '';
-    setTimeout(() => msg.style.display = 'none', 2000);
-  } catch (e) {
-    showToast('Greška: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false;
-  }
+  } catch { /* backend silent until first deploy */ }
 }
 
 async function startAutoTrade() {
+  const assets = getAtAssets();
+  if (!assets.length) { showToast('Select at least one market', 'error'); return; }
+  const amount = parseFloat(document.getElementById('at-amount').value);
+  if (!amount || amount < 1) { showToast('Enter a valid amount', 'error'); return; }
+
+  const startBtn = document.getElementById('at-start-btn');
+  startBtn.disabled = true;
   try {
-    await saveAtConfig();
+    await api('POST', '/auto-trade/config', {
+      amount, minPrice: 0.97, duration: 'both', assets,
+    });
     await api('POST', '/auto-trade/start');
     setAtStatus(true);
+    const msg = document.getElementById('at-save-msg');
+    msg.style.display = '';
+    setTimeout(() => msg.style.display = 'none', 2000);
     showToast('Auto Trade started', 'success');
     if (_atPollTimer) clearInterval(_atPollTimer);
     _atPollTimer = setInterval(loadAtStatus, 15000);
   } catch (e) {
-    showToast('Greška: ' + e.message, 'error');
+    showToast(e.message, 'error');
+    startBtn.disabled = false;
   }
 }
 
@@ -1031,9 +1006,7 @@ async function stopAutoTrade() {
     setAtStatus(false);
     showToast('Auto Trade stopped', 'success');
     if (_atPollTimer) { clearInterval(_atPollTimer); _atPollTimer = null; }
-  } catch (e) {
-    showToast('Greška: ' + e.message, 'error');
-  }
+  } catch (e) { showToast(e.message, 'error'); }
 }
 
 // auto trade tab hook — patched into existing navSwitch below
