@@ -317,7 +317,7 @@ async function getLeaderboard(period, currentUserId) {
     ? `AND bp.updated_at >= NOW() - INTERVAL '${intervals[period]}'`
     : '';
   const tradesPeriod = intervals[period]
-    ? `AND t.created_at >= NOW() - INTERVAL '${intervals[period]}'`
+    ? `AND created_at >= NOW() - INTERVAL '${intervals[period]}'`
     : '';
   const sql = `
     WITH vol AS (
