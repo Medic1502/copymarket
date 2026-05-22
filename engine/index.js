@@ -179,7 +179,7 @@ async function apiFetch(url, opts = {}) {
 
 // Returns recent trade activity sorted newest-first
 async function getRecentActivity(walletAddress) {
-  const data = await apiFetch(`https://data-api.polymarket.com/activity?user=${walletAddress}&limit=200`);
+  const data = await apiFetch(`https://data-api.polymarket.com/activity?user=${walletAddress}&limit=500`);
   const items = Array.isArray(data) ? data : (data.data || data.activity || []);
   return items.map(a => {
     const usdcSize = parseFloat(a.usdcSize || a.usdc_size || a.cashSize || a.amount || 0);
@@ -1016,8 +1016,10 @@ async function startCopyEngine(user, targetWallet) {
   // Register config in the shared poll for this target wallet
   activeEngines[user.configId] = targetWallet;
   if (!sharedPolls[targetWallet]) {
-    // Initialize timestamp cursor to now in ms — only copy trades after this point
-    lastActivityTs[targetWallet] = Date.now();
+    // 5-minute lookback so trades during Railway restarts are not missed.
+    // Safe: userBought is pre-populated from bot_positions so already-copied
+    // positions get skipped by the initial_only / maxPositionSize checks.
+    lastActivityTs[targetWallet] = Date.now() - 5 * 60 * 1000;
     logger.info('Activity cursor initialized', { targetWallet, fromTs: lastActivityTs[targetWallet] });
 
     sharedPolls[targetWallet] = {
