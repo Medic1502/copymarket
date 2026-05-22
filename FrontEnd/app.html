@@ -125,15 +125,23 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
 .btn-block{width:100%}
 .mode-btn{flex:1}
 .mode-btn.selected{background:var(--blue);color:#fff;border-color:var(--blue)}
-.cat-chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
-.cat-chip:hover{border-color:var(--blue);color:var(--text)}
-.cat-chip.on{background:rgba(37,99,235,.2);border-color:var(--blue);color:#93C5FD}
-.cat-chip.blocked{background:rgba(239,68,68,.15);border-color:#EF4444;color:#FCA5A5}
-.cat-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.cat-group-label{font-size:11px;font-weight:700;color:var(--text3);min-width:18px}
-.cat-broad{font-weight:700;font-size:11px;padding:3px 11px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}
-.cat-broad.on{background:rgba(37,99,235,.25);border-color:var(--blue);color:#93C5FD}
-.cat-broad:hover{border-color:var(--blue);color:var(--text)}
+.cat-section{display:flex;flex-direction:column;gap:4px;padding:8px 0;border-bottom:1px solid var(--border)}
+.cat-section:last-child{border-bottom:none;padding-bottom:0}
+.cat-section:first-child{padding-top:0}
+.cat-parent-row{display:flex;align-items:center;gap:8px;cursor:pointer;padding:2px 0}
+.cat-parent-row:hover .cat-parent-label{color:var(--text)}
+.cat-checkbox{width:15px;height:15px;border:1.5px solid var(--border);border-radius:3px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+.cat-checkbox.on{background:var(--blue);border-color:var(--blue)}
+.cat-checkbox.partial{background:rgba(37,99,235,.35);border-color:var(--blue)}
+.cat-checkbox svg{display:none}
+.cat-checkbox.on svg,.cat-checkbox.partial svg{display:block}
+.cat-parent-label{font-size:13px;font-weight:700;color:var(--text2);user-select:none;transition:color .1s}
+.cat-parent-row.on .cat-parent-label{color:var(--text)}
+.cat-children{display:flex;flex-wrap:wrap;gap:5px;padding-left:23px;margin-top:6px}
+.cat-chip{display:inline-flex;align-items:center;padding:2px 9px;border-radius:4px;border:1px solid var(--border);background:none;color:var(--text3);font-size:11px;font-weight:500;cursor:pointer;transition:all .15s;white-space:nowrap}
+.cat-chip:hover{border-color:rgba(147,197,253,.4);color:var(--text2)}
+.cat-chip.on{background:rgba(37,99,235,.18);border-color:rgba(37,99,235,.5);color:#93C5FD}
+.cat-chip.blocked{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.4);color:#FCA5A5}
 
 /* ── TRADERS TABLE ────────────────────────────────── */
 .section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
@@ -1176,35 +1184,66 @@ const CAT_GROUPS = [
   ]},
 ];
 
+const CHECK_SVG   = `<svg width="9" height="9" viewBox="0 0 10 10" fill="none"><polyline points="1.5,5 4,7.5 8.5,2" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const PARTIAL_SVG = `<svg width="9" height="9" viewBox="0 0 10 10" fill="none"><line x1="2" y1="5" x2="8" y2="5" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>`;
+
+function _broadState(group, container) {
+  const onCount = group.chips.filter(c => container.querySelector(`[data-cat-id="${c.id}"]`)?.classList.contains('on')).length;
+  if (onCount === group.chips.length) return 'on';
+  if (onCount > 0) return 'partial';
+  return '';
+}
+
+function _updateBroadBtn(group, container) {
+  const row = container.querySelector(`[data-group="${group.name}"]`);
+  if (!row) return;
+  const cb    = row.querySelector('.cat-checkbox');
+  const label = row.querySelector('.cat-parent-label');
+  if (!cb) return;
+  const state = _broadState(group, container);
+  cb.className = 'cat-checkbox' + (state ? ' ' + state : '');
+  cb.innerHTML = state === 'on' ? CHECK_SVG : state === 'partial' ? PARTIAL_SVG : '';
+  row.classList.toggle('on', state === 'on');
+  label.style.color = state ? 'var(--text)' : '';
+}
+
 function renderCatChips(selected) {
   const container = document.getElementById('cat-chips');
   if (!container) return;
   const whitelist = new Set((selected || []).filter(c => !c.startsWith('!')));
   const blacklist = new Set((selected || []).filter(c => c.startsWith('!')).map(c => c.slice(1)));
   container.innerHTML = CAT_GROUPS.map(g => {
-    const allOn = g.chips.every(c => whitelist.has(c.id));
-    return `<div class="cat-group">
-      <button type="button" class="cat-broad${allOn ? ' on' : ''}" data-group="${g.name}" onclick="toggleBroadCat('${g.name}',this)">${g.label} ${g.name}</button>
-      ${g.chips.map(c => {
-        const cls = whitelist.has(c.id) ? ' on' : blacklist.has(c.id) ? ' blocked' : '';
-        return `<button type="button" class="cat-chip${cls}" data-cat-id="${c.id}" onclick="toggleCat('${c.id}',this)">${c.label}</button>`;
-      }).join('')}
+    const onCount = g.chips.filter(c => whitelist.has(c.id)).length;
+    const state   = onCount === g.chips.length ? 'on' : onCount > 0 ? 'partial' : '';
+    const cbHtml  = `<span class="cat-checkbox${state ? ' ' + state : ''}">${state === 'on' ? CHECK_SVG : state === 'partial' ? PARTIAL_SVG : ''}</span>`;
+    return `<div class="cat-section">
+      <div class="cat-parent-row${state === 'on' ? ' on' : ''}" data-group="${g.name}" onclick="toggleBroadCat('${g.name}',this)">
+        ${cbHtml}
+        <span class="cat-parent-label" style="${state ? 'color:var(--text)' : ''}">${g.label} ${g.name}</span>
+      </div>
+      <div class="cat-children">
+        ${g.chips.map(c => {
+          const cls = whitelist.has(c.id) ? ' on' : blacklist.has(c.id) ? ' blocked' : '';
+          return `<button type="button" class="cat-chip${cls}" data-cat-id="${c.id}" onclick="toggleCat('${c.id}',this)">${c.label}</button>`;
+        }).join('')}
+      </div>
     </div>`;
   }).join('');
 }
 
-function toggleBroadCat(groupName, broadBtn) {
+function toggleBroadCat(groupName, row) {
   const group = CAT_GROUPS.find(g => g.name === groupName);
   if (!group) return;
-  const turnOn = !broadBtn.classList.contains('on');
   const container = document.getElementById('cat-chips');
+  const state  = _broadState(group, container);
+  const turnOn = state !== 'on';
   group.chips.forEach(c => {
     const chip = container.querySelector(`[data-cat-id="${c.id}"]`);
     if (!chip) return;
     chip.classList.remove('on', 'blocked');
     if (turnOn) chip.classList.add('on');
   });
-  broadBtn.classList.toggle('on', turnOn);
+  _updateBroadBtn(group, container);
 }
 
 function toggleCat(id, btn) {
@@ -1216,14 +1255,9 @@ function toggleCat(id, btn) {
   } else {
     btn.classList.add('on');
   }
-  // Sync broad chip state
   const container = document.getElementById('cat-chips');
   const group = CAT_GROUPS.find(g => g.chips.some(c => c.id === id));
-  if (!group) return;
-  const broadBtn = container.querySelector(`[data-group="${group.name}"]`);
-  if (!broadBtn) return;
-  const allOn = group.chips.every(c => container.querySelector(`[data-cat-id="${c.id}"]`)?.classList.contains('on'));
-  broadBtn.classList.toggle('on', allOn);
+  if (group) _updateBroadBtn(group, container);
 }
 
 function getSelectedCats() {
@@ -1600,11 +1634,15 @@ function renderTradersHtml(traders) {
           (t.maxPositionSize != null ? '<span>Max position: <strong>$' + t.maxPositionSize + '</strong></span>' : '') +
           '<span>Wallet: <strong style="font-family:monospace">'+short+'</strong></span>' +
         '</div>' +
-        '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">' +
-          '<button class="btn btn-sm btn-red" onclick="sellAllTraderPositions(\''+t.id+'\')" style="width:auto">Sell all open</button>' +
-          '<button class="btn btn-sm" onclick="clearResolvedPositions()" style="width:auto">Clear resolved</button>' +
-          '<button class="btn btn-sm" onclick="resetTraderStats(\''+t.id+'\')" style="width:auto">Reset stats</button>' +
-          '<button class="btn btn-sm btn-red" onclick="deleteTrader(\''+t.id+'\')" style="width:auto">Remove trader</button>' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">' +
+          '<div style="display:flex;gap:6px">' +
+            '<button class="btn btn-sm" onclick="clearResolvedPositions()" style="width:auto">Clear resolved</button>' +
+            '<button class="btn btn-sm" onclick="resetTraderStats(\''+t.id+'\')" style="width:auto">Reset stats</button>' +
+          '</div>' +
+          '<div style="display:flex;gap:6px">' +
+            '<button class="btn btn-sm btn-red" style="width:auto;opacity:.85" onclick="sellAllTraderPositions(\''+t.id+'\')">Sell all open</button>' +
+            '<button class="btn btn-sm btn-red" onclick="deleteTrader(\''+t.id+'\')" style="width:auto">Remove trader</button>' +
+          '</div>' +
         '</div>' +
       '</div>';
 
