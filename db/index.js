@@ -307,13 +307,14 @@ async function deleteCopyConfig(id, userId) {
   await query('DELETE FROM copy_configs WHERE id = $1 AND user_id = $2', [id, userId]);
 }
 
-async function getLeaderboard(period) {
+async function getLeaderboard(period, currentUserId) {
   const intervals = { daily: '1 day', weekly: '7 days', monthly: '30 days' };
   const periodJoin = intervals[period]
     ? `AND bp.updated_at >= NOW() - INTERVAL '${intervals[period]}'`
     : '';
-  const res = await query(`
+  const sql = `
     SELECT
+      u.id                                                          AS user_id,
       COALESCE(lk.discord_username, split_part(u.email, '@', 1))  AS display_name,
       COALESCE(SUM(bp.resolved_pnl), 0)                            AS profit,
       COALESCE(SUM(bp.usdc_spent), 0)                              AS volume,
@@ -329,17 +330,51 @@ async function getLeaderboard(period) {
     HAVING COUNT(bp.id) > 0
     ORDER BY profit DESC, trades DESC
     LIMIT 50
-  `);
-  return res.rows.map((r, i) => ({
-    rank:        i + 1,
-    displayName: r.display_name,
-    profit:      parseFloat(r.profit),
-    volume:      parseFloat(r.volume),
-    trades:      parseInt(r.trades),
-    wins:        parseInt(r.wins),
-    losses:      parseInt(r.losses),
-    winRate:     parseInt(r.trades) > 0 ? Math.round(parseInt(r.wins) / parseInt(r.trades) * 100) : 0,
+  `;
+  const res = await query(sql);
+  const rows = res.rows.map((r, i) => ({
+    rank:          i + 1,
+    userId:        r.user_id,
+    displayName:   r.display_name,
+    profit:        parseFloat(r.profit),
+    volume:        parseFloat(r.volume),
+    trades:        parseInt(r.trades),
+    wins:          parseInt(r.wins),
+    losses:        parseInt(r.losses),
+    winRate:       parseInt(r.trades) > 0 ? Math.round(parseInt(r.wins) / parseInt(r.trades) * 100) : 0,
+    isCurrentUser: r.user_id === currentUserId,
   }));
+
+  // If current user not in top 50, fetch their stats separately
+  let currentUser = rows.find(r => r.isCurrentUser) || null;
+  if (!currentUser && currentUserId) {
+    const cu = await query(`
+      SELECT
+        COALESCE(lk.discord_username, split_part(u.email, '@', 1)) AS display_name,
+        COALESCE(SUM(bp.resolved_pnl), 0)   AS profit,
+        COALESCE(SUM(bp.usdc_spent), 0)      AS volume,
+        COUNT(bp.id)                          AS trades,
+        COUNT(bp.id) FILTER (WHERE bp.resolved_outcome='WON') AS wins
+      FROM users u
+      JOIN wallets w ON w.user_id = u.id
+      JOIN bot_positions bp ON bp.user_id = u.id
+        AND bp.resolved_outcome IS NOT NULL ${periodJoin}
+      LEFT JOIN license_keys lk ON lk.user_id = u.id
+      WHERE u.id = $1
+      GROUP BY u.id, display_name
+    `, [currentUserId]);
+    if (cu.rows.length) {
+      const r = cu.rows[0];
+      currentUser = {
+        rank: '—', displayName: r.display_name,
+        profit: parseFloat(r.profit), volume: parseFloat(r.volume),
+        trades: parseInt(r.trades), wins: parseInt(r.wins),
+        winRate: parseInt(r.trades) > 0 ? Math.round(parseInt(r.wins) / parseInt(r.trades) * 100) : 0,
+        isCurrentUser: true,
+      };
+    }
+  }
+  return { rows, currentUser };
 }
 
 async function updateCopyConfig(id, userId, { nickname, notes, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice, maxPositionSize }) {

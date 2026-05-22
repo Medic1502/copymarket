@@ -64,46 +64,63 @@ body{color:var(--text);font-family:'Inter',-apple-system,sans-serif;font-size:14
 
 
 /* ── LEADERBOARD ──────────────────────────────────── */
-.lb-period{font-size:11.5px;padding:4px 10px}
-.lb-period.active{background:rgba(37,99,235,.2);border-color:var(--blue);color:#93C5FD}
-/* Podium */
-.lb-podium{display:flex;align-items:flex-end;justify-content:center;gap:10px;padding:28px 20px 0}
-.lb-pod{display:flex;flex-direction:column;align-items:center;border-radius:12px 12px 0 0;border:1px solid;border-bottom:none;text-align:center;cursor:default;flex-shrink:0}
-.lb-pod-1{width:160px;padding:24px 16px 0;background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.35)}
-.lb-pod-2{width:136px;padding:14px 14px 0;background:rgba(148,163,184,.05);border-color:rgba(148,163,184,.28)}
-.lb-pod-3{width:124px;padding:8px 12px 0;background:rgba(180,120,60,.05);border-color:rgba(180,120,60,.22)}
-.lb-pod-medal{line-height:1;margin-bottom:8px}
-.lb-pod-1 .lb-pod-medal{font-size:38px}
-.lb-pod-2 .lb-pod-medal{font-size:30px}
-.lb-pod-3 .lb-pod-medal{font-size:26px}
-.lb-pod-name{font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;margin-bottom:6px}
-.lb-pod-1 .lb-pod-name{font-size:15px}
-.lb-pod-2 .lb-pod-name{font-size:13px}
-.lb-pod-3 .lb-pod-name{font-size:12px}
-.lb-pod-pnl{font-weight:700}
-.lb-pod-1 .lb-pod-pnl{font-size:20px}
-.lb-pod-2 .lb-pod-pnl{font-size:16px}
-.lb-pod-3 .lb-pod-pnl{font-size:14px}
-.lb-pod-pnl.pos{color:var(--green)}
-.lb-pod-pnl.neg{color:var(--red)}
-.lb-pod-vol{font-size:10.5px;color:var(--text3);margin-top:3px;margin-bottom:14px}
-.lb-pod-step{width:100%;display:flex;align-items:center;justify-content:center;border-radius:4px;font-weight:800;margin-top:auto;letter-spacing:.04em}
-.lb-pod-1 .lb-pod-step{height:38px;font-size:15px;background:rgba(245,158,11,.22);color:#F59E0B}
-.lb-pod-2 .lb-pod-step{height:28px;font-size:13px;background:rgba(148,163,184,.18);color:#94A3B8}
-.lb-pod-3 .lb-pod-step{height:22px;font-size:12px;background:rgba(180,120,60,.18);color:#C97934}
-/* List rows */
-.lb-list-wrap{border-top:1px solid var(--border)}
-.lb-row{display:grid;grid-template-columns:44px 1fr 120px 110px;align-items:center;padding:11px 16px;border-bottom:1px solid var(--border);transition:background .1s}
-.lb-row:last-child{border-bottom:none}
-.lb-row:hover{background:rgba(255,255,255,.025)}
-.lb-head{display:grid;grid-template-columns:44px 1fr 120px 110px;padding:7px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--border)}
-.lb-head span{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em}
-.lb-rank{font-size:13px;font-weight:700;color:var(--text3);text-align:center}
-.lb-name{font-size:13px;font-weight:600;color:var(--text)}
-.lb-profit{font-size:13px;font-weight:700;text-align:right}
-.lb-profit.pos{color:var(--green)}
-.lb-profit.neg{color:var(--red)}
-.lb-vol{font-size:12px;color:var(--text3);text-align:right}
+.lb2-wrap{display:flex;flex-direction:column;gap:0}
+.lb2-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.lb2-title-group{display:flex;align-items:center;gap:14px}
+.lb2-trophy{width:46px;height:46px;border-radius:12px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.lb2-title{font-size:22px;font-weight:800;letter-spacing:.12em;color:var(--text);text-transform:uppercase}
+.lb2-subtitle{font-size:12px;color:var(--text3);margin-top:2px}
+.lb2-subtitle span{color:var(--blue-light)}
+.lb2-periods{display:flex;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:3px;gap:2px}
+.lb2-period{padding:6px 14px;font-size:11.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;border:none;background:none;color:var(--text3);border-radius:6px;cursor:pointer;transition:all .15s;white-space:nowrap;font-family:inherit}
+.lb2-period:hover{color:var(--text)}
+.lb2-period.active{background:var(--blue);color:#fff;box-shadow:0 2px 8px rgba(37,99,235,.4)}
+/* Stage */
+.lb2-stage{border-radius:16px 16px 0 0;background:linear-gradient(180deg,rgba(37,99,235,.07) 0%,rgba(37,99,235,.02) 100%);border:1px solid var(--border);border-bottom:none;padding:0 16px;position:relative;overflow:hidden}
+.lb2-stage::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:300px;height:140px;background:radial-gradient(ellipse at 50% 0%,rgba(245,158,11,.12),transparent 70%);pointer-events:none}
+.lb2-podium{display:flex;align-items:flex-end;justify-content:center;gap:10px;padding:28px 0 0;position:relative;z-index:1}
+/* Pod cards */
+.lb2-pod{display:flex;flex-direction:column;align-items:center;border-radius:14px 14px 0 0;border:1px solid;border-bottom:none;text-align:center;position:relative;overflow:hidden;transition:transform .2s}
+.lb2-pod:hover{transform:translateY(-3px)}
+.lb2-pod-1{width:188px;padding:20px 20px 0;background:linear-gradient(170deg,rgba(245,158,11,.1) 0%,rgba(245,158,11,.03) 100%);border-color:rgba(245,158,11,.45);box-shadow:0 -4px 24px rgba(245,158,11,.08) inset}
+.lb2-pod-2{width:158px;padding:16px 16px 0;background:linear-gradient(170deg,rgba(148,163,184,.07) 0%,rgba(148,163,184,.02) 100%);border-color:rgba(148,163,184,.3)}
+.lb2-pod-3{width:142px;padding:12px 14px 0;background:linear-gradient(170deg,rgba(180,120,60,.07) 0%,rgba(180,120,60,.02) 100%);border-color:rgba(180,120,60,.3)}
+.lb2-crown{font-size:30px;margin-bottom:4px;line-height:1;filter:drop-shadow(0 0 8px rgba(245,158,11,.6))}
+.lb2-pod-rank{font-weight:900;letter-spacing:-.02em;line-height:1;margin-bottom:10px}
+.lb2-pod-1 .lb2-pod-rank{font-size:52px;color:#F59E0B;text-shadow:0 0 20px rgba(245,158,11,.4)}
+.lb2-pod-2 .lb2-pod-rank{font-size:38px;color:#94A3B8}
+.lb2-pod-3 .lb2-pod-rank{font-size:32px;color:#C97934}
+.lb2-pod-name{font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;margin-bottom:6px}
+.lb2-pod-1 .lb2-pod-name{font-size:15px}
+.lb2-pod-2 .lb2-pod-name{font-size:13.5px}
+.lb2-pod-3 .lb2-pod-name{font-size:12.5px}
+.lb2-pod-pnl{font-weight:800;margin-bottom:2px}
+.lb2-pod-1 .lb2-pod-pnl{font-size:20px}
+.lb2-pod-2 .lb2-pod-pnl{font-size:16px}
+.lb2-pod-3 .lb2-pod-pnl{font-size:14px}
+.lb2-pod-pnl.pos{color:var(--green)}
+.lb2-pod-pnl.neg{color:var(--red)}
+.lb2-pod-vol{font-size:10.5px;color:var(--text3);margin-bottom:16px}
+/* List card */
+.lb2-card{background:var(--bg2);border:1px solid var(--border);border-top:none;border-radius:0 0 16px 16px;overflow:hidden}
+.lb2-list-head{display:grid;grid-template-columns:52px 1fr 120px 110px;padding:8px 20px;background:rgba(255,255,255,.025);border-bottom:1px solid var(--border)}
+.lb2-list-head span{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3)}
+.lb2-list-row{display:grid;grid-template-columns:52px 1fr 120px 110px;align-items:center;padding:13px 20px;border-bottom:1px solid var(--border);transition:background .12s}
+.lb2-list-row:last-child{border-bottom:none}
+.lb2-list-row:hover{background:rgba(255,255,255,.03)}
+.lb2-list-rank{font-size:14px;font-weight:700;color:var(--text3);text-align:center}
+.lb2-list-player{display:flex;align-items:center;gap:10px}
+.lb2-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;border:1px solid}
+.lb2-list-name{font-size:13.5px;font-weight:600;color:var(--text)}
+.lb2-list-pnl{font-size:13.5px;font-weight:700;text-align:right}
+.lb2-list-pnl.pos{color:var(--green)}
+.lb2-list-pnl.neg{color:var(--red)}
+.lb2-list-vol{font-size:12px;color:var(--text3);text-align:right}
+/* YOU row */
+.lb2-you{display:grid;grid-template-columns:52px 1fr 120px 110px;align-items:center;padding:14px 20px;background:rgba(37,99,235,.1);border-top:1px solid rgba(37,99,235,.3)}
+.lb2-you-rank{font-size:14px;font-weight:800;color:var(--blue-light);text-align:center}
+.lb2-you-badge{display:inline-block;background:var(--blue);color:#fff;font-size:9px;font-weight:800;letter-spacing:.08em;padding:2px 6px;border-radius:4px;margin-left:6px;vertical-align:middle}
+.lb2-empty{text-align:center;padding:48px 0;color:var(--text3);font-size:13px}
 
 /* ── TABS ─────────────────────────────────────────── */
 .tab-nav{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px;gap:0}
@@ -670,21 +687,24 @@ div.expand-panel.closed{display:none !important}
 
     <!-- ── LEADERBOARD ──────────────────────────────── -->
     <div id="tab-leaderboard" class="tab-panel">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-        <div>
-          <div style="font-size:18px;font-weight:700;color:var(--text)">Leaderboard</div>
-          <div style="font-size:12.5px;color:var(--text2);margin-top:3px">Top traders using Jonin CT</div>
+      <div class="lb2-wrap">
+        <div class="lb2-header">
+          <div class="lb2-title-group">
+            <div class="lb2-trophy">🏆</div>
+            <div>
+              <div class="lb2-title">Leaderboard</div>
+              <div class="lb2-subtitle">Compete, climb ranks, and <span>be the best</span>.</div>
+            </div>
+          </div>
+          <div class="lb2-periods">
+            <button class="lb2-period active" data-period="daily"   onclick="setLbPeriod(this)">Today</button>
+            <button class="lb2-period"        data-period="weekly"  onclick="setLbPeriod(this)">This Week</button>
+            <button class="lb2-period"        data-period="monthly" onclick="setLbPeriod(this)">This Month</button>
+            <button class="lb2-period"        data-period="alltime" onclick="setLbPeriod(this)">All Time</button>
+          </div>
         </div>
-        <div style="display:flex;gap:6px">
-          <button class="btn btn-sm lb-period active" data-period="daily"   onclick="setLbPeriod(this)">Daily</button>
-          <button class="btn btn-sm lb-period"        data-period="weekly"  onclick="setLbPeriod(this)">Weekly</button>
-          <button class="btn btn-sm lb-period"        data-period="monthly" onclick="setLbPeriod(this)">Monthly</button>
-          <button class="btn btn-sm lb-period"        data-period="alltime" onclick="setLbPeriod(this)">All Time</button>
-        </div>
-      </div>
-      <div class="card" style="padding:0;overflow:hidden">
-        <div id="lb-list" style="min-height:200px">
-          <div style="text-align:center;padding:40px 0;color:var(--text3);font-size:13px">Loading…</div>
+        <div id="lb2-content">
+          <div class="lb2-empty">Loading…</div>
         </div>
       </div>
     </div>
@@ -2240,65 +2260,94 @@ function fmtDateTime(ts) {
 let _lbPeriod = 'daily';
 
 function setLbPeriod(btn) {
-  document.querySelectorAll('.lb-period').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.lb2-period').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   _lbPeriod = btn.dataset.period;
   loadLeaderboard();
 }
 
+function _lbFmt(v)    { return (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2); }
+function _lbVol(v)    { return '$' + parseFloat(v).toFixed(2); }
+function _lbCls(v)    { return v >= 0 ? 'pos' : 'neg'; }
+function _lbAvatar(name, color) {
+  const init = (name || '?').slice(0,2).toUpperCase();
+  return `<div class="lb2-avatar" style="background:${color}22;border-color:${color}55;color:${color}">${init}</div>`;
+}
+
 async function loadLeaderboard() {
-  const el = document.getElementById('lb-list');
+  const el = document.getElementById('lb2-content');
   if (!el) return;
-  el.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text3);font-size:13px">Loading…</div>';
+  el.innerHTML = '<div class="lb2-empty">Loading…</div>';
   try {
-    const { rows } = await api('GET', '/dashboard/leaderboard?period=' + _lbPeriod);
+    const { rows, currentUser } = await api('GET', '/dashboard/leaderboard?period=' + _lbPeriod);
     if (!rows.length) {
-      el.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text3);font-size:13px">No data for this period yet.</div>';
+      el.innerHTML = '<div class="lb2-empty">No trades recorded for this period yet.</div>';
       return;
     }
 
-    const fmt    = (v) => (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2);
-    const fmtVol = (v) => '$' + v.toFixed(2);
-    const cls    = (v) => v >= 0 ? 'pos' : 'neg';
+    // ── Podium top 3 ─────────────────────────────────────────────────────────
+    const top = rows.slice(0, Math.min(3, rows.length));
+    // Display order: 2nd | 1st | 3rd
+    const podOrder = top.length === 1 ? [null, top[0], null]
+                   : top.length === 2 ? [top[1], top[0], null]
+                   : [top[1], top[0], top[2]];
 
-    // ── Podium (top 3) ────────────────────────────────────────────────────────
-    const top = rows.slice(0, 3);
-    const podOrder = top.length >= 2 ? [top[1], top[0], top[2]].filter(Boolean) : [top[0]].filter(Boolean);
-    const podClasses  = ['lb-pod-2','lb-pod-1','lb-pod-3'];
-    const podMedals   = ['🥈','🥇','🥉'];
-    const podStepNums = ['2','1','3'];
+    const podDefs = [
+      { cls:'lb-pod-2', rankCls:'lb2-pod-2', num:'2', color:'#94A3B8' },
+      { cls:'lb-pod-1', rankCls:'lb2-pod-1', num:'1', color:'#F59E0B' },
+      { cls:'lb-pod-3', rankCls:'lb2-pod-3', num:'3', color:'#C97934' },
+    ];
 
-    const podiumHtml = `<div class="lb-podium">${
-      podOrder.map((r, idx) => {
-        const realIdx = top.indexOf(r);
-        const pc  = podClasses[idx];
-        const med = podMedals[idx];
-        const num = podStepNums[idx];
-        return `<div class="lb-pod ${pc}">
-          <div class="lb-pod-medal">${med}</div>
-          <div class="lb-pod-name" title="${r.displayName}">${r.displayName}</div>
-          <div class="lb-pod-pnl ${cls(r.profit)}">${fmt(r.profit)}</div>
-          <div class="lb-pod-vol">Vol: ${fmtVol(r.volume)}</div>
-          <div class="lb-pod-step">${num}</div>
-        </div>`;
-      }).join('')
-    }</div>`;
+    const podHtml = podOrder.map((r, i) => {
+      if (!r) return `<div style="flex:1;max-width:${i===0?158:142}px"></div>`;
+      const d = podDefs[i];
+      const crown = i === 1 ? '<div class="lb2-crown">👑</div>' : '';
+      return `<div class="lb2-pod ${d.rankCls}">
+        ${crown}
+        <div class="lb2-pod-rank">${d.num}</div>
+        <div class="lb2-pod-name" title="${r.displayName}">${r.displayName}</div>
+        <div class="lb2-pod-pnl ${_lbCls(r.profit)}">${_lbFmt(r.profit)}</div>
+        <div class="lb2-pod-vol">Vol ${_lbVol(r.volume)}</div>
+      </div>`;
+    }).join('');
 
-    // ── List (4th+) ───────────────────────────────────────────────────────────
+    // ── List 4th+ ────────────────────────────────────────────────────────────
     const rest = rows.slice(3);
-    const listHtml = rest.length ? `<div class="lb-list-wrap">
-      <div class="lb-head"><span>#</span><span>Trader</span><span style="text-align:right">P&amp;L</span><span style="text-align:right">Volume</span></div>
-      ${rest.map((r, i) => `<div class="lb-row">
-        <div class="lb-rank">${i + 4}</div>
-        <div class="lb-name">${r.displayName}</div>
-        <div class="lb-profit ${cls(r.profit)}">${fmt(r.profit)}</div>
-        <div class="lb-vol">${fmtVol(r.volume)}</div>
-      </div>`).join('')}
-    </div>` : '';
+    const avatarColors = ['#3B82F6','#8B5CF6','#EC4899','#10B981','#F59E0B','#EF4444','#06B6D4','#84CC16'];
+    const listRows = rest.map((r, i) => {
+      const color = avatarColors[(i + 3) % avatarColors.length];
+      return `<div class="lb2-list-row${r.isCurrentUser ? ' lb2-you-row' : ''}">
+        <div class="lb2-list-rank">${r.rank}</div>
+        <div class="lb2-list-player">${_lbAvatar(r.displayName, color)}<span class="lb2-list-name">${r.displayName}${r.isCurrentUser ? '<span class="lb2-you-badge">YOU</span>' : ''}</span></div>
+        <div class="lb2-list-pnl ${_lbCls(r.profit)}">${_lbFmt(r.profit)}</div>
+        <div class="lb2-list-vol">${_lbVol(r.volume)}</div>
+      </div>`;
+    }).join('');
 
-    el.innerHTML = podiumHtml + listHtml;
+    const listHtml = rest.length ? `
+      <div class="lb2-list-head">
+        <span>Rank</span><span>Trader</span>
+        <span style="text-align:right">P&amp;L</span>
+        <span style="text-align:right">Volume</span>
+      </div>${listRows}` : '';
+
+    // ── YOU row (if not already visible) ─────────────────────────────────────
+    const youInList = currentUser && rows.some(r => r.isCurrentUser);
+    const youHtml = currentUser && !youInList ? `
+      <div class="lb2-you">
+        <div class="lb2-you-rank">${currentUser.rank}</div>
+        <div class="lb2-list-player">${_lbAvatar(currentUser.displayName,'#3B82F6')}
+          <span class="lb2-list-name">${currentUser.displayName}<span class="lb2-you-badge">YOU</span></span>
+        </div>
+        <div class="lb2-list-pnl ${_lbCls(currentUser.profit)}">${_lbFmt(currentUser.profit)}</div>
+        <div class="lb2-list-vol">${_lbVol(currentUser.volume)}</div>
+      </div>` : '';
+
+    el.innerHTML = `
+      <div class="lb2-stage"><div class="lb2-podium">${podHtml}</div></div>
+      <div class="lb2-card">${listHtml}${youHtml}</div>`;
   } catch(e) {
-    el.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text3);font-size:13px">Could not load leaderboard.</div>';
+    el.innerHTML = '<div class="lb2-empty">Could not load leaderboard.</div>';
   }
 }
 </script>

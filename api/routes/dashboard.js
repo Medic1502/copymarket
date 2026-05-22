@@ -411,8 +411,8 @@ router.get('/leaderboard', requireAuth, async (req, res, next) => {
   try {
     const period = ['daily', 'weekly', 'monthly', 'alltime'].includes(req.query.period)
       ? req.query.period : 'alltime';
-    const rows = await db.getLeaderboard(period);
-    res.json({ period, rows });
+    const { rows, currentUser } = await db.getLeaderboard(period, req.user?.id);
+    res.json({ period, rows, currentUser });
   } catch (err) { next(err); }
 });
 
