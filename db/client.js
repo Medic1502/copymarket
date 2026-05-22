@@ -231,6 +231,13 @@ async function migrate() {
     await run(`CREATE INDEX IF NOT EXISTS idx_at_pos_user ON auto_trade_positions(user_id)`);
 
     await run(`ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name VARCHAR(64)`);
+    await run(`
+      CREATE TABLE IF NOT EXISTS activity_cursors (
+        target_wallet TEXT PRIMARY KEY,
+        last_ts       BIGINT NOT NULL,
+        updated_at    TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
     console.log('Database migration complete.');
   } catch (err) {
     console.error('Migration failed (server will continue):', err.message);

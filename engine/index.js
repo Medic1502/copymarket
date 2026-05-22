@@ -1016,11 +1016,15 @@ async function startCopyEngine(user, targetWallet) {
   // Register config in the shared poll for this target wallet
   activeEngines[user.configId] = targetWallet;
   if (!sharedPolls[targetWallet]) {
-    // 5-minute lookback so trades during Railway restarts are not missed.
+    // Load persisted cursor from DB — survives Railway restarts.
+    // Cap at 30 min max lookback so we don't replay hours of old signals.
     // Safe: userBought is pre-populated from bot_positions so already-copied
-    // positions get skipped by the initial_only / maxPositionSize checks.
-    lastActivityTs[targetWallet] = Date.now() - 5 * 60 * 1000;
-    logger.info('Activity cursor initialized', { targetWallet, fromTs: lastActivityTs[targetWallet] });
+    // positions are skipped by the initial_only / maxPositionSize checks.
+    const MAX_LOOKBACK_MS = 30 * 60 * 1000;
+    const savedTs = await db.getActivityCursor(targetWallet).catch(() => null);
+    const floorTs = Date.now() - MAX_LOOKBACK_MS;
+    lastActivityTs[targetWallet] = savedTs ? Math.max(Number(savedTs), floorTs) : floorTs;
+    logger.info('Activity cursor initialized', { targetWallet: targetWallet.slice(0,10), fromTs: lastActivityTs[targetWallet], source: savedTs ? 'db' : 'fallback' });
 
     sharedPolls[targetWallet] = {
       users: new Map(),
@@ -1050,7 +1054,9 @@ async function startCopyEngine(user, targetWallet) {
 
           if (fresh.length === 0) return;
 
-          lastActivityTs[targetWallet] = Math.max(...fresh.map(a => a.timestamp));
+          const newTs = Math.max(...fresh.map(a => a.timestamp));
+          lastActivityTs[targetWallet] = newTs;
+          db.setActivityCursor(targetWallet, newTs).catch(() => {});
 
           const opened = fresh.filter(a => a.side === 'BUY');
           const closed = fresh.filter(a => a.side === 'SELL');

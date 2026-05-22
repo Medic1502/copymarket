@@ -307,6 +307,19 @@ async function deleteCopyConfig(id, userId) {
   await query('DELETE FROM copy_configs WHERE id = $1 AND user_id = $2', [id, userId]);
 }
 
+async function getActivityCursor(targetWallet) {
+  const r = await query('SELECT last_ts FROM activity_cursors WHERE target_wallet=$1', [targetWallet]);
+  return r.rows[0]?.last_ts ?? null;
+}
+async function setActivityCursor(targetWallet, lastTs) {
+  await query(
+    `INSERT INTO activity_cursors (target_wallet, last_ts, updated_at)
+     VALUES ($1,$2,NOW())
+     ON CONFLICT (target_wallet) DO UPDATE SET last_ts=$2, updated_at=NOW()`,
+    [targetWallet, lastTs]
+  );
+}
+
 async function updateDisplayName(userId, displayName) {
   await query('UPDATE users SET display_name=$2 WHERE id=$1', [userId, displayName || null]);
 }
@@ -421,6 +434,7 @@ module.exports = {
   setConfigActive,
   createWalletForUser, getWalletByUserId, getUSDCBalance,
   saveCopyConfig, updateCopyConfig, getCopyConfig, setConfigActive, getAllActiveConfigs, deleteCopyConfig,
+  getActivityCursor, setActivityCursor,
   updateDisplayName, getLeaderboard,
   saveTrade, resolveTradeOutcome, getRecentTrades, getDashboardStats, getTraderStats,
   upsertBotPosition, deleteBotPosition, resolveBotPosition, deleteResolvedPosition, getBotPositions, getBotPositionsWithNames, clearBotPositions, clearResolvedPositions, resetTraderStats,
