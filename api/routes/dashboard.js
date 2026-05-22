@@ -406,6 +406,23 @@ router.post('/share-win', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── DISPLAY NAME ──────────────────────────────────────────────────────────────
+router.get('/display-name', requireAuth, async (req, res, next) => {
+  try {
+    const r = await require('../../db/client').query('SELECT display_name FROM users WHERE id=$1', [req.user.id]);
+    res.json({ displayName: r.rows[0]?.display_name || null });
+  } catch (err) { next(err); }
+});
+
+router.put('/display-name', requireAuth, async (req, res, next) => {
+  try {
+    const { displayName } = req.body;
+    if (displayName && displayName.length > 32) return res.status(400).json({ error: 'Max 32 characters' });
+    await db.updateDisplayName(req.user.id, displayName?.trim() || null);
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+});
+
 // ── LEADERBOARD ───────────────────────────────────────────────────────────────
 router.get('/leaderboard', requireAuth, async (req, res, next) => {
   try {

@@ -682,6 +682,15 @@ div.expand-panel.closed{display:none !important}
           <button class="btn btn-sm" onclick="copyProfileAddr()">Copy</button>
         </div>
       </div>
+      <div class="card">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Leaderboard Name</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Shown on the leaderboard instead of your account name. Use your Polymarket username.</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="display-name-input" maxlength="32" placeholder="e.g. surfandturf" style="flex:1">
+          <button class="btn btn-sm btn-primary" onclick="saveDisplayName()">Save</button>
+        </div>
+        <div id="display-name-msg" style="font-size:12px;margin-top:6px;display:none"></div>
+      </div>
     </div>
 
 
@@ -690,7 +699,7 @@ div.expand-panel.closed{display:none !important}
       <div class="lb2-wrap">
         <div class="lb2-header">
           <div class="lb2-title-group">
-            <div class="lb2-trophy">🏆</div>
+            <div class="lb2-trophy"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#F59E0B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg></div>
             <div>
               <div class="lb2-title">Leaderboard</div>
               <div class="lb2-subtitle">Compete, climb ranks, and <span>be the best</span>.</div>
@@ -2174,6 +2183,15 @@ async function loadDashboard() {
     document.getElementById('profile-name-display').textContent  = uname;
     document.getElementById('profile-email-display').textContent = uemail;
     document.getElementById('profile-initials').textContent      = uname[0].toUpperCase();
+    // Pre-fill display name input if already set (from server data if available)
+    try {
+      const dnInput = document.getElementById('display-name-input');
+      if (dnInput && !dnInput.dataset.loaded) {
+        const dn = await api('GET', '/dashboard/display-name').catch(() => null);
+        if (dn?.displayName) dnInput.value = dn.displayName;
+        dnInput.dataset.loaded = '1';
+      }
+    } catch {}
     document.getElementById('profile-since').textContent         = walletData.createdAt ? new Date(walletData.createdAt).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}) : '—';
     document.getElementById('profile-status').innerHTML          = copyActive ? '<span class="badge b-buy">Active</span>' : '<span class="badge" style="background:rgba(255,255,255,.06);color:var(--text3)">Paused</span>';
     document.getElementById('profile-trades').textContent        = stats.totalTrades || '0';
@@ -2256,8 +2274,42 @@ function fmtDateTime(ts) {
   return months[d.getMonth()] + ' ' + d.getDate() + ', ' + h + ':' + m;
 }
 
+// ── DISPLAY NAME ─────────────────────────────────────────────────────────────
+async function saveDisplayName() {
+  const input = document.getElementById('display-name-input');
+  const msg   = document.getElementById('display-name-msg');
+  const val   = (input.value || '').trim();
+  try {
+    await api('PUT', '/dashboard/display-name', { displayName: val });
+    msg.style.display = '';
+    msg.style.color   = 'var(--green)';
+    msg.textContent   = val ? 'Saved! Will appear on leaderboard.' : 'Name cleared.';
+    setTimeout(() => msg.style.display = 'none', 3000);
+  } catch(e) {
+    msg.style.display = '';
+    msg.style.color   = 'var(--red)';
+    msg.textContent   = e.message;
+  }
+}
+
 // ── LEADERBOARD ───────────────────────────────────────────────────────────────
 let _lbPeriod = 'daily';
+
+const LB_SVG = {
+  crown: `<svg viewBox="0 0 44 32" width="44" height="32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 26 L8 14 L16 22 L22 6 L28 22 L36 14 L40 26 Z" fill="#F59E0B" stroke="#F59E0B" stroke-width="1.5" stroke-linejoin="round"/>
+    <rect x="4" y="26" width="36" height="6" rx="2" fill="#F59E0B"/>
+    <circle cx="22" cy="6" r="3.5" fill="#fff" opacity=".95"/>
+    <circle cx="8" cy="14" r="2.5" fill="#fff" opacity=".85"/>
+    <circle cx="36" cy="14" r="2.5" fill="#fff" opacity=".85"/>
+  </svg>`,
+  medal2: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+    <path d="M12 2L14.5 8.5H21L15.7 12.5L17.8 19L12 15.3L6.2 19L8.3 12.5L3 8.5H9.5Z" fill="#94A3B8"/>
+  </svg>`,
+  medal3: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+    <path d="M12 2L14.5 8.5H21L15.7 12.5L17.8 19L12 15.3L6.2 19L8.3 12.5L3 8.5Z" fill="#C97934"/>
+  </svg>`,
+};
 
 function setLbPeriod(btn) {
   document.querySelectorAll('.lb2-period').forEach(b => b.classList.remove('active'));
@@ -2293,17 +2345,17 @@ async function loadLeaderboard() {
                    : [top[1], top[0], top[2]];
 
     const podDefs = [
-      { cls:'lb-pod-2', rankCls:'lb2-pod-2', num:'2', color:'#94A3B8' },
-      { cls:'lb-pod-1', rankCls:'lb2-pod-1', num:'1', color:'#F59E0B' },
-      { cls:'lb-pod-3', rankCls:'lb2-pod-3', num:'3', color:'#C97934' },
+      { rankCls:'lb2-pod-2', num:'2', color:'#94A3B8' },
+      { rankCls:'lb2-pod-1', num:'1', color:'#F59E0B' },
+      { rankCls:'lb2-pod-3', num:'3', color:'#C97934' },
     ];
 
     const podHtml = podOrder.map((r, i) => {
       if (!r) return `<div style="flex:1;max-width:${i===0?158:142}px"></div>`;
       const d = podDefs[i];
-      const crown = i === 1 ? '<div class="lb2-crown">👑</div>' : '';
+      const crownEl = i === 1 ? `<div class="lb2-crown">${LB_SVG.crown}</div>` : '';
       return `<div class="lb2-pod ${d.rankCls}">
-        ${crown}
+        ${crownEl}
         <div class="lb2-pod-rank">${d.num}</div>
         <div class="lb2-pod-name" title="${r.displayName}">${r.displayName}</div>
         <div class="lb2-pod-pnl ${_lbCls(r.profit)}">${_lbFmt(r.profit)}</div>
@@ -2331,9 +2383,8 @@ async function loadLeaderboard() {
         <span style="text-align:right">Volume</span>
       </div>${listRows}` : '';
 
-    // ── YOU row (if not already visible) ─────────────────────────────────────
-    const youInList = currentUser && rows.some(r => r.isCurrentUser);
-    const youHtml = currentUser && !youInList ? `
+    // ── YOU row — always pinned at bottom ─────────────────────────────────────
+    const youHtml = currentUser ? `
       <div class="lb2-you">
         <div class="lb2-you-rank">${currentUser.rank}</div>
         <div class="lb2-list-player">${_lbAvatar(currentUser.displayName,'#3B82F6')}

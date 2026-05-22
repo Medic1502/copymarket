@@ -307,6 +307,10 @@ async function deleteCopyConfig(id, userId) {
   await query('DELETE FROM copy_configs WHERE id = $1 AND user_id = $2', [id, userId]);
 }
 
+async function updateDisplayName(userId, displayName) {
+  await query('UPDATE users SET display_name=$2 WHERE id=$1', [userId, displayName || null]);
+}
+
 async function getLeaderboard(period, currentUserId) {
   const intervals = { daily: '1 day', weekly: '7 days', monthly: '30 days' };
   const periodJoin = intervals[period]
@@ -315,7 +319,7 @@ async function getLeaderboard(period, currentUserId) {
   const sql = `
     SELECT
       u.id                                                          AS user_id,
-      COALESCE(lk.discord_username, split_part(u.email, '@', 1))  AS display_name,
+      COALESCE(u.display_name, lk.discord_username, split_part(u.email, '@', 1))  AS display_name,
       COALESCE(SUM(bp.resolved_pnl), 0)                            AS profit,
       COALESCE(SUM(bp.usdc_spent), 0)                              AS volume,
       COUNT(bp.id)                                                  AS trades,
@@ -326,7 +330,7 @@ async function getLeaderboard(period, currentUserId) {
     JOIN bot_positions bp ON bp.user_id = u.id
       AND bp.resolved_outcome IS NOT NULL ${periodJoin}
     LEFT JOIN license_keys lk ON lk.user_id = u.id
-    GROUP BY u.id, display_name
+    GROUP BY u.id, u.display_name, lk.discord_username
     HAVING COUNT(bp.id) > 0
     ORDER BY profit DESC, trades DESC
     LIMIT 50
@@ -350,7 +354,7 @@ async function getLeaderboard(period, currentUserId) {
   if (!currentUser && currentUserId) {
     const cu = await query(`
       SELECT
-        COALESCE(lk.discord_username, split_part(u.email, '@', 1)) AS display_name,
+        COALESCE(u.display_name, lk.discord_username, split_part(u.email, '@', 1)) AS display_name,
         COALESCE(SUM(bp.resolved_pnl), 0)   AS profit,
         COALESCE(SUM(bp.usdc_spent), 0)      AS volume,
         COUNT(bp.id)                          AS trades,
@@ -406,7 +410,8 @@ module.exports = {
   createUser, createLicenseUser, getUserByEmail, getUserById, verifyPassword,
   setConfigActive,
   createWalletForUser, getWalletByUserId, getUSDCBalance,
-  saveCopyConfig, updateCopyConfig, getCopyConfig, setConfigActive, getAllActiveConfigs, deleteCopyConfig, getLeaderboard,
+  saveCopyConfig, updateCopyConfig, getCopyConfig, setConfigActive, getAllActiveConfigs, deleteCopyConfig,
+  updateDisplayName, getLeaderboard,
   saveTrade, resolveTradeOutcome, getRecentTrades, getDashboardStats, getTraderStats,
   upsertBotPosition, deleteBotPosition, resolveBotPosition, deleteResolvedPosition, getBotPositions, getBotPositionsWithNames, clearBotPositions, clearResolvedPositions, resetTraderStats,
   encryptPrivateKey, decryptPrivateKey,
