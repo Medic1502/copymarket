@@ -159,14 +159,20 @@ function decryptPrivateKey(encryptedStr) {
   return decrypted.toString('utf8');
 }
 
-async function apiFetch(url, opts = {}) {
+async function apiFetch(url, opts = {}, timeoutMs = 10_000) {
   const { default: fetch } = await import('node-fetch');
-  const res = await fetch(url, opts);
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`API ${res.status}: ${text.slice(0, 200)}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal, ...opts });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`API ${res.status}: ${text.slice(0, 200)}`);
+    }
+    return res.json();
+  } finally {
+    clearTimeout(timer);
   }
-  return res.json();
 }
 
 // Returns recent trade activity sorted newest-first
