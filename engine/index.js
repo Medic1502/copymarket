@@ -1016,15 +1016,11 @@ async function startCopyEngine(user, targetWallet) {
   // Register config in the shared poll for this target wallet
   activeEngines[user.configId] = targetWallet;
   if (!sharedPolls[targetWallet]) {
-    // Load persisted cursor from DB — survives Railway restarts.
-    // Cap at 30 min max lookback so we don't replay hours of old signals.
+    // 5-minute lookback — catches trades that happened during Railway restart window.
     // Safe: userBought is pre-populated from bot_positions so already-copied
     // positions are skipped by the initial_only / maxPositionSize checks.
-    const MAX_LOOKBACK_MS = 30 * 60 * 1000;
-    const savedTs = await db.getActivityCursor(targetWallet).catch(() => null);
-    const floorTs = Date.now() - MAX_LOOKBACK_MS;
-    lastActivityTs[targetWallet] = savedTs ? Math.max(Number(savedTs), floorTs) : floorTs;
-    logger.info('Activity cursor initialized', { targetWallet: targetWallet.slice(0,10), fromTs: lastActivityTs[targetWallet], source: savedTs ? 'db' : 'fallback' });
+    lastActivityTs[targetWallet] = Date.now() - 5 * 60 * 1000;
+    logger.info('Activity cursor initialized', { targetWallet: targetWallet.slice(0,10), fromTs: lastActivityTs[targetWallet] });
 
     sharedPolls[targetWallet] = {
       users: new Map(),
@@ -1048,15 +1044,13 @@ async function startCopyEngine(user, targetWallet) {
           // Auto-sell check runs every tick for all users — TTL cache prevents excess API calls
           for (const [, { user: u, wallet: w }] of poll.users) {
             await checkHighPricePositions(u, w).catch(e =>
-              logger.warn('High price check error', { userId: u.id, error: e.message })
+              logger.warn('High price check error', { userId: u?.id, error: e.message })
             );
           }
 
           if (fresh.length === 0) return;
 
-          const newTs = Math.max(...fresh.map(a => a.timestamp));
-          lastActivityTs[targetWallet] = newTs;
-          db.setActivityCursor(targetWallet, newTs).catch(() => {});
+          lastActivityTs[targetWallet] = Math.max(...fresh.map(a => a.timestamp));
 
           const opened = fresh.filter(a => a.side === 'BUY');
           const closed = fresh.filter(a => a.side === 'SELL');
