@@ -742,6 +742,8 @@ function navSwitch(key, el) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   const panel = document.getElementById('tab-' + key);
   if (panel) panel.classList.add('active');
+  const statsRow = document.querySelector('.stats-row');
+  if (statsRow) statsRow.style.display = key === 'traders' ? '' : 'none';
   if (key === 'trades')       loadTradeHistory();
   if (key === 'leaderboard')  loadLeaderboard();
 }
