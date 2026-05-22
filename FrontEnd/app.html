@@ -131,6 +131,9 @@ input[type=number]::-webkit-inner-spin-button{opacity:.4}
 .cat-chip.blocked{background:rgba(239,68,68,.15);border-color:#EF4444;color:#FCA5A5}
 .cat-group{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .cat-group-label{font-size:11px;font-weight:700;color:var(--text3);min-width:18px}
+.cat-broad{font-weight:700;font-size:11px;padding:3px 11px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.cat-broad.on{background:rgba(37,99,235,.25);border-color:var(--blue);color:#93C5FD}
+.cat-broad:hover{border-color:var(--blue);color:var(--text)}
 
 /* ── TRADERS TABLE ────────────────────────────────── */
 .section-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
@@ -719,11 +722,9 @@ div.expand-panel.closed{display:none !important}
       <!-- How it works -->
       <div class="card" style="margin-bottom:14px;background:rgba(245,158,11,.04);border-color:rgba(245,158,11,.2)">
         <div style="font-size:11px;font-weight:700;color:#F59E0B;text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px">How it works</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;color:var(--text2);line-height:1.6">
-          <div><span style="color:#F59E0B;font-weight:700">1.</span> Scans all 5 &amp; 15-min Up/Down crypto markets every 30s</div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:12px;color:var(--text2);line-height:1.6">
+          <div><span style="color:#F59E0B;font-weight:700">1.</span> Scans all 5 &amp; 15-min Up/Down crypto markets every 15s</div>
           <div><span style="color:#F59E0B;font-weight:700">2.</span> Enters only when price ≥97¢ and market is well established</div>
-          <div><span style="color:#F59E0B;font-weight:700">3.</span> Smart filters: timing, order book depth, spread, volume</div>
-          <div><span style="color:#F59E0B;font-weight:700">4.</span> Fill-or-Kill orders — never creates phantom positions</div>
         </div>
       </div>
 
@@ -1180,15 +1181,30 @@ function renderCatChips(selected) {
   if (!container) return;
   const whitelist = new Set((selected || []).filter(c => !c.startsWith('!')));
   const blacklist = new Set((selected || []).filter(c => c.startsWith('!')).map(c => c.slice(1)));
-  container.innerHTML = CAT_GROUPS.map(g =>
-    `<div class="cat-group">
-      <span class="cat-group-label" title="${g.name}">${g.label}</span>
+  container.innerHTML = CAT_GROUPS.map(g => {
+    const allOn = g.chips.every(c => whitelist.has(c.id));
+    return `<div class="cat-group">
+      <button type="button" class="cat-broad${allOn ? ' on' : ''}" data-group="${g.name}" onclick="toggleBroadCat('${g.name}',this)">${g.label} ${g.name}</button>
       ${g.chips.map(c => {
         const cls = whitelist.has(c.id) ? ' on' : blacklist.has(c.id) ? ' blocked' : '';
         return `<button type="button" class="cat-chip${cls}" data-cat-id="${c.id}" onclick="toggleCat('${c.id}',this)">${c.label}</button>`;
       }).join('')}
-    </div>`
-  ).join('');
+    </div>`;
+  }).join('');
+}
+
+function toggleBroadCat(groupName, broadBtn) {
+  const group = CAT_GROUPS.find(g => g.name === groupName);
+  if (!group) return;
+  const turnOn = !broadBtn.classList.contains('on');
+  const container = document.getElementById('cat-chips');
+  group.chips.forEach(c => {
+    const chip = container.querySelector(`[data-cat-id="${c.id}"]`);
+    if (!chip) return;
+    chip.classList.remove('on', 'blocked');
+    if (turnOn) chip.classList.add('on');
+  });
+  broadBtn.classList.toggle('on', turnOn);
 }
 
 function toggleCat(id, btn) {
@@ -1200,6 +1216,14 @@ function toggleCat(id, btn) {
   } else {
     btn.classList.add('on');
   }
+  // Sync broad chip state
+  const container = document.getElementById('cat-chips');
+  const group = CAT_GROUPS.find(g => g.chips.some(c => c.id === id));
+  if (!group) return;
+  const broadBtn = container.querySelector(`[data-group="${group.name}"]`);
+  if (!broadBtn) return;
+  const allOn = group.chips.every(c => container.querySelector(`[data-cat-id="${c.id}"]`)?.classList.contains('on'));
+  broadBtn.classList.toggle('on', allOn);
 }
 
 function getSelectedCats() {
@@ -1479,10 +1503,28 @@ async function resetTraderStats(id) {
   catch(e) { showToast('Error: ' + e.message, 'error'); }
 }
 
+async function sellAllTraderPositions(configId) {
+  const positions = (window._lastPositions || []).filter(p => p.config_id === configId && !p.resolved_outcome && parseFloat(p.shares) > 0);
+  if (!positions.length) { showToast('No open positions to sell.'); return; }
+  const ok = await showConfirm({ title: 'Sell all open positions', body: `Sell <strong>${positions.length} open position${positions.length > 1 ? 's' : ''}</strong> on Polymarket? This cannot be undone.`, confirmText: 'Sell all', danger: true });
+  if (!ok) return;
+  let sold = 0, failed = 0;
+  for (const p of positions) {
+    try {
+      await api('POST', '/dashboard/positions/' + encodeURIComponent(p.condition_id) + '/' + encodeURIComponent(p.outcome) + '/sell');
+      sold++;
+    } catch { failed++; }
+  }
+  if (failed) showToast(`Sold ${sold}, failed ${failed}.`, 'error');
+  else showToast(`Sold ${sold} position${sold > 1 ? 's' : ''} ✓`);
+  loadDashboard();
+}
+
 // ── RENDER TRADERS ────────────────────────────────────────────────────────────
 function renderTraders(config) {
   _allTraders = (config && config.traders) ? config.traders : [];
   _allTraders.sort((a, b) => {
+    if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
     const ta = a.stats && a.stats.lastTradeAt ? new Date(a.stats.lastTradeAt).getTime() : 0;
     const tb = b.stats && b.stats.lastTradeAt ? new Date(b.stats.lastTradeAt).getTime() : 0;
     return tb - ta;
@@ -1558,7 +1600,8 @@ function renderTradersHtml(traders) {
           (t.maxPositionSize != null ? '<span>Max position: <strong>$' + t.maxPositionSize + '</strong></span>' : '') +
           '<span>Wallet: <strong style="font-family:monospace">'+short+'</strong></span>' +
         '</div>' +
-        '<div style="display:flex;gap:8px;margin-top:12px">' +
+        '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">' +
+          '<button class="btn btn-sm btn-red" onclick="sellAllTraderPositions(\''+t.id+'\')" style="width:auto">Sell all open</button>' +
           '<button class="btn btn-sm" onclick="clearResolvedPositions()" style="width:auto">Clear resolved</button>' +
           '<button class="btn btn-sm" onclick="resetTraderStats(\''+t.id+'\')" style="width:auto">Reset stats</button>' +
           '<button class="btn btn-sm btn-red" onclick="deleteTrader(\''+t.id+'\')" style="width:auto">Remove trader</button>' +
