@@ -84,7 +84,7 @@ async function fetchActiveUpOrDownMarkets() {
 
 // ── MARKET INFO via CLOB (always works by conditionId) ───────────────────
 const _mktInfoCache = {}; // conditionId → { data, ts }
-const INFO_TTL      = 2 * 60_000;
+const INFO_TTL      = 20_000; // 20s — must be fresh for near-expiry price checks
 
 async function getMarketInfo(conditionId) {
   const c = _mktInfoCache[conditionId];
@@ -385,29 +385,19 @@ async function globalPoll() {
         const tokens = mkt.tokens || [];
         if (tokens.length < 2) continue;
 
-        // ④ Find token at minPrice (use lowest configured minPrice to be inclusive)
+        // ④+⑤ Live book check for both tokens — cached prices are stale, use real-time ask
         const lowestMin = Math.min(...activeUsers.map(([, s]) => s.config.minPrice));
         let targetIdx   = -1;
         let targetToken = null;
+        let bookResult  = null;
 
         for (let i = 0; i < tokens.length; i++) {
-          const p = parseFloat(tokens[i].price ?? 0);
-          if (p >= lowestMin) {
-            targetIdx   = i;
-            targetToken = tokens[i].token_id;
-            break;
-          }
+          if (!tokens[i].token_id) continue;
+          const res = await passesBookFilter(tokens[i].token_id, lowestMin);
+          if (res.ok) { targetIdx = i; targetToken = tokens[i].token_id; bookResult = res; break; }
         }
-        if (targetIdx < 0 || !targetToken) {
-          const prices = tokens.map(t => parseFloat(t.price ?? 0).toFixed(2)).join(' / ');
-          log('skip', `${label} — price below threshold`, { id: shortId, prices, min: lowestMin });
-          continue;
-        }
-
-        // ⑤ Book filter — once per token
-        const bookResult = await passesBookFilter(targetToken, lowestMin);
-        if (!bookResult.ok) {
-          log('skip', `${label} — book filter: ${bookResult.reason}`, { id: shortId });
+        if (targetIdx < 0) {
+          log('skip', `${label} — book: no token at ≥${lowestMin}`, { id: shortId });
           continue;
         }
 
