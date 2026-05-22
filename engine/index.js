@@ -586,19 +586,13 @@ async function processSignalForUser(user, wallet, signal, side) {
         return;
       }
 
-      // Use current best ask price — trader's price is stale by the time we copy.
-      // Placing a GTC limit at the old price leaves unfilled zombie orders.
-      const askPrice = await getBestPrice(tokenId, 0);
-      if (!askPrice || askPrice <= 0) {
-        logger.warn('Skip: no ask price', { tokenId });
+      // Use trader's price as limit — with correct cursor (5-min lookback) signals are
+      // fresh so market is still at/near trader's price and GTC fills quickly.
+      const price = signal.price > 0 ? signal.price : await getBestPrice(tokenId, 0);
+      if (!price || price <= 0) {
+        logger.warn('Skip: no price', { tokenId, signalPrice: signal.price });
         return;
       }
-      // Skip if market moved too far (>20¢ above trader's price) — opportunity gone
-      if (signal.price > 0 && askPrice - signal.price > 0.20) {
-        logger.info('Skip: market moved too far from trader price', { traderPrice: signal.price, askNow: askPrice, conditionId: signal.conditionId?.slice(0,10) });
-        return;
-      }
-      const price = askPrice;
 
       // Calculate USDC to spend (fixed amount or % of trader's bet)
       let usdcToSpend = calcTradeSize(user, signal);
@@ -629,10 +623,9 @@ async function processSignalForUser(user, wallet, signal, side) {
       const marketName = market?.question || market?.title || market?.market_slug || signal.conditionId;
       const marketSlug = market?.market_slug || null;
 
-      // Always FOK — fills immediately at current ask or cancels.
-      // GTC orders at stale prices create zombie unfilled orders in the book.
+      // GTC for normal prices, FOK only for ≥95¢ (prevents phantom positions near expiry)
       const { OrderType: OT } = await getClobLib();
-      const chosenOrderType = OT.FOK;
+      const chosenOrderType = price >= 0.95 ? OT.FOK : OT.GTC;
       logger.trade('Placing BUY', { userId: user.id, market: marketName.slice(0,40), price, usdc: usdcToSpend, type: chosenOrderType });
       const result = await placeOrder(wallet, tokenId, 'BUY', price, usdcToSpend, chosenOrderType);
 
