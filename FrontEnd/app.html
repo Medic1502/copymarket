@@ -34,7 +34,10 @@ body{color:var(--text);font-family:'Inter',-apple-system,sans-serif;font-size:14
 
 /* ── SIDEBAR ──────────────────────────────────────── */
 .sidebar{width:220px;flex-shrink:0;background:var(--bg);border-right:1px solid var(--border);display:flex;flex-direction:column}
-.sb-nav{flex:1;padding:10px 8px;display:flex;flex-direction:column;gap:2px}
+.sb-nav{flex:1;padding:10px 8px 10px;display:flex;flex-direction:column;gap:2px;overflow:hidden}
+.nav-sep{height:1px;background:var(--border);margin:10px 4px}
+.nav-spacer{flex:1}
+.nav-section{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);padding:8px 8px 4px}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:var(--text2);font-size:13.5px;font-weight:500;cursor:pointer;transition:all .15s;border:none;background:none;width:100%;text-align:left}
 .nav-item:hover{background:rgba(255,255,255,.05);color:var(--text)}
 .nav-item.active{background:rgba(37,99,235,.18);color:var(--blue-light)}
@@ -427,6 +430,18 @@ div.expand-panel.closed{display:none !important}
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
       Trade History
     </button>
+
+    <div class="nav-sep"></div>
+
+    <button class="nav-item" id="nav-leaderboard" onclick="navSwitch('leaderboard',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+      Leaderboard
+    </button>
+
+    <div class="nav-spacer"></div>
+
+    <div class="nav-sep"></div>
+
     <button class="nav-item" id="nav-wallet" onclick="navSwitch('wallet',this)">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
       Wallet
@@ -434,10 +449,6 @@ div.expand-panel.closed{display:none !important}
     <button class="nav-item" id="nav-profile" onclick="navSwitch('profile',this)">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       Profile
-    </button>
-    <button class="nav-item" id="nav-leaderboard" onclick="navSwitch('leaderboard',this)">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-      Leaderboard
     </button>
   </nav>
 
