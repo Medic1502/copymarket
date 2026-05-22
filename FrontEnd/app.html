@@ -66,21 +66,44 @@ body{color:var(--text);font-family:'Inter',-apple-system,sans-serif;font-size:14
 /* ── LEADERBOARD ──────────────────────────────────── */
 .lb-period{font-size:11.5px;padding:4px 10px}
 .lb-period.active{background:rgba(37,99,235,.2);border-color:var(--blue);color:#93C5FD}
-.lb-row{display:grid;grid-template-columns:40px 1fr 110px 90px 70px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);transition:background .1s}
+/* Podium */
+.lb-podium{display:flex;align-items:flex-end;justify-content:center;gap:10px;padding:28px 20px 0}
+.lb-pod{display:flex;flex-direction:column;align-items:center;border-radius:12px 12px 0 0;border:1px solid;border-bottom:none;text-align:center;cursor:default;flex-shrink:0}
+.lb-pod-1{width:160px;padding:24px 16px 0;background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.35)}
+.lb-pod-2{width:136px;padding:14px 14px 0;background:rgba(148,163,184,.05);border-color:rgba(148,163,184,.28)}
+.lb-pod-3{width:124px;padding:8px 12px 0;background:rgba(180,120,60,.05);border-color:rgba(180,120,60,.22)}
+.lb-pod-medal{line-height:1;margin-bottom:8px}
+.lb-pod-1 .lb-pod-medal{font-size:38px}
+.lb-pod-2 .lb-pod-medal{font-size:30px}
+.lb-pod-3 .lb-pod-medal{font-size:26px}
+.lb-pod-name{font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;margin-bottom:6px}
+.lb-pod-1 .lb-pod-name{font-size:15px}
+.lb-pod-2 .lb-pod-name{font-size:13px}
+.lb-pod-3 .lb-pod-name{font-size:12px}
+.lb-pod-pnl{font-weight:700}
+.lb-pod-1 .lb-pod-pnl{font-size:20px}
+.lb-pod-2 .lb-pod-pnl{font-size:16px}
+.lb-pod-3 .lb-pod-pnl{font-size:14px}
+.lb-pod-pnl.pos{color:var(--green)}
+.lb-pod-pnl.neg{color:var(--red)}
+.lb-pod-vol{font-size:10.5px;color:var(--text3);margin-top:3px;margin-bottom:14px}
+.lb-pod-step{width:100%;display:flex;align-items:center;justify-content:center;border-radius:4px;font-weight:800;margin-top:auto;letter-spacing:.04em}
+.lb-pod-1 .lb-pod-step{height:38px;font-size:15px;background:rgba(245,158,11,.22);color:#F59E0B}
+.lb-pod-2 .lb-pod-step{height:28px;font-size:13px;background:rgba(148,163,184,.18);color:#94A3B8}
+.lb-pod-3 .lb-pod-step{height:22px;font-size:12px;background:rgba(180,120,60,.18);color:#C97934}
+/* List rows */
+.lb-list-wrap{border-top:1px solid var(--border)}
+.lb-row{display:grid;grid-template-columns:44px 1fr 120px 110px;align-items:center;padding:11px 16px;border-bottom:1px solid var(--border);transition:background .1s}
 .lb-row:last-child{border-bottom:none}
 .lb-row:hover{background:rgba(255,255,255,.025)}
-.lb-head{display:grid;grid-template-columns:40px 1fr 110px 90px 70px;padding:8px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--border)}
-.lb-head span{font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em}
-.lb-rank{font-size:14px;font-weight:700;color:var(--text3);text-align:center}
-.lb-rank.gold{color:#F59E0B;font-size:16px}
-.lb-rank.silver{color:#94A3B8;font-size:16px}
-.lb-rank.bronze{color:#C97934;font-size:16px}
-.lb-name{font-size:13.5px;font-weight:600;color:var(--text)}
-.lb-profit{font-size:14px;font-weight:700;text-align:right}
+.lb-head{display:grid;grid-template-columns:44px 1fr 120px 110px;padding:7px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--border)}
+.lb-head span{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em}
+.lb-rank{font-size:13px;font-weight:700;color:var(--text3);text-align:center}
+.lb-name{font-size:13px;font-weight:600;color:var(--text)}
+.lb-profit{font-size:13px;font-weight:700;text-align:right}
 .lb-profit.pos{color:var(--green)}
 .lb-profit.neg{color:var(--red)}
-.lb-wr{font-size:12px;color:var(--text2);text-align:right}
-.lb-trades{font-size:12px;color:var(--text3);text-align:right}
+.lb-vol{font-size:12px;color:var(--text3);text-align:right}
 
 /* ── TABS ─────────────────────────────────────────── */
 .tab-nav{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px;gap:0}
@@ -2233,22 +2256,47 @@ async function loadLeaderboard() {
       el.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text3);font-size:13px">No data for this period yet.</div>';
       return;
     }
-    const medals = ['🥇','🥈','🥉'];
-    const rankClass = i => i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
-    const rankLabel = i => i < 3 ? medals[i] : (i + 1);
-    el.innerHTML =
-      '<div class="lb-head"><span></span><span>Trader</span><span style="text-align:right">Profit</span><span style="text-align:right">Win Rate</span><span style="text-align:right">Trades</span></div>' +
-      rows.map((r, i) => {
-        const profitStr = (r.profit >= 0 ? '+$' : '-$') + Math.abs(r.profit).toFixed(2);
-        const profitCls = r.profit >= 0 ? 'pos' : 'neg';
-        return `<div class="lb-row">
-          <div class="lb-rank ${rankClass(i)}">${rankLabel(i)}</div>
-          <div class="lb-name">${r.displayName}</div>
-          <div class="lb-profit ${profitCls}">${profitStr}</div>
-          <div class="lb-wr">${r.winRate}%</div>
-          <div class="lb-trades">${r.trades}</div>
+
+    const fmt    = (v) => (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2);
+    const fmtVol = (v) => '$' + v.toFixed(2);
+    const cls    = (v) => v >= 0 ? 'pos' : 'neg';
+
+    // ── Podium (top 3) ────────────────────────────────────────────────────────
+    const top = rows.slice(0, 3);
+    const podOrder = top.length >= 2 ? [top[1], top[0], top[2]].filter(Boolean) : [top[0]].filter(Boolean);
+    const podClasses  = ['lb-pod-2','lb-pod-1','lb-pod-3'];
+    const podMedals   = ['🥈','🥇','🥉'];
+    const podStepNums = ['2','1','3'];
+
+    const podiumHtml = `<div class="lb-podium">${
+      podOrder.map((r, idx) => {
+        const realIdx = top.indexOf(r);
+        const pc  = podClasses[idx];
+        const med = podMedals[idx];
+        const num = podStepNums[idx];
+        return `<div class="lb-pod ${pc}">
+          <div class="lb-pod-medal">${med}</div>
+          <div class="lb-pod-name" title="${r.displayName}">${r.displayName}</div>
+          <div class="lb-pod-pnl ${cls(r.profit)}">${fmt(r.profit)}</div>
+          <div class="lb-pod-vol">Vol: ${fmtVol(r.volume)}</div>
+          <div class="lb-pod-step">${num}</div>
         </div>`;
-      }).join('');
+      }).join('')
+    }</div>`;
+
+    // ── List (4th+) ───────────────────────────────────────────────────────────
+    const rest = rows.slice(3);
+    const listHtml = rest.length ? `<div class="lb-list-wrap">
+      <div class="lb-head"><span>#</span><span>Trader</span><span style="text-align:right">P&amp;L</span><span style="text-align:right">Volume</span></div>
+      ${rest.map((r, i) => `<div class="lb-row">
+        <div class="lb-rank">${i + 4}</div>
+        <div class="lb-name">${r.displayName}</div>
+        <div class="lb-profit ${cls(r.profit)}">${fmt(r.profit)}</div>
+        <div class="lb-vol">${fmtVol(r.volume)}</div>
+      </div>`).join('')}
+    </div>` : '';
+
+    el.innerHTML = podiumHtml + listHtml;
   } catch(e) {
     el.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text3);font-size:13px">Could not load leaderboard.</div>';
   }

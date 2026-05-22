@@ -316,6 +316,7 @@ async function getLeaderboard(period) {
     SELECT
       COALESCE(lk.discord_username, split_part(u.email, '@', 1))  AS display_name,
       COALESCE(SUM(bp.resolved_pnl), 0)                            AS profit,
+      COALESCE(SUM(bp.usdc_spent), 0)                              AS volume,
       COUNT(bp.id)                                                  AS trades,
       COUNT(bp.id) FILTER (WHERE bp.resolved_outcome = 'WON')      AS wins,
       COUNT(bp.id) FILTER (WHERE bp.resolved_outcome = 'LOST')      AS losses
@@ -333,6 +334,7 @@ async function getLeaderboard(period) {
     rank:        i + 1,
     displayName: r.display_name,
     profit:      parseFloat(r.profit),
+    volume:      parseFloat(r.volume),
     trades:      parseInt(r.trades),
     wins:        parseInt(r.wins),
     losses:      parseInt(r.losses),
