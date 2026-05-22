@@ -316,21 +316,31 @@ async function getLeaderboard(period, currentUserId) {
   const periodJoin = intervals[period]
     ? `AND bp.updated_at >= NOW() - INTERVAL '${intervals[period]}'`
     : '';
+  const tradesPeriod = intervals[period]
+    ? `AND t.created_at >= NOW() - INTERVAL '${intervals[period]}'`
+    : '';
   const sql = `
+    WITH vol AS (
+      SELECT user_id, COALESCE(SUM(size), 0) AS total
+      FROM trades
+      WHERE side = 'BUY' AND status = 'FILLED' ${tradesPeriod}
+      GROUP BY user_id
+    )
     SELECT
-      u.id                                                          AS user_id,
+      u.id                                                                          AS user_id,
       COALESCE(u.display_name, lk.discord_username, split_part(u.email, '@', 1))  AS display_name,
-      COALESCE(SUM(bp.resolved_pnl), 0)                            AS profit,
-      COALESCE(SUM(bp.usdc_spent), 0)                              AS volume,
-      COUNT(bp.id)                                                  AS trades,
-      COUNT(bp.id) FILTER (WHERE bp.resolved_outcome = 'WON')      AS wins,
-      COUNT(bp.id) FILTER (WHERE bp.resolved_outcome = 'LOST')      AS losses
+      COALESCE(SUM(bp.resolved_pnl), 0)                                            AS profit,
+      COALESCE(v.total, 0)                                                          AS volume,
+      COUNT(bp.id)                                                                  AS trades,
+      COUNT(bp.id) FILTER (WHERE bp.resolved_outcome = 'WON')                      AS wins,
+      COUNT(bp.id) FILTER (WHERE bp.resolved_outcome = 'LOST')                      AS losses
     FROM users u
     JOIN wallets w ON w.user_id = u.id
     JOIN bot_positions bp ON bp.user_id = u.id
       AND bp.resolved_outcome IS NOT NULL ${periodJoin}
     LEFT JOIN license_keys lk ON lk.user_id = u.id
-    GROUP BY u.id, u.display_name, lk.discord_username
+    LEFT JOIN vol v ON v.user_id = u.id
+    GROUP BY u.id, u.display_name, lk.discord_username, v.total
     HAVING COUNT(bp.id) > 0
     ORDER BY profit DESC, trades DESC
     LIMIT 50
@@ -356,7 +366,7 @@ async function getLeaderboard(period, currentUserId) {
       SELECT
         COALESCE(u.display_name, lk.discord_username, split_part(u.email, '@', 1)) AS display_name,
         COALESCE(SUM(bp.resolved_pnl), 0)   AS profit,
-        COALESCE(SUM(bp.usdc_spent), 0)      AS volume,
+        COALESCE((SELECT SUM(size) FROM trades WHERE user_id=$1 AND side='BUY' AND status='FILLED' ${tradesPeriod}), 0) AS volume,
         COUNT(bp.id)                          AS trades,
         COUNT(bp.id) FILTER (WHERE bp.resolved_outcome='WON') AS wins
       FROM users u
@@ -365,7 +375,7 @@ async function getLeaderboard(period, currentUserId) {
         AND bp.resolved_outcome IS NOT NULL ${periodJoin}
       LEFT JOIN license_keys lk ON lk.user_id = u.id
       WHERE u.id = $1
-      GROUP BY u.id, display_name
+      GROUP BY u.id, u.display_name, lk.discord_username
     `, [currentUserId]);
     if (cu.rows.length) {
       const r = cu.rows[0];
