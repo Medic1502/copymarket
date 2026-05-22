@@ -10,7 +10,7 @@ const db = require('../db');
 const CLOB_BASE = 'https://clob.polymarket.com';
 const DATA_BASE = 'https://data-api.polymarket.com';
 const CHAIN_ID  = 137;
-const POLL_MS   = 30_000;
+const POLL_MS   = 15_000;
 const REDEEM_MS = 60_000;
 
 const DEPOSIT_WALLET_FACTORY = '0x00000000000Fb5C9ADea0298D729A0CB3823Cc07';
@@ -111,21 +111,20 @@ function passesAssetFilter(title, assets) {
 }
 
 // ── FILTER: time in window ────────────────────────────────────────────────
+// Target the final 2 minutes where price converges to 99¢.
+// "Too early" check (elapsed > 40%) was useless — 99¢ only appears in the last ~60s.
 function passesTimeFilter(mkt) {
   const start = mkt.game_start_time || mkt.startDate;
   const end   = mkt.end_date_iso    || mkt.endDate;
   if (!start || !end) return true;
 
-  const startMs   = new Date(start).getTime();
-  const endMs     = new Date(end).getTime();
-  const nowMs     = Date.now();
-  const totalMs   = endMs - startMs;
-  const elapsedMs = nowMs - startMs;
-  const remainMs  = endMs - nowMs;
+  const endMs    = new Date(end).getTime();
+  const nowMs    = Date.now();
+  const remainMs = endMs - nowMs;
 
-  if (totalMs <= 0 || remainMs <= 0) return false;   // closed
-  if (remainMs < 20_000)             return false;   // < 20s left
-  if (elapsedMs / totalMs < 0.40)    return false;   // too early
+  if (remainMs <= 0)        return false;  // closed
+  if (remainMs < 20_000)    return false;  // < 20s left (too late, risky)
+  if (remainMs > 120_000)   return false;  // > 2 min left (price not at 99¢ yet)
   return true;
 }
 
