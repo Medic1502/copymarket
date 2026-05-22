@@ -323,7 +323,7 @@ async function getLeaderboard(period, currentUserId) {
     WITH vol AS (
       SELECT user_id, COALESCE(SUM(size), 0) AS total
       FROM trades
-      WHERE side = 'BUY' AND status = 'FILLED' ${tradesPeriod}
+      WHERE side = 'BUY' AND size > 0 ${tradesPeriod}
       GROUP BY user_id
     )
     SELECT
@@ -366,7 +366,7 @@ async function getLeaderboard(period, currentUserId) {
       SELECT
         COALESCE(u.display_name, lk.discord_username, split_part(u.email, '@', 1)) AS display_name,
         COALESCE(SUM(bp.resolved_pnl), 0)   AS profit,
-        COALESCE((SELECT SUM(size) FROM trades WHERE user_id=$1 AND side='BUY' AND status='FILLED' ${tradesPeriod}), 0) AS volume,
+        COALESCE((SELECT SUM(size) FROM trades WHERE user_id=$1 AND side='BUY' AND size > 0 ${tradesPeriod}), 0) AS volume,
         COUNT(bp.id)                          AS trades,
         COUNT(bp.id) FILTER (WHERE bp.resolved_outcome='WON') AS wins
       FROM users u
