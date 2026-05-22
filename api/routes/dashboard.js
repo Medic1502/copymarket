@@ -406,4 +406,14 @@ router.post('/share-win', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── LEADERBOARD ───────────────────────────────────────────────────────────────
+router.get('/leaderboard', requireAuth, async (req, res, next) => {
+  try {
+    const period = ['daily', 'weekly', 'monthly', 'alltime'].includes(req.query.period)
+      ? req.query.period : 'alltime';
+    const rows = await db.getLeaderboard(period);
+    res.json({ period, rows });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

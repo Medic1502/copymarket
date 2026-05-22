@@ -307,6 +307,38 @@ async function deleteCopyConfig(id, userId) {
   await query('DELETE FROM copy_configs WHERE id = $1 AND user_id = $2', [id, userId]);
 }
 
+async function getLeaderboard(period) {
+  const intervals = { daily: '1 day', weekly: '7 days', monthly: '30 days' };
+  const where = intervals[period]
+    ? `AND bp.updated_at >= NOW() - INTERVAL '${intervals[period]}'`
+    : '';
+  const res = await query(`
+    SELECT
+      COALESCE(lk.discord_username, split_part(u.email, '@', 1))          AS display_name,
+      COALESCE(SUM(bp.resolved_pnl), 0)                                    AS profit,
+      COUNT(*) FILTER (WHERE bp.resolved_outcome IS NOT NULL)              AS trades,
+      COUNT(*) FILTER (WHERE bp.resolved_outcome = 'WON')                  AS wins,
+      COUNT(*) FILTER (WHERE bp.resolved_outcome = 'LOST')                 AS losses
+    FROM users u
+    JOIN bot_positions bp ON bp.user_id = u.id
+    LEFT JOIN license_keys lk ON lk.user_id = u.id
+    WHERE bp.resolved_outcome IS NOT NULL ${where}
+    GROUP BY u.id, display_name
+    HAVING COALESCE(SUM(bp.resolved_pnl), 0) != 0
+    ORDER BY profit DESC
+    LIMIT 50
+  `);
+  return res.rows.map((r, i) => ({
+    rank:        i + 1,
+    displayName: r.display_name,
+    profit:      parseFloat(r.profit),
+    trades:      parseInt(r.trades),
+    wins:        parseInt(r.wins),
+    losses:      parseInt(r.losses),
+    winRate:     parseInt(r.trades) > 0 ? Math.round(parseInt(r.wins) / parseInt(r.trades) * 100) : 0,
+  }));
+}
+
 async function updateCopyConfig(id, userId, { nickname, notes, copyMode, copyPercentage, fixedAmount, minTraderBet, maxTraderBet, categories, followMode, minSharePrice, maxSharePrice, maxPositionSize }) {
   const res = await query(
     `UPDATE copy_configs SET nickname=$3, notes=$4, copy_mode=$5, copy_percentage=$6, fixed_amount=$7,
@@ -336,7 +368,7 @@ module.exports = {
   createUser, createLicenseUser, getUserByEmail, getUserById, verifyPassword,
   setConfigActive,
   createWalletForUser, getWalletByUserId, getUSDCBalance,
-  saveCopyConfig, updateCopyConfig, getCopyConfig, setConfigActive, getAllActiveConfigs, deleteCopyConfig,
+  saveCopyConfig, updateCopyConfig, getCopyConfig, setConfigActive, getAllActiveConfigs, deleteCopyConfig, getLeaderboard,
   saveTrade, resolveTradeOutcome, getRecentTrades, getDashboardStats, getTraderStats,
   upsertBotPosition, deleteBotPosition, resolveBotPosition, deleteResolvedPosition, getBotPositions, getBotPositionsWithNames, clearBotPositions, clearResolvedPositions, resetTraderStats,
   encryptPrivateKey, decryptPrivateKey,

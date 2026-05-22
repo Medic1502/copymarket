@@ -63,6 +63,25 @@ body{color:var(--text);font-family:'Inter',-apple-system,sans-serif;font-size:14
 .stat-sub{font-size:11px;color:var(--text3);margin-top:4px}
 
 
+/* ── LEADERBOARD ──────────────────────────────────── */
+.lb-period{font-size:11.5px;padding:4px 10px}
+.lb-period.active{background:rgba(37,99,235,.2);border-color:var(--blue);color:#93C5FD}
+.lb-row{display:grid;grid-template-columns:40px 1fr 110px 90px 70px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);transition:background .1s}
+.lb-row:last-child{border-bottom:none}
+.lb-row:hover{background:rgba(255,255,255,.025)}
+.lb-head{display:grid;grid-template-columns:40px 1fr 110px 90px 70px;padding:8px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--border)}
+.lb-head span{font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.07em}
+.lb-rank{font-size:14px;font-weight:700;color:var(--text3);text-align:center}
+.lb-rank.gold{color:#F59E0B;font-size:16px}
+.lb-rank.silver{color:#94A3B8;font-size:16px}
+.lb-rank.bronze{color:#C97934;font-size:16px}
+.lb-name{font-size:13.5px;font-weight:600;color:var(--text)}
+.lb-profit{font-size:14px;font-weight:700;text-align:right}
+.lb-profit.pos{color:var(--green)}
+.lb-profit.neg{color:var(--red)}
+.lb-wr{font-size:12px;color:var(--text2);text-align:right}
+.lb-trades{font-size:12px;color:var(--text3);text-align:right}
+
 /* ── TABS ─────────────────────────────────────────── */
 .tab-nav{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px;gap:0}
 .tab-btn{padding:9px 18px;font-size:13.5px;font-weight:500;color:var(--text3);background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;transition:all .15s;font-family:'Inter',sans-serif}
@@ -376,6 +395,10 @@ div.expand-panel.closed{display:none !important}
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       Profile
     </button>
+    <button class="nav-item" id="nav-leaderboard" onclick="navSwitch('leaderboard',this)">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+      Leaderboard
+    </button>
   </nav>
 
   <div class="sb-bottom">
@@ -622,6 +645,27 @@ div.expand-panel.closed{display:none !important}
     </div>
 
 
+    <!-- ── LEADERBOARD ──────────────────────────────── -->
+    <div id="tab-leaderboard" class="tab-panel">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:var(--text)">Leaderboard</div>
+          <div style="font-size:12.5px;color:var(--text2);margin-top:3px">Top traders using Jonin CT</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm lb-period active" data-period="daily"   onclick="setLbPeriod(this)">Daily</button>
+          <button class="btn btn-sm lb-period"        data-period="weekly"  onclick="setLbPeriod(this)">Weekly</button>
+          <button class="btn btn-sm lb-period"        data-period="monthly" onclick="setLbPeriod(this)">Monthly</button>
+          <button class="btn btn-sm lb-period"        data-period="alltime" onclick="setLbPeriod(this)">All Time</button>
+        </div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden">
+        <div id="lb-list" style="min-height:200px">
+          <div style="text-align:center;padding:40px 0;color:var(--text3);font-size:13px">Loading…</div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /content -->
 </main>
 
@@ -698,7 +742,8 @@ function navSwitch(key, el) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   const panel = document.getElementById('tab-' + key);
   if (panel) panel.classList.add('active');
-  if (key === 'trades')     loadTradeHistory();
+  if (key === 'trades')       loadTradeHistory();
+  if (key === 'leaderboard')  loadLeaderboard();
 }
 
 // kept for backward compat if called anywhere
@@ -2164,6 +2209,47 @@ function fmtDateTime(ts) {
   const h = d.getHours().toString().padStart(2,'0');
   const m = d.getMinutes().toString().padStart(2,'0');
   return months[d.getMonth()] + ' ' + d.getDate() + ', ' + h + ':' + m;
+}
+
+// ── LEADERBOARD ───────────────────────────────────────────────────────────────
+let _lbPeriod = 'daily';
+
+function setLbPeriod(btn) {
+  document.querySelectorAll('.lb-period').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _lbPeriod = btn.dataset.period;
+  loadLeaderboard();
+}
+
+async function loadLeaderboard() {
+  const el = document.getElementById('lb-list');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text3);font-size:13px">Loading…</div>';
+  try {
+    const { rows } = await api('GET', '/dashboard/leaderboard?period=' + _lbPeriod);
+    if (!rows.length) {
+      el.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text3);font-size:13px">No data for this period yet.</div>';
+      return;
+    }
+    const medals = ['🥇','🥈','🥉'];
+    const rankClass = i => i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+    const rankLabel = i => i < 3 ? medals[i] : (i + 1);
+    el.innerHTML =
+      '<div class="lb-head"><span></span><span>Trader</span><span style="text-align:right">Profit</span><span style="text-align:right">Win Rate</span><span style="text-align:right">Trades</span></div>' +
+      rows.map((r, i) => {
+        const profitStr = (r.profit >= 0 ? '+$' : '-$') + Math.abs(r.profit).toFixed(2);
+        const profitCls = r.profit >= 0 ? 'pos' : 'neg';
+        return `<div class="lb-row">
+          <div class="lb-rank ${rankClass(i)}">${rankLabel(i)}</div>
+          <div class="lb-name">${r.displayName}</div>
+          <div class="lb-profit ${profitCls}">${profitStr}</div>
+          <div class="lb-wr">${r.winRate}%</div>
+          <div class="lb-trades">${r.trades}</div>
+        </div>`;
+      }).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text3);font-size:13px">Could not load leaderboard.</div>';
+  }
 }
 </script>
 </body>
