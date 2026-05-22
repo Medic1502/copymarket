@@ -309,23 +309,24 @@ async function deleteCopyConfig(id, userId) {
 
 async function getLeaderboard(period) {
   const intervals = { daily: '1 day', weekly: '7 days', monthly: '30 days' };
-  const where = intervals[period]
+  const periodJoin = intervals[period]
     ? `AND bp.updated_at >= NOW() - INTERVAL '${intervals[period]}'`
     : '';
   const res = await query(`
     SELECT
-      COALESCE(lk.discord_username, split_part(u.email, '@', 1))          AS display_name,
-      COALESCE(SUM(bp.resolved_pnl), 0)                                    AS profit,
-      COUNT(*) FILTER (WHERE bp.resolved_outcome IS NOT NULL)              AS trades,
-      COUNT(*) FILTER (WHERE bp.resolved_outcome = 'WON')                  AS wins,
-      COUNT(*) FILTER (WHERE bp.resolved_outcome = 'LOST')                 AS losses
+      COALESCE(lk.discord_username, split_part(u.email, '@', 1))  AS display_name,
+      COALESCE(SUM(bp.resolved_pnl), 0)                            AS profit,
+      COUNT(bp.id)                                                  AS trades,
+      COUNT(bp.id) FILTER (WHERE bp.resolved_outcome = 'WON')      AS wins,
+      COUNT(bp.id) FILTER (WHERE bp.resolved_outcome = 'LOST')      AS losses
     FROM users u
+    JOIN wallets w ON w.user_id = u.id
     JOIN bot_positions bp ON bp.user_id = u.id
+      AND bp.resolved_outcome IS NOT NULL ${periodJoin}
     LEFT JOIN license_keys lk ON lk.user_id = u.id
-    WHERE bp.resolved_outcome IS NOT NULL ${where}
     GROUP BY u.id, display_name
-    HAVING COALESCE(SUM(bp.resolved_pnl), 0) != 0
-    ORDER BY profit DESC
+    HAVING COUNT(bp.id) > 0
+    ORDER BY profit DESC, trades DESC
     LIMIT 50
   `);
   return res.rows.map((r, i) => ({
