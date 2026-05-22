@@ -2100,12 +2100,18 @@ function renderTrades(trades) {
 
 function renderTradesHtml(trades) {
   const c = document.getElementById('trades-list');
-  if (!trades || !trades.length) {
+  // Filter out FAIL trades caused by insufficient balance/allowance — not actionable for the user
+  const visible = (trades || []).filter(t => {
+    if (t.status !== 'FAILED') return true;
+    const r = (t.skip_reason || '').toLowerCase();
+    return !r.includes('balance') && !r.includes('allowance') && !r.includes('insufficient');
+  });
+  if (!visible.length) {
     const q = (document.getElementById('trade-search') || {}).value || '';
     c.innerHTML = '<div style="color:var(--text3);font-size:13px;text-align:center;padding:24px">' + (q ? 'No trades match "' + q + '".' : 'No trades yet. Waiting for the trader to make a move.') + '</div>';
     return;
   }
-  c.innerHTML = trades.map(function(t) {
+  c.innerHTML = visible.map(function(t) {
     const st = t.status || '';
     const isSkip = st === 'SKIPPED';
     const isWon  = st === 'WON';

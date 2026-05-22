@@ -667,9 +667,13 @@ async function processSignalForUser(user, wallet, signal, side) {
   } catch (err) {
     logger.error(`${side} failed`, { userId: user.id, conditionId: signal.conditionId, error: err.message });
     if (side === 'BUY') {
-      const failMkt  = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
-      const failName = failMkt?.question || failMkt?.title || failMkt?.market_slug || signal.conditionId;
-      await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName: failName, outcome: signal.outcome, side: 'BUY', size: 0, price: 0, orderId: null, filledSize: null, status: 'FAILED', skipReason: err.message.slice(0, 200), pnl: null, configId: user.configId }).catch(() => {});
+      const errLower = err.message.toLowerCase();
+      const isBalanceErr = errLower.includes('balance') || errLower.includes('allowance') || errLower.includes('insufficient');
+      if (!isBalanceErr) {
+        const failMkt  = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
+        const failName = failMkt?.question || failMkt?.title || failMkt?.market_slug || signal.conditionId;
+        await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName: failName, outcome: signal.outcome, side: 'BUY', size: 0, price: 0, orderId: null, filledSize: null, status: 'FAILED', skipReason: err.message.slice(0, 200), pnl: null, configId: user.configId }).catch(() => {});
+      }
     }
   }
 }
