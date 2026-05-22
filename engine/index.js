@@ -167,7 +167,7 @@ async function apiFetch(url, opts = {}) {
 
 // Returns recent trade activity sorted newest-first
 async function getRecentActivity(walletAddress) {
-  const data = await apiFetch(`https://data-api.polymarket.com/activity?user=${walletAddress}&limit=20`);
+  const data = await apiFetch(`https://data-api.polymarket.com/activity?user=${walletAddress}&limit=200`);
   const items = Array.isArray(data) ? data : (data.data || data.activity || []);
   return items.map(a => {
     const usdcSize = parseFloat(a.usdcSize || a.usdc_size || a.cashSize || a.amount || 0);
