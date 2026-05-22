@@ -64,15 +64,27 @@ function marketMatchesCategories(market, categories) {
   const q   = (market.question || '').toLowerCase();
   const matchId = c => {
     switch (c) {
-      case 'nba':    return cat === 'sports' && (q.startsWith('nba:') || q.includes(' nba '));
-      case 'nfl':    return cat === 'sports' && (q.startsWith('nfl:') || q.includes(' nfl '));
-      case 'mlb':    return cat === 'sports' && (q.startsWith('mlb:') || q.includes(' mlb ') || q.includes('baseball'));
-      case 'nhl':    return cat === 'sports' && (q.startsWith('nhl:') || q.includes(' nhl ') || q.includes('hockey'));
-      case 'soccer': return cat === 'sports' && (q.includes('soccer') || q.includes(' mls') || q.includes('premier league') || q.includes('champions league') || q.includes('la liga') || q.includes('bundesliga') || q.includes('serie a'));
-      case 'tennis': return cat === 'sports' && (q.includes('tennis') || q.includes('atp') || q.includes('wta') || q.includes('wimbledon') || q.includes('open:'));
-      case 'golf':   return cat === 'sports' && (q.includes('golf') || q.includes('pga') || q.includes('masters'));
-      case 'mma':    return cat === 'sports' && (q.includes('ufc') || q.includes('mma') || q.includes('bellator'));
-      case 'boxing': return cat === 'sports' && q.includes('boxing');
+      case 'nba': {
+        const NBA = ['spurs','lakers','celtics','warriors','nets','knicks','bulls','heat','bucks','suns','clippers','nuggets','jazz','76ers','sixers','raptors','hawks','cavaliers','cavs','pistons','pacers','hornets','magic','wizards','kings','blazers','thunder','mavericks','mavs','rockets','grizzlies','pelicans','timberwolves','wolves','wnba'];
+        return cat === 'sports' && (q.startsWith('nba:') || q.includes('nba') || NBA.some(t => q.includes(t)));
+      }
+      case 'nfl': {
+        const NFL = ['chiefs','cowboys','eagles','patriots','49ers','rams','bills','ravens','bengals','browns','steelers','texans','colts','jaguars','titans','broncos','raiders','chargers','seahawks','cardinals','falcons','saints','buccaneers','panthers','vikings','packers','bears','lions','giants','commanders','redskins'];
+        return cat === 'sports' && (q.startsWith('nfl:') || q.includes('nfl') || q.includes('super bowl') || NFL.some(t => q.includes(t)));
+      }
+      case 'mlb': {
+        const MLB = ['yankees','red sox','dodgers','cubs','mets','braves','astros','blue jays','cardinals','phillies','padres','giants','mariners','pirates','brewers','reds','tigers','white sox','orioles','rays','twins','athletics','rangers','royals','angels','diamondbacks','rockies','marlins','nationals'];
+        return cat === 'sports' && (q.startsWith('mlb:') || q.includes('mlb') || q.includes('baseball') || MLB.some(t => q.includes(t)));
+      }
+      case 'nhl': {
+        const NHL = ['bruins','maple leafs','canadiens','rangers','penguins','blackhawks','red wings','flyers','oilers','flames','avalanche','lightning','capitals','golden knights','hurricanes','ducks','kings','sharks','devils','islanders','sabres','senators','canucks','jets','coyotes','predators','stars','wild','blue jackets'];
+        return cat === 'sports' && (q.startsWith('nhl:') || q.includes('nhl') || q.includes('hockey') || NHL.some(t => q.includes(t)));
+      }
+      case 'soccer': return cat === 'sports' && (q.includes('soccer') || q.includes(' mls') || q.includes('premier league') || q.includes('champions league') || q.includes('la liga') || q.includes('bundesliga') || q.includes('serie a') || q.includes('eredivisie') || q.includes('ligue 1') || q.includes(' fc ') || q.includes('united') || q.includes('city') || q.includes('atletico') || q.includes('barcelona') || q.includes('real madrid') || q.includes('ajax') || q.includes('arsenal') || q.includes('liverpool') || q.includes('chelsea'));
+      case 'tennis': return cat === 'sports' && (q.includes('tennis') || q.includes('atp') || q.includes('wta') || q.includes('wimbledon') || q.includes('open:') || q.includes('grand slam'));
+      case 'golf':   return cat === 'sports' && (q.includes('golf') || q.includes('pga') || q.includes('masters') || q.includes('lpga'));
+      case 'mma':    return cat === 'sports' && (q.includes('ufc') || q.includes('mma') || q.includes('bellator') || q.includes('one fc'));
+      case 'boxing': return cat === 'sports' && (q.includes('boxing') || q.includes('bout') || q.includes(' vs '));
       case 'us-politics':   return cat === 'us-current-affairs' || cat === 'politics';
       case 'international': return cat === 'ukraine & russia' || cat === 'geopolitics' || cat === 'international';
       case 'crypto':   return cat === 'crypto';
