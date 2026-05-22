@@ -58,38 +58,30 @@ async function getCachedTokenBid(tokenId) {
   return bid;
 }
 
+// Category detection using CLOB market_slug (reliable) + tags + question as fallback.
+// Slug format: "mlb-hou-chc-2026-05-22", "nba-bos-nyk-spread-2026-05-22", etc.
 function marketMatchesCategories(market, categories) {
   if (!categories || categories.length === 0) return true;
-  const cat = (market.category || '').toLowerCase();
-  const q   = (market.question || '').toLowerCase();
+  const slug = (market.market_slug || market.slug || '').toLowerCase();
+  const tags = (Array.isArray(market.tags) ? market.tags.join(' ') : (market.tags || '')).toLowerCase();
+  const q    = (market.question || '').toLowerCase();
+
   const matchId = c => {
     switch (c) {
-      case 'nba': {
-        const NBA = ['spurs','lakers','celtics','warriors','nets','knicks','bulls','heat','bucks','suns','clippers','nuggets','jazz','76ers','sixers','raptors','hawks','cavaliers','cavs','pistons','pacers','hornets','magic','wizards','kings','blazers','thunder','mavericks','mavs','rockets','grizzlies','pelicans','timberwolves','wolves','wnba'];
-        return cat === 'sports' && (q.startsWith('nba:') || q.includes('nba') || NBA.some(t => q.includes(t)));
-      }
-      case 'nfl': {
-        const NFL = ['chiefs','cowboys','eagles','patriots','49ers','rams','bills','ravens','bengals','browns','steelers','texans','colts','jaguars','titans','broncos','raiders','chargers','seahawks','cardinals','falcons','saints','buccaneers','panthers','vikings','packers','bears','lions','giants','commanders','redskins'];
-        return cat === 'sports' && (q.startsWith('nfl:') || q.includes('nfl') || q.includes('super bowl') || NFL.some(t => q.includes(t)));
-      }
-      case 'mlb': {
-        const MLB = ['yankees','red sox','dodgers','cubs','mets','braves','astros','blue jays','cardinals','phillies','padres','giants','mariners','pirates','brewers','reds','tigers','white sox','orioles','rays','twins','athletics','rangers','royals','angels','diamondbacks','rockies','marlins','nationals'];
-        return cat === 'sports' && (q.startsWith('mlb:') || q.includes('mlb') || q.includes('baseball') || MLB.some(t => q.includes(t)));
-      }
-      case 'nhl': {
-        const NHL = ['bruins','maple leafs','canadiens','rangers','penguins','blackhawks','red wings','flyers','oilers','flames','avalanche','lightning','capitals','golden knights','hurricanes','ducks','kings','sharks','devils','islanders','sabres','senators','canucks','jets','coyotes','predators','stars','wild','blue jackets'];
-        return cat === 'sports' && (q.startsWith('nhl:') || q.includes('nhl') || q.includes('hockey') || NHL.some(t => q.includes(t)));
-      }
-      case 'soccer': return cat === 'sports' && (q.includes('soccer') || q.includes(' mls') || q.includes('premier league') || q.includes('champions league') || q.includes('la liga') || q.includes('bundesliga') || q.includes('serie a') || q.includes('eredivisie') || q.includes('ligue 1') || q.includes(' fc ') || q.includes('united') || q.includes('city') || q.includes('atletico') || q.includes('barcelona') || q.includes('real madrid') || q.includes('ajax') || q.includes('arsenal') || q.includes('liverpool') || q.includes('chelsea'));
-      case 'tennis': return cat === 'sports' && (q.includes('tennis') || q.includes('atp') || q.includes('wta') || q.includes('wimbledon') || q.includes('open:') || q.includes('grand slam'));
-      case 'golf':   return cat === 'sports' && (q.includes('golf') || q.includes('pga') || q.includes('masters') || q.includes('lpga'));
-      case 'mma':    return cat === 'sports' && (q.includes('ufc') || q.includes('mma') || q.includes('bellator') || q.includes('one fc'));
-      case 'boxing': return cat === 'sports' && (q.includes('boxing') || q.includes('bout') || q.includes(' vs '));
-      case 'us-politics':   return cat === 'us-current-affairs' || cat === 'politics';
-      case 'international': return cat === 'ukraine & russia' || cat === 'geopolitics' || cat === 'international';
-      case 'crypto':   return cat === 'crypto';
-      case 'business': return cat === 'business' || cat === 'finance';
-      case 'entertainment': return cat === 'pop-culture' || cat === 'art' || cat === 'awards';
+      case 'nba':    return slug.startsWith('nba') || slug.startsWith('wnba') || tags.includes('nba') || tags.includes('basketball') || q.includes('nba') || q.includes('wnba');
+      case 'nfl':    return slug.startsWith('nfl') || tags.includes('nfl') || tags.includes('american football') || q.includes('nfl') || q.includes('super bowl');
+      case 'mlb':    return slug.startsWith('mlb') || tags.includes('mlb') || tags.includes('baseball') || q.includes('mlb') || q.includes('baseball');
+      case 'nhl':    return slug.startsWith('nhl') || tags.includes('nhl') || tags.includes('hockey') || q.includes('nhl') || q.includes('hockey');
+      case 'soccer': return slug.startsWith('soccer') || slug.startsWith('epl') || slug.startsWith('mls') || slug.startsWith('ucl') || tags.includes('soccer') || tags.includes('premier league') || tags.includes('champions league') || tags.includes('eredivisie') || q.includes('premier league') || q.includes('champions league') || q.includes('la liga') || q.includes('bundesliga') || q.includes('eredivisie') || q.includes('serie a') || q.includes('mls');
+      case 'tennis': return slug.startsWith('tennis') || tags.includes('tennis') || tags.includes('atp') || tags.includes('wta') || q.includes('tennis') || q.includes('wimbledon');
+      case 'golf':   return slug.startsWith('golf') || slug.startsWith('pga') || tags.includes('golf') || tags.includes('pga') || q.includes('golf') || q.includes('pga');
+      case 'mma':    return slug.startsWith('ufc') || slug.startsWith('mma') || tags.includes('ufc') || tags.includes('mma') || q.includes('ufc') || q.includes('mma');
+      case 'boxing': return slug.startsWith('boxing') || tags.includes('boxing') || q.includes('boxing');
+      case 'us-politics':   return tags.includes('politics') || tags.includes('election') || tags.includes('trump') || tags.includes('us politics') || q.includes('president') || q.includes('congress') || q.includes('senate');
+      case 'international': return tags.includes('geopolit') || tags.includes('ukraine') || tags.includes('international') || q.includes('ukraine') || q.includes('nato');
+      case 'crypto':        return slug.startsWith('crypto') || slug.startsWith('bitcoin') || slug.startsWith('eth') || tags.includes('crypto') || tags.includes('bitcoin') || tags.includes('ethereum');
+      case 'business':      return tags.includes('business') || tags.includes('finance') || tags.includes('earnings') || tags.includes('economy');
+      case 'entertainment': return tags.includes('pop culture') || tags.includes('entertainment') || tags.includes('music') || tags.includes('awards');
       default: return false;
     }
   };
@@ -558,17 +550,31 @@ async function processSignalForUser(user, wallet, signal, side) {
         }
       }
 
-      // Category filter — uses Gamma market cache (4min TTL, shared across users)
-      if (user.categories && user.categories.length > 0) {
-        const market = await getCachedMarket(signal.conditionId);
-        if (market && !marketMatchesCategories(market, user.categories)) {
-          logger.info('Skip: category not in filter', { cats: user.categories, conditionId: signal.conditionId?.slice(0,10) });
+      // Fetch CLOB market data once — used for both category check and tokenId lookup.
+      // CLOB has ALL markets (incl. spreads/O/U) and market_slug is always reliable.
+      let clobMarket = null;
+      try {
+        clobMarket = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`);
+      } catch {}
+
+      // Category filter — uses CLOB market_slug + tags (reliable for all market types)
+      if (user.categories && user.categories.length > 0 && clobMarket) {
+        if (!marketMatchesCategories(clobMarket, user.categories)) {
+          logger.info('Skip: category not in filter', { slug: clobMarket.market_slug, cats: user.categories, conditionId: signal.conditionId?.slice(0,10) });
           return;
         }
       }
 
-      const tokenId = signal.tokenId || await getTokenId(signal.conditionId, signal.outcome);
-      logger.info('Token debug', { signalTokenId: signal.tokenId, resolved: tokenId, outcome: signal.outcome, conditionId: signal.conditionId?.slice(0,10) });
+      // TokenId from CLOB data (no extra call needed)
+      const tokenId = signal.tokenId || (() => {
+        const tokens = clobMarket?.tokens || [];
+        const t = tokens.find(tk =>
+          tk.outcome?.toLowerCase() === signal.outcome?.toLowerCase() ||
+          (signal.outcomeIndex != null && tk.outcome_index === signal.outcomeIndex)
+        );
+        return t?.token_id || null;
+      })() || await getTokenId(signal.conditionId, signal.outcome);
+
       if (!tokenId) {
         logger.warn('Skip: token not found', { conditionId: signal.conditionId, outcome: signal.outcome });
         return;
