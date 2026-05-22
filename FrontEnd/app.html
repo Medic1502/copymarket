@@ -892,24 +892,6 @@ async function doWithdraw() {
   } catch(e) { showAlert('withdraw-alert', e.message); }
 }
 
-// ── CATEGORIES ───────────────────────────────────────────────────────────────
-const CATEGORIES = ['Politics','Sports','Crypto','Business','Science','Entertainment','AI','Economics','Global'];
-
-function initCategoryChips() {
-  const c = document.getElementById('category-chips');
-  if (!c) return;
-  c.innerHTML = CATEGORIES.map(cat =>
-    '<button class="btn btn-sm cat-chip" data-cat="' + cat + '" onclick="toggleCat(this)" style="font-size:12px;padding:4px 10px">' + cat + '</button>'
-  ).join('');
-}
-function toggleCat(el) {
-  el.classList.toggle('selected');
-  if (el.classList.contains('selected')) {
-    el.style.background = 'var(--blue)'; el.style.color = '#fff'; el.style.borderColor = 'var(--blue)';
-  } else {
-    el.style.background = ''; el.style.color = ''; el.style.borderColor = '';
-  }
-}
 
 // ── CATEGORY CHIPS ────────────────────────────────────────────────────────────
 const CAT_GROUPS = [

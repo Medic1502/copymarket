@@ -109,13 +109,6 @@ async function getCopyConfig(userId) {
   return res.rows ?? [];
 }
 
-async function setActive(userId, isActive, pausedReason = null) {
-  await query(
-    'UPDATE copy_configs SET is_active = $2, paused_reason = $3, updated_at = NOW() WHERE user_id = $1',
-    [userId, isActive, pausedReason]
-  );
-}
-
 async function setConfigActive(configId, userId, isActive, pausedReason = null) {
   await query(
     'UPDATE copy_configs SET is_active = $3, paused_reason = $4, updated_at = NOW() WHERE id = $1 AND user_id = $2',
@@ -327,12 +320,6 @@ async function updateCopyConfig(id, userId, { nickname, notes, copyMode, copyPer
   return res.rows[0];
 }
 
-async function getTodayLoss(userId) {
-  const res = await query('SELECT COALESCE(SUM(pnl), 0) AS pnl FROM daily_pnl WHERE user_id = $1 AND date = CURRENT_DATE', [userId]);
-  const pnl = parseFloat(res.rows[0].pnl);
-  return pnl < 0 ? Math.abs(pnl) : 0;
-}
-
 async function createLicenseUser(discordUserId, discordUsername) {
   const internalEmail = `discord:${discordUserId}@jonin.internal`;
   const existing = await query('SELECT id FROM users WHERE email = $1', [internalEmail]);
@@ -345,111 +332,12 @@ async function createLicenseUser(discordUserId, discordUsername) {
   return res.rows[0];
 }
 
-// ── AUTO TRADE DB ─────────────────────────────────────────────────────────
-
-async function getAutoTradeConfig(userId) {
-  const r = await query('SELECT * FROM auto_trade_configs WHERE user_id=$1', [userId]);
-  return r.rows[0] || null;
-}
-
-async function saveAutoTradeConfig(userId, { amount, minPrice, duration, assets }) {
-  await query(
-    `INSERT INTO auto_trade_configs (user_id, amount, min_price, duration, assets)
-     VALUES ($1,$2,$3,$4,$5)
-     ON CONFLICT (user_id) DO UPDATE
-     SET amount=$2, min_price=$3, duration=$4, assets=$5, updated_at=NOW()`,
-    [userId, amount, minPrice, duration, assets]
-  );
-}
-
-async function setAutoTradeRunning(userId, running) {
-  await query(
-    `INSERT INTO auto_trade_configs (user_id, running)
-     VALUES ($1,$2)
-     ON CONFLICT (user_id) DO UPDATE SET running=$2, updated_at=NOW()`,
-    [userId, running]
-  );
-}
-
-async function getRunningAutoTradeUsers() {
-  const r = await query('SELECT user_id FROM auto_trade_configs WHERE running=true');
-  return r.rows;
-}
-
-async function upsertAutoTradePosition(userId, { conditionId, outcome, marketName, tokenId, outcomeIndex, price, shares, usdcSpent }) {
-  await query(
-    `INSERT INTO auto_trade_positions
-       (user_id, condition_id, outcome, market_name, token_id, outcome_index, price, shares, usdc_spent)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-     ON CONFLICT (user_id, condition_id, outcome) DO UPDATE
-     SET shares=auto_trade_positions.shares+$8, usdc_spent=auto_trade_positions.usdc_spent+$9, updated_at=NOW()`,
-    [userId, conditionId, outcome, marketName, tokenId, outcomeIndex, price, shares, usdcSpent]
-  );
-}
-
-async function getAutoTradePositions(userId) {
-  const r = await query(
-    'SELECT * FROM auto_trade_positions WHERE user_id=$1 AND resolved_outcome IS NULL',
-    [userId]
-  );
-  return r.rows;
-}
-
-async function resolveAutoTradePosition(userId, conditionId, outcome, resolvedOutcome, resolvedPnl) {
-  await query(
-    `UPDATE auto_trade_positions
-     SET resolved_outcome=$4, resolved_pnl=$5, updated_at=NOW()
-     WHERE user_id=$1 AND condition_id=$2 AND outcome=$3`,
-    [userId, conditionId, outcome, resolvedOutcome, resolvedPnl]
-  );
-}
-
-async function getAutoTradeStats(userId) {
-  const today = new Date().toISOString().slice(0, 10);
-  const r = await query(
-    `SELECT
-       COUNT(*) FILTER (WHERE resolved_outcome IS NOT NULL)                  AS total,
-       COUNT(*) FILTER (WHERE resolved_outcome='WON')                        AS wins,
-       COUNT(*) FILTER (WHERE resolved_outcome='LOST')                       AS losses,
-       COALESCE(SUM(resolved_pnl) FILTER (WHERE resolved_outcome IS NOT NULL), 0) AS total_pnl,
-       COUNT(*) FILTER (WHERE resolved_outcome IS NOT NULL AND updated_at::date = $2::date) AS today_trades,
-       COALESCE(SUM(resolved_pnl) FILTER (WHERE resolved_outcome IS NOT NULL AND updated_at::date = $2::date), 0) AS today_pnl,
-       COUNT(*) FILTER (WHERE resolved_outcome IS NULL)                       AS open
-     FROM auto_trade_positions WHERE user_id=$1`,
-    [userId, today]
-  );
-  return r.rows[0];
-}
-
-async function getAutoTradeRecentTrades(userId, limit = 30) {
-  const r = await query(
-    `SELECT condition_id, outcome, market_name, price, shares, usdc_spent, resolved_outcome, resolved_pnl, updated_at
-     FROM auto_trade_positions WHERE user_id=$1
-     ORDER BY updated_at DESC LIMIT $2`,
-    [userId, limit]
-  );
-  return r.rows.map(t => ({
-    conditionId: t.condition_id,
-    outcome:     t.outcome,
-    marketName:  t.market_name,
-    price:       parseFloat(t.price),
-    shares:      parseFloat(t.shares),
-    usdcSpent:   parseFloat(t.usdc_spent),
-    status:      t.resolved_outcome || 'OPEN',
-    pnl:         t.resolved_pnl != null ? parseFloat(t.resolved_pnl) : null,
-  }));
-}
-
 module.exports = {
   createUser, createLicenseUser, getUserByEmail, getUserById, verifyPassword,
   setConfigActive,
   createWalletForUser, getWalletByUserId, getUSDCBalance,
-  saveCopyConfig, updateCopyConfig, getCopyConfig, setActive, getAllActiveConfigs, deleteCopyConfig,
-  saveTrade, resolveTradeOutcome, getRecentTrades, getDashboardStats, getTodayLoss, getTraderStats,
+  saveCopyConfig, updateCopyConfig, getCopyConfig, setConfigActive, getAllActiveConfigs, deleteCopyConfig,
+  saveTrade, resolveTradeOutcome, getRecentTrades, getDashboardStats, getTraderStats,
   upsertBotPosition, deleteBotPosition, resolveBotPosition, deleteResolvedPosition, getBotPositions, getBotPositionsWithNames, clearBotPositions, clearResolvedPositions, resetTraderStats,
   encryptPrivateKey, decryptPrivateKey,
-  // auto trade
-  getAutoTradeConfig, saveAutoTradeConfig, setAutoTradeRunning, getRunningAutoTradeUsers,
-  upsertAutoTradePosition, getAutoTradePositions, resolveAutoTradePosition,
-  getAutoTradeStats, getAutoTradeRecentTrades,
 };
