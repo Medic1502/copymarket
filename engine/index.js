@@ -590,9 +590,17 @@ async function processSignalForUser(user, wallet, signal, side) {
         return;
       }
 
-      const price = signal.price > 0 ? signal.price : await getBestPrice(tokenId, 0);
+      // Always use current best ask — trader's price may be 15s stale (1 poll cycle)
+      // which is enough for the ask to move and leave a GTC order sitting unfilled.
+      // FOK at current ask fills immediately or cancels cleanly (no ghost entries).
+      const price = await getBestPrice(tokenId, 0);
       if (!price || price <= 0) {
-        logger.warn('Skip: no price', { tokenId, signalPrice: signal.price });
+        logger.warn('Skip: no ask price', { tokenId });
+        return;
+      }
+      // Skip if market moved >20¢ above trader's buy price — opportunity is gone
+      if (signal.price > 0 && price - signal.price > 0.20) {
+        logger.info('Skip: market moved too far', { traderPrice: signal.price, askNow: price, conditionId: signal.conditionId?.slice(0,10) });
         return;
       }
 
@@ -620,21 +628,25 @@ async function processSignalForUser(user, wallet, signal, side) {
         return;
       }
 
-      // Fetch market name and slug for display/links
-      const market = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
-      const marketName = market?.question || market?.title || market?.market_slug || signal.conditionId;
-      const marketSlug = market?.market_slug || null;
+      const marketName = clobMarket?.question || clobMarket?.title || clobMarket?.market_slug || signal.conditionId;
+      const marketSlug = clobMarket?.market_slug || null;
 
-      // GTC for normal prices, FOK only for ≥95¢ (prevents phantom positions near expiry)
+      // FOK always — fills immediately at current ask or cancels cleanly.
+      // No USDC locked in unfilled orders, no ghost entries.
       const { OrderType: OT } = await getClobLib();
-      const chosenOrderType = price >= 0.95 ? OT.FOK : OT.GTC;
+      const chosenOrderType = OT.FOK;
       logger.trade('Placing BUY', { userId: user.id, market: marketName.slice(0,40), price, usdc: usdcToSpend, type: chosenOrderType });
       const result = await placeOrder(wallet, tokenId, 'BUY', price, usdcToSpend, chosenOrderType);
 
-      // FOK: if CLOB accepted but didn't fill (no immediate match), treat as skip
-      if (chosenOrderType === OT.FOK && (!result.orderID || result.status === 'CANCELLED')) {
-        logger.info('FOK order not matched — no sell liquidity at this price, skipping', {
+      // If CLOB didn't confirm the order (no orderID or cancelled) — skip regardless of order type.
+      // Previously this guard was FOK-only, which caused ghost DB entries when GTC orders were
+      // silently rejected/cancelled by the CLOB (no errorMsg but no orderID either).
+      if (!result.orderID || result.status === 'CANCELLED') {
+        logger.warn(chosenOrderType === OT.FOK
+          ? 'FOK order not matched — no sell liquidity at this price, skipping'
+          : 'GTC order cancelled/rejected by CLOB — skipping (no ghost entry)', {
           userId: user.id, price, conditionId: signal.conditionId?.slice(0,10),
+          orderType: chosenOrderType, status: result.status, resultSnippet: JSON.stringify(result).slice(0, 200),
         });
         return;
       }
