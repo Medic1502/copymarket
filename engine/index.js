@@ -503,12 +503,10 @@ async function getClobClient(wallet) {
 
 // side: 'BUY' | 'SELL'
 // amount: USDC to spend (BUY), shares to sell (SELL)
-// orderType: optional override ('GTC' | 'FOK'). Defaults to GTC.
-async function placeOrder(wallet, tokenId, side, price, amount, orderType) {
+async function placeOrder(wallet, tokenId, side, price, amount) {
   const { Side, OrderType } = await getClobLib();
   const client = await getClobClient(wallet);
   const isBuy = side === 'BUY';
-  const size = isBuy ? amount / price : amount;
 
   let tickSize = '0.01';
   try { tickSize = await client.getTickSize(tokenId); } catch {}
@@ -516,7 +514,6 @@ async function placeOrder(wallet, tokenId, side, price, amount, orderType) {
   let negRisk = false;
   try { negRisk = await client.getNegRisk(tokenId); } catch {}
 
-  // Round price to tick size decimal places
   const decimals = tickSize.includes('.') ? tickSize.split('.')[1].length : 2;
   const roundedPrice = parseFloat(price.toFixed(decimals));
   const MIN_SHARES = 5;
@@ -530,8 +527,7 @@ async function placeOrder(wallet, tokenId, side, price, amount, orderType) {
     { tickSize, negRisk }
   );
 
-  const chosenType = orderType ?? OrderType.GTC;
-  const result = await client.postOrder(order, chosenType);
+  const result = await client.postOrder(order, OrderType.GTC);
   if (result.errorMsg) throw new Error(`CLOB rejected: ${result.errorMsg}`);
   if (result.status && result.status >= 400) throw new Error(`CLOB error ${result.status}: ${JSON.stringify(result)}`);
   return result;
@@ -560,48 +556,27 @@ async function processSignalForUser(user, wallet, signal, side) {
         }
       }
 
-      // Fetch CLOB market data once — used for both category check and tokenId lookup.
-      // CLOB has ALL markets (incl. spreads/O/U) and market_slug is always reliable.
-      let clobMarket = null;
-      try {
-        clobMarket = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`);
-      } catch {}
-
-      // Category filter — uses CLOB market_slug + tags (reliable for all market types)
-      if (user.categories && user.categories.length > 0 && clobMarket) {
-        if (!marketMatchesCategories(clobMarket, user.categories)) {
-          logger.info('Skip: category not in filter', { slug: clobMarket.market_slug, cats: user.categories, conditionId: signal.conditionId?.slice(0,10) });
+      // Category filter — uses Gamma market cache (4min TTL, shared across users)
+      if (user.categories && user.categories.length > 0) {
+        const market = await getCachedMarket(signal.conditionId);
+        if (market && !marketMatchesCategories(market, user.categories)) {
+          logger.info('Skip: category not in filter', { cats: user.categories, conditionId: signal.conditionId?.slice(0,10) });
           return;
         }
       }
 
-      // TokenId from CLOB data (no extra call needed)
-      const tokenId = signal.tokenId || (() => {
-        const tokens = clobMarket?.tokens || [];
-        const t = tokens.find(tk =>
-          tk.outcome?.toLowerCase() === signal.outcome?.toLowerCase() ||
-          (signal.outcomeIndex != null && tk.outcome_index === signal.outcomeIndex)
-        );
-        return t?.token_id || null;
-      })() || await getTokenId(signal.conditionId, signal.outcome);
-
+      const tokenId = signal.tokenId || await getTokenId(signal.conditionId, signal.outcome);
+      logger.info('Token debug', { signalTokenId: signal.tokenId, resolved: tokenId, outcome: signal.outcome, conditionId: signal.conditionId?.slice(0,10) });
       if (!tokenId) {
         logger.warn('Skip: token not found', { conditionId: signal.conditionId, outcome: signal.outcome });
         return;
       }
 
-      // Always use current best ask — trader's price may be 15s stale (1 poll cycle)
-      // which is enough for the ask to move and leave a GTC order sitting unfilled.
-      // FOK at current ask fills immediately or cancels cleanly (no ghost entries).
-      const price = await getBestPrice(tokenId, 0);
+      // Use trader's price — copy exact same price they paid
+      const price = signal.price > 0 ? signal.price : await getBestPrice(tokenId, 0);
       if (!price || price <= 0) {
-        logger.warn('Skip: no ask price', { tokenId });
+        logger.warn('Skip: no price', { tokenId, signalPrice: signal.price });
         return;
-      }
-      // Log price delta for observability — no longer skipping since sports markets
-      // legitimately move 20-40¢ between a bet and our 15s poll window
-      if (signal.price > 0 && price > signal.price) {
-        logger.info('Price moved since trader bet', { traderPrice: signal.price, askNow: price, delta: (price - signal.price).toFixed(2), conditionId: signal.conditionId?.slice(0,10) });
       }
 
       // Calculate USDC to spend (fixed amount or % of trader's bet)
@@ -628,26 +603,13 @@ async function processSignalForUser(user, wallet, signal, side) {
         return;
       }
 
-      const marketName = clobMarket?.question || clobMarket?.title || clobMarket?.market_slug || signal.conditionId;
-      const marketSlug = clobMarket?.market_slug || null;
+      // Fetch market name and slug for display/links
+      const market = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
+      const marketName = market?.question || market?.title || market?.market_slug || signal.conditionId;
+      const marketSlug = market?.market_slug || null;
 
-      // GTC at current ask — same as original engine. Buys at ask = immediate fill.
-      const { OrderType: OT } = await getClobLib();
-      const chosenOrderType = OT.GTC;
-      logger.trade('Placing BUY', { userId: user.id, market: marketName.slice(0,40), price, usdc: usdcToSpend, type: chosenOrderType });
-      const result = await placeOrder(wallet, tokenId, 'BUY', price, usdcToSpend, chosenOrderType);
-
-      // If CLOB didn't confirm the order (no orderID or cancelled) — skip regardless of order type.
-      // Previously this guard was FOK-only, which caused ghost DB entries when GTC orders were
-      // silently rejected/cancelled by the CLOB (no errorMsg but no orderID either).
-      if (!result.orderID || result.status === 'CANCELLED') {
-        logger.warn('Order cancelled/rejected by CLOB — skipping', {
-          userId: user.id, price, conditionId: signal.conditionId?.slice(0,10),
-          status: result.status, resultSnippet: JSON.stringify(result).slice(0, 200),
-        });
-        return;
-      }
-
+      logger.trade('Placing BUY', { userId: user.id, market: marketName.slice(0,40), price, usdc: usdcToSpend });
+      const result = await placeOrder(wallet, tokenId, 'BUY', price, usdcToSpend);
       logger.trade('BUY placed', { userId: user.id, orderId: result.orderID, status: result.status });
       const key = snapshotKey(signal);
       const prev = userBought[user.id]?.get(key) || { usdc: 0, shares: 0 };
@@ -689,13 +651,7 @@ async function processSignalForUser(user, wallet, signal, side) {
   } catch (err) {
     logger.error(`${side} failed`, { userId: user.id, conditionId: signal.conditionId, error: err.message });
     if (side === 'BUY') {
-      const errLower = err.message.toLowerCase();
-      const isBalanceErr = errLower.includes('balance') || errLower.includes('allowance') || errLower.includes('insufficient');
-      if (!isBalanceErr) {
-        const failMkt  = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
-        const failName = failMkt?.question || failMkt?.title || failMkt?.market_slug || signal.conditionId;
-        await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName: failName, outcome: signal.outcome, side: 'BUY', size: 0, price: 0, orderId: null, filledSize: null, status: 'FAILED', skipReason: err.message.slice(0, 200), pnl: null, configId: user.configId }).catch(() => {});
-      }
+      await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName: signal.conditionId, outcome: signal.outcome, side: 'BUY', size: 0, price: 0, orderId: null, filledSize: null, status: 'FAILED', skipReason: err.message.slice(0, 200), pnl: null, configId: user.configId }).catch(() => {});
     }
   }
 }
