@@ -466,10 +466,12 @@ async function getClobClient(wallet) {
   let creds;
   try {
     creds = await clientL1.deriveApiKey();
+    if (!creds || !creds.id) throw new Error('deriveApiKey returned empty creds');
     logger.info('API key derived', { wallet: wallet.address.slice(0, 10) });
   } catch {
     try {
       creds = await clientL1.createApiKey();
+      if (!creds || !creds.id) throw new Error('createApiKey returned empty creds');
       logger.info('API key created', { wallet: wallet.address.slice(0, 10) });
     } catch (createErr) {
       throw new Error(`Failed to get CLOB API key: ${createErr.message}`);
@@ -598,10 +600,10 @@ async function processSignalForUser(user, wallet, signal, side) {
         logger.warn('Skip: no ask price', { tokenId });
         return;
       }
-      // Skip if market moved >20¢ above trader's buy price — opportunity is gone
-      if (signal.price > 0 && price - signal.price > 0.20) {
-        logger.info('Skip: market moved too far', { traderPrice: signal.price, askNow: price, conditionId: signal.conditionId?.slice(0,10) });
-        return;
+      // Log price delta for observability — no longer skipping since sports markets
+      // legitimately move 20-40¢ between a bet and our 15s poll window
+      if (signal.price > 0 && price > signal.price) {
+        logger.info('Price moved since trader bet', { traderPrice: signal.price, askNow: price, delta: (price - signal.price).toFixed(2), conditionId: signal.conditionId?.slice(0,10) });
       }
 
       // Calculate USDC to spend (fixed amount or % of trader's bet)
