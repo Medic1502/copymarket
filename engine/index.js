@@ -631,10 +631,9 @@ async function processSignalForUser(user, wallet, signal, side) {
       const marketName = clobMarket?.question || clobMarket?.title || clobMarket?.market_slug || signal.conditionId;
       const marketSlug = clobMarket?.market_slug || null;
 
-      // FOK always — fills immediately at current ask or cancels cleanly.
-      // No USDC locked in unfilled orders, no ghost entries.
+      // GTC at current ask — same as original engine. Buys at ask = immediate fill.
       const { OrderType: OT } = await getClobLib();
-      const chosenOrderType = OT.FOK;
+      const chosenOrderType = OT.GTC;
       logger.trade('Placing BUY', { userId: user.id, market: marketName.slice(0,40), price, usdc: usdcToSpend, type: chosenOrderType });
       const result = await placeOrder(wallet, tokenId, 'BUY', price, usdcToSpend, chosenOrderType);
 
@@ -642,11 +641,9 @@ async function processSignalForUser(user, wallet, signal, side) {
       // Previously this guard was FOK-only, which caused ghost DB entries when GTC orders were
       // silently rejected/cancelled by the CLOB (no errorMsg but no orderID either).
       if (!result.orderID || result.status === 'CANCELLED') {
-        logger.warn(chosenOrderType === OT.FOK
-          ? 'FOK order not matched — no sell liquidity at this price, skipping'
-          : 'GTC order cancelled/rejected by CLOB — skipping (no ghost entry)', {
+        logger.warn('Order cancelled/rejected by CLOB — skipping', {
           userId: user.id, price, conditionId: signal.conditionId?.slice(0,10),
-          orderType: chosenOrderType, status: result.status, resultSnippet: JSON.stringify(result).slice(0, 200),
+          status: result.status, resultSnippet: JSON.stringify(result).slice(0, 200),
         });
         return;
       }
