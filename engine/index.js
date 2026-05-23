@@ -572,10 +572,10 @@ async function processSignalForUser(user, wallet, signal, side) {
         return;
       }
 
-      // Use trader's price — copy exact same price they paid
-      const price = signal.price > 0 ? signal.price : await getBestPrice(tokenId, 0);
+      // Buy at current ask — fills immediately
+      const price = await getBestPrice(tokenId, 0);
       if (!price || price <= 0) {
-        logger.warn('Skip: no price', { tokenId, signalPrice: signal.price });
+        logger.warn('Skip: no ask price', { tokenId });
         return;
       }
 
