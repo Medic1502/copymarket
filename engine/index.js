@@ -458,8 +458,8 @@ async function getClobClient(wallet) {
 
   const viemSigner = await makeViemSigner(wallet.privateKey);
 
-  // Deploy deposit wallet + move USDC there automatically
-  const depositAddr = await ensureDepositWalletReady(wallet);
+  // Derive deposit wallet address (pure computation, no on-chain calls)
+  const depositAddr = await getDepositWalletAddressCached(wallet.address);
 
   // Derive API key first, create only if missing
   const clientL1 = new ClobClient({ host: CLOB_BASE, chain: CHAIN_ID, signer: viemSigner });
