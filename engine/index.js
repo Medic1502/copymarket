@@ -466,12 +466,10 @@ async function getClobClient(wallet) {
   let creds;
   try {
     creds = await clientL1.deriveApiKey();
-    if (!creds || !creds.id) throw new Error('deriveApiKey returned empty creds');
     logger.info('API key derived', { wallet: wallet.address.slice(0, 10) });
   } catch {
     try {
       creds = await clientL1.createApiKey();
-      if (!creds || !creds.id) throw new Error('createApiKey returned empty creds');
       logger.info('API key created', { wallet: wallet.address.slice(0, 10) });
     } catch (createErr) {
       throw new Error(`Failed to get CLOB API key: ${createErr.message}`);
