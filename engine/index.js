@@ -1037,10 +1037,7 @@ async function startCopyEngine(user, targetWallet) {
   // Register config in the shared poll for this target wallet
   activeEngines[user.configId] = targetWallet;
   if (!sharedPolls[targetWallet]) {
-    // 5-minute lookback — catches trades that happened during Railway restart window.
-    // Safe: userBought is pre-populated from bot_positions so already-copied
-    // positions are skipped by the initial_only / maxPositionSize checks.
-    lastActivityTs[targetWallet] = Date.now() - 5 * 60 * 1000;
+    lastActivityTs[targetWallet] = Date.now();
     logger.info('Activity cursor initialized', { targetWallet: targetWallet.slice(0,10), fromTs: lastActivityTs[targetWallet] });
 
     sharedPolls[targetWallet] = {
