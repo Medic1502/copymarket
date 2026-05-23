@@ -610,13 +610,26 @@ async function processSignalForUser(user, wallet, signal, side) {
 
       logger.trade('Placing BUY', { userId: user.id, market: marketName.slice(0,40), price, usdc: usdcToSpend });
       const result = await placeOrder(wallet, tokenId, 'BUY', price, usdcToSpend);
-      logger.trade('BUY placed', { userId: user.id, orderId: result.orderID, status: result.status });
+
+      // Use actual fill amounts from CLOB response (takingAmount=shares, makingAmount=USDC paid)
+      let actualShares = parseFloat(result.takingAmount || '0');
+      let actualUsdc   = parseFloat(result.makingAmount || '0');
+      if (actualShares <= 0 || actualUsdc <= 0) {
+        // Order didn't fill immediately — fall back to estimate
+        actualShares = usdcToSpend / price;
+        actualUsdc   = usdcToSpend;
+      } else if (actualUsdc / actualShares > 1.0) {
+        // Fields are reversed in this CLOB version (makingAmount=shares, takingAmount=USDC)
+        [actualShares, actualUsdc] = [actualUsdc, actualShares];
+      }
+      const actualPrice = actualShares > 0 ? actualUsdc / actualShares : price;
+
+      logger.trade('BUY placed', { userId: user.id, orderId: result.orderID, status: result.status, actualPrice: actualPrice.toFixed(4), actualUsdc: actualUsdc.toFixed(2), actualShares: actualShares.toFixed(4) });
       const key = snapshotKey(signal);
       const prev = userBought[user.id]?.get(key) || { usdc: 0, shares: 0 };
-      const newShares = usdcToSpend / price;
-      userBought[user.id].set(key, { usdc: prev.usdc + usdcToSpend, shares: prev.shares + newShares });
-      await db.upsertBotPosition(user.id, user.configId, signal.conditionId, signal.outcome, usdcToSpend, newShares, signal.outcomeIndex, tokenId, marketName, marketSlug).catch(() => {});
-      await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName, marketSlug, outcome: signal.outcome, side: 'BUY', size: usdcToSpend, price, orderId: result.orderID || null, filledSize: null, status: result.status || 'OPEN', skipReason: null, pnl: null, configId: user.configId });
+      userBought[user.id].set(key, { usdc: prev.usdc + actualUsdc, shares: prev.shares + actualShares });
+      await db.upsertBotPosition(user.id, user.configId, signal.conditionId, signal.outcome, actualUsdc, actualShares, signal.outcomeIndex, tokenId, marketName, marketSlug).catch(() => {});
+      await db.saveTrade(user.id, { conditionId: signal.conditionId, marketName, marketSlug, outcome: signal.outcome, side: 'BUY', size: actualUsdc, price: actualPrice, orderId: result.orderID || null, filledSize: null, status: result.status || 'OPEN', skipReason: null, pnl: null, configId: user.configId });
 
     } else { // SELL
       const key = snapshotKey(signal);
