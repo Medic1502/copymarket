@@ -177,7 +177,7 @@ async function apiFetch(url, opts = {}, timeoutMs = 10_000) {
 
 // Returns recent trade activity sorted newest-first
 async function getRecentActivity(walletAddress) {
-  const data = await apiFetch(`https://data-api.polymarket.com/activity?user=${walletAddress}&limit=500`);
+  const data = await apiFetch(`https://data-api.polymarket.com/activity?user=${walletAddress}&limit=200`);
   const items = Array.isArray(data) ? data : (data.data || data.activity || []);
   return items.map(a => {
     const usdcSize = parseFloat(a.usdcSize || a.usdc_size || a.cashSize || a.amount || 0);
@@ -590,19 +590,11 @@ async function processSignalForUser(user, wallet, signal, side) {
         return;
       }
 
-      // Always use current best ask price — trader's price is stale by copy time.
-      // GTC at old price locks USDC in exchange until cancelled (zombie order).
-      const askPrice = await getBestPrice(tokenId, 0);
-      if (!askPrice || askPrice <= 0) {
-        logger.warn('Skip: no ask price', { tokenId });
+      const price = signal.price > 0 ? signal.price : await getBestPrice(tokenId, 0);
+      if (!price || price <= 0) {
+        logger.warn('Skip: no price', { tokenId, signalPrice: signal.price });
         return;
       }
-      // Skip if market moved too far (>20¢ above trader's price) — opportunity gone
-      if (signal.price > 0 && askPrice - signal.price > 0.20) {
-        logger.info('Skip: market moved too far', { traderPrice: signal.price, askNow: askPrice, conditionId: signal.conditionId?.slice(0,10) });
-        return;
-      }
-      const price = askPrice;
 
       // Calculate USDC to spend (fixed amount or % of trader's bet)
       let usdcToSpend = calcTradeSize(user, signal);
@@ -633,9 +625,9 @@ async function processSignalForUser(user, wallet, signal, side) {
       const marketName = market?.question || market?.title || market?.market_slug || signal.conditionId;
       const marketSlug = market?.market_slug || null;
 
-      // Always FOK — fills immediately at current ask or cancels. No USDC locked.
+      // GTC for normal prices, FOK only for ≥95¢ (prevents phantom positions near expiry)
       const { OrderType: OT } = await getClobLib();
-      const chosenOrderType = OT.FOK;
+      const chosenOrderType = price >= 0.95 ? OT.FOK : OT.GTC;
       logger.trade('Placing BUY', { userId: user.id, market: marketName.slice(0,40), price, usdc: usdcToSpend, type: chosenOrderType });
       const result = await placeOrder(wallet, tokenId, 'BUY', price, usdcToSpend, chosenOrderType);
 
