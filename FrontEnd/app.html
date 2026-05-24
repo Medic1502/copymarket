@@ -1623,10 +1623,10 @@ function renderOpenPositions(traders, positions) {
           const entryRaw   = sharesN > 0 ? (parseFloat(p.usdc_spent) / sharesN) * 100 : 0;
           const entryPrice = entryRaw > 99 ? '~' + Math.round(entryRaw) : Math.round(entryRaw);
           const name       = p.market_name && p.market_name !== p.condition_id ? p.market_name : null;
-          const link       = p.market_slug ? 'https://polymarket.com/event/' + p.market_slug : 'https://polymarket.com/event/' + p.condition_id;
+          const link       = p.market_slug ? 'https://polymarket.com/event/' + p.market_slug : null;
           const nameHtml   = name
-            ? '<a href="' + link + '" target="_blank" style="color:var(--text);text-decoration:none;font-size:12.5px;font-weight:600;line-height:1.3" onclick="event.stopPropagation()">' + name + ' ↗</a>'
-            : '<a href="' + link + '" target="_blank" style="color:var(--text2);text-decoration:none;font-family:monospace;font-size:11px" onclick="event.stopPropagation()">' + (p.condition_id||'').slice(0,14) + '... ↗</a>';
+            ? (link ? '<a href="' + link + '" target="_blank" style="color:var(--text);text-decoration:none;font-size:12.5px;font-weight:600;line-height:1.3" onclick="event.stopPropagation()">' + name + ' ↗</a>' : '<span style="color:var(--text);font-size:12.5px;font-weight:600;line-height:1.3">' + name + '</span>')
+            : (link ? '<a href="' + link + '" target="_blank" style="color:var(--text2);text-decoration:none;font-family:monospace;font-size:11px" onclick="event.stopPropagation()">' + (p.condition_id||'').slice(0,14) + '... ↗</a>' : '<span style="color:var(--text2);font-family:monospace;font-size:11px">' + (p.condition_id||'').slice(0,14) + '...</span>');
           const entryFrac  = sharesN > 0 ? parseFloat(p.usdc_spent) / sharesN : 0;
           const liveSpan   = p.token_id
             ? '<span data-price-token="' + p.token_id + '" data-condition-id="' + p.condition_id + '" data-outcome="' + (p.outcome||'Yes').replace(/"/g,'') + '" data-entry="' + entryFrac.toFixed(4) + '" style="color:var(--text)">—</span>'
@@ -1672,10 +1672,10 @@ function renderOpenPositions(traders, positions) {
             ? '<span style="background:var(--green-dim);color:var(--green);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;flex-shrink:0">WIN</span>'
             : '<span style="background:rgba(239,68,68,.12);color:#ef4444;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;flex-shrink:0">LOSS</span>';
           const name   = p.market_name && p.market_name !== p.condition_id ? p.market_name : null;
-          const link   = p.market_slug ? 'https://polymarket.com/event/' + p.market_slug : 'https://polymarket.com/event/' + p.condition_id;
+          const link   = p.market_slug ? 'https://polymarket.com/event/' + p.market_slug : null;
           const nameHtml = name
-            ? '<a href="' + link + '" target="_blank" style="color:var(--text);text-decoration:none;font-weight:600" onclick="event.stopPropagation()">' + name + ' ↗</a>'
-            : '<a href="' + link + '" target="_blank" style="color:var(--text2);text-decoration:none;font-family:monospace;font-size:11px" onclick="event.stopPropagation()">' + (p.condition_id||'').slice(0,14) + '... ↗</a>';
+            ? (link ? '<a href="' + link + '" target="_blank" style="color:var(--text);text-decoration:none;font-weight:600" onclick="event.stopPropagation()">' + name + ' ↗</a>' : '<span style="color:var(--text);font-weight:600">' + name + '</span>')
+            : (link ? '<a href="' + link + '" target="_blank" style="color:var(--text2);text-decoration:none;font-family:monospace;font-size:11px" onclick="event.stopPropagation()">' + (p.condition_id||'').slice(0,14) + '... ↗</a>' : '<span style="color:var(--text2);font-family:monospace;font-size:11px">' + (p.condition_id||'').slice(0,14) + '...</span>');
           const cid = p.condition_id.replace(/'/g, '');
           const out = (p.outcome||'Yes').replace(/'/g, '');
           const mktName  = (name || p.condition_id || '').replace(/'/g, "\\'");
@@ -2133,7 +2133,7 @@ function renderTradesHtml(trades) {
 
     const entryPrice = !isSkip && t.price ? (parseFloat(t.price)*100).toFixed(1) + '¢' : null;
     const spent      = !isSkip && t.size  ? '$' + parseFloat(t.size).toFixed(2) : null;
-    const polyLink   = t.market_slug ? 'https://polymarket.com/event/' + t.market_slug : (t.condition_id ? 'https://polymarket.com/event/' + t.condition_id : null);
+    const polyLink   = t.market_slug ? 'https://polymarket.com/event/' + t.market_slug : null;
     const meta       = isSkip
       ? (t.skip_reason || 'Skipped')
       : isFail

@@ -215,12 +215,14 @@ async function getTokenId(conditionId, outcome) {
   }
 }
 
-// side: 0 = BUY (look at asks), 1 = SELL (look at bids)
+// side: 0 = BUY (returns lowest ask = real market price), 1 = SELL (returns highest bid)
 async function getBestPrice(tokenId, side) {
   const book = await apiFetch(`${CLOB_BASE}/book?token_id=${tokenId}`);
-  return side === 0
-    ? parseFloat(book.asks?.[0]?.price ?? 0)
-    : parseFloat(book.bids?.[0]?.price ?? 0);
+  if (side === 0) {
+    const prices = (book.asks || []).map(a => parseFloat(a.price)).filter(p => p > 0 && p < 1);
+    return prices.length ? Math.min(...prices) : 0;
+  }
+  return parseFloat(book.bids?.[0]?.price ?? 0);
 }
 
 const USDC_E_ADDRESS = '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'; // USDC.e (legacy)
@@ -516,6 +518,8 @@ async function placeOrder(wallet, tokenId, side, price, amount) {
 
   const decimals = tickSize.includes('.') ? tickSize.split('.')[1].length : 2;
   const roundedPrice = parseFloat(price.toFixed(decimals));
+  // For BUY GTC: limit at max (1 - tickSize) to sweep the book, shares calculated at real market price
+  const orderPrice = isBuy ? parseFloat((1 - parseFloat(tickSize)).toFixed(decimals)) : roundedPrice;
   const MIN_SHARES = 5;
   let sharesSize = isBuy ? amount / roundedPrice : amount;
   if (sharesSize < MIN_SHARES) throw new Error(`Min 5 shares required, have ${sharesSize.toFixed(2)} at price ${roundedPrice}. Increase per-trade amount.`);
@@ -523,7 +527,7 @@ async function placeOrder(wallet, tokenId, side, price, amount) {
 
   const builderCode = process.env.POLY_BUILDER_CODE || null;
   const order = await client.createOrder(
-    { tokenID: tokenId, price: roundedPrice, side: isBuy ? Side.BUY : Side.SELL, size: sharesSize, ...(builderCode ? { builderCode } : {}) },
+    { tokenID: tokenId, price: orderPrice, side: isBuy ? Side.BUY : Side.SELL, size: sharesSize, ...(builderCode ? { builderCode } : {}) },
     { tickSize, negRisk }
   );
 
@@ -604,9 +608,10 @@ async function processSignalForUser(user, wallet, signal, side) {
       }
 
       // Fetch market name and slug for display/links
-      const market = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
-      const marketName = market?.question || market?.title || market?.market_slug || signal.conditionId;
-      const marketSlug = market?.market_slug || null;
+      const market      = await apiFetch(`${CLOB_BASE}/markets/${signal.conditionId}`).catch(() => null);
+      const gammaMarket = await getCachedMarket(signal.conditionId);
+      const marketName  = market?.question || market?.title || market?.market_slug || signal.conditionId;
+      const marketSlug  = gammaMarket?.slug || market?.market_slug || null;
 
       logger.trade('Placing BUY', { userId: user.id, market: marketName.slice(0,40), price, usdc: usdcToSpend });
       const result = await placeOrder(wallet, tokenId, 'BUY', price, usdcToSpend);
@@ -764,16 +769,21 @@ async function checkAndRedeemPositions(user, wallet) {
         if (ourIdx == null && clobTokenIds.length >= 2) {
           const ctfAbi = ['function balanceOf(address,uint256) view returns (uint256)'];
           const ctf = new ethers.Contract(CTF_ADDR, ctfAbi, provider);
-          const [bal0, bal1] = await Promise.all([
-            ctf.balanceOf(depositAddr, BigInt(clobTokenIds[0])).catch(() => 0n),
-            ctf.balanceOf(depositAddr, BigInt(clobTokenIds[1])).catch(() => 0n),
-          ]);
+          let bal0, bal1;
+          try {
+            [bal0, bal1] = await Promise.all([
+              ctf.balanceOf(depositAddr, BigInt(clobTokenIds[0])),
+              ctf.balanceOf(depositAddr, BigInt(clobTokenIds[1])),
+            ]);
+          } catch (e) {
+            logger.warn('CTF balance RPC failed for ourIdx lookup, skipping', { conditionId: conditionId.slice(0, 10), error: e.message?.slice(0, 60) });
+            continue;
+          }
           if (bal0 > 0n) ourIdx = 0;
           else if (bal1 > 0n) ourIdx = 1;
           else {
             // No balance — already redeemed or never filled; clean up
             logger.info('No CTF balance, cleaning up DB position', { conditionId: conditionId.slice(0, 10) });
-            // Use on-chain winner if available, otherwise fall back to Gamma prices
             const onChain = onChainRes ?? await getOnChainResolution(conditionId, provider);
             let cleanOutcome = 'LOST';
             if (onChain.resolved && onChain.winnerIdx != null) {
@@ -797,15 +807,31 @@ async function checkAndRedeemPositions(user, wallet) {
         if (clobTokenIds.length > ourIdx) {
           const ctfGuardAbi = ['function balanceOf(address,uint256) view returns (uint256)'];
           const ctfGuard = new ethers.Contract(CTF_ADDR, ctfGuardAbi, provider);
-          const ctfBal = await ctfGuard.balanceOf(depositAddr, BigInt(clobTokenIds[ourIdx])).catch(() => 0n);
-          if (ctfBal === 0n) {
-            logger.info('No CTF tokens — order unfilled (cancelled at market close), removing phantom position', {
-              userId: user.id, conditionId: conditionId.slice(0, 10), outcome: pos.outcome,
-            });
-            // pnl=0 because USDC was never spent (limit order never matched)
-            await db.resolveBotPosition(user.id, conditionId, pos.outcome, 'LOST', 0).catch(() => {});
-            if (userBought[user.id]) userBought[user.id].delete(`${conditionId}_${pos.outcome}`);
+          let ctfBal;
+          try {
+            ctfBal = await ctfGuard.balanceOf(depositAddr, BigInt(clobTokenIds[ourIdx]));
+          } catch (e) {
+            logger.warn('CTF balance RPC failed, skipping position this cycle', { conditionId: conditionId.slice(0, 10), error: e.message?.slice(0, 60) });
             continue;
+          }
+          if (ctfBal === 0n) {
+            // Check if we actually won — if so, tokens may have been auto-redeemed by Polymarket platform
+            const onChainForGuard = onChainRes ?? await getOnChainResolution(conditionId, provider);
+            if (onChainForGuard.resolved && onChainForGuard.winnerIdx === ourIdx) {
+              // We won and CTF balance is 0 — Polymarket platform likely auto-redeemed our tokens.
+              // Fall through to normal WON settlement below.
+              logger.info('CTF balance 0 but we are winner — platform auto-redeemed, settling as WON', {
+                userId: user.id, conditionId: conditionId.slice(0, 10),
+              });
+            } else {
+              // Genuinely phantom position: order was submitted but never filled (cancelled at close)
+              logger.info('No CTF tokens — order unfilled (cancelled at market close), removing phantom position', {
+                userId: user.id, conditionId: conditionId.slice(0, 10), outcome: pos.outcome,
+              });
+              await db.resolveBotPosition(user.id, conditionId, pos.outcome, 'LOST', 0).catch(() => {});
+              if (userBought[user.id]) userBought[user.id].delete(`${conditionId}_${pos.outcome}`);
+              continue;
+            }
           }
         }
 
